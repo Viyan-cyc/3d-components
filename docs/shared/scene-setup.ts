@@ -4,7 +4,7 @@ import * as THREE from 'three';
  * Minimal Three.js scene setup shared across all demos.
  * Returns everything needed for a render loop.
  */
-export function createScene(canvas: HTMLCanvasElement, bgColor = 0x1a1a2e) {
+export function createScene(canvas: HTMLCanvasElement, bgColor = 0xe8ecf1) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -18,16 +18,16 @@ export function createScene(canvas: HTMLCanvasElement, bgColor = 0x1a1a2e) {
   camera.lookAt(0, 0, 0);
 
   // Ambient + directional light
-  const ambient = new THREE.AmbientLight(0x404060, 1.2);
+  const ambient = new THREE.AmbientLight(0x8899aa, 0.8);
   scene.add(ambient);
 
-  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
   dir.position.set(5, 10, 5);
   dir.castShadow = true;
   scene.add(dir);
 
-  // Ground grid
-  const grid = new THREE.GridHelper(10, 20, 0x333355, 0x222244);
+  // Ground grid — darker for light bg
+  const grid = new THREE.GridHelper(10, 20, 0xccd0d8, 0xdfe2e8);
   scene.add(grid);
 
   // Handle resize

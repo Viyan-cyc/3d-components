@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
+import hljs from 'highlight.js/lib/core';
+import typescript from 'highlight.js/lib/languages/typescript';
+import bash from 'highlight.js/lib/languages/bash';
+import 'highlight.js/styles/github.css';
 import { BaseGroup } from '../src/core/BaseGroup';
 import { HeatMesh } from '../src/heat/HeatMesh';
 import { ShinyMaterial } from '../src/material/ShinyMaterial';
@@ -7,6 +11,9 @@ import { Util } from '../src/utils/index';
 import { createScene, startLoop, addSimpleOrbit } from './shared/scene-setup';
 
 import './style.css';
+
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('bash', bash);
 
 // ===================== SIDEBAR FOLDERS =====================
 document.querySelectorAll<HTMLButtonElement>('.nav-folder').forEach((btn) => {
@@ -83,6 +90,10 @@ function showPage(name: string) {
   document.querySelectorAll('.nav-page').forEach((a) => {
     a.classList.toggle('active', (a as HTMLElement).dataset.page === name);
   });
+
+  // Syntax highlight code blocks on the newly active page
+  const page = document.getElementById(`page-${name}`);
+  if (page) page.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el as HTMLElement));
 
   // Lazy-init demo
   if (!demoInited[name] && name !== 'guide') {
