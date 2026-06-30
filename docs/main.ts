@@ -307,7 +307,6 @@ function initUtilsDemo() {
     <p class="info">Colored by <code>Util.hslToRgb()</code> + <code>Util.clamp()</code>. Drag to orbit.</p>`;
 
   ctrl.querySelector('#sel-util')!.addEventListener('change', (e) => build((e.target as HTMLSelectElement).value));
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); camera.position.multiplyScalar(1 + e.deltaY * 0.001); }, { passive: false });
 
   startLoop(renderer, scene, camera, resize, () => {
     ptGroup.rotation.y += 0.003;
