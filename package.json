@@ -1,0 +1,93 @@
+{
+  "name": "@cyc/3d-components",
+  "version": "0.1.0",
+  "description": "3D component library based on Three.js — general, heat, material components with utility tools",
+  "type": "module",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/es/index.js",
+  "types": "./dist/es/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/es/index.d.ts",
+        "default": "./dist/es/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/es/core.d.ts",
+        "default": "./dist/es/core.js"
+      },
+      "require": {
+        "types": "./dist/cjs/core.d.ts",
+        "default": "./dist/cjs/core.cjs"
+      }
+    },
+    "./heat": {
+      "import": {
+        "types": "./dist/es/heat.d.ts",
+        "default": "./dist/es/heat.js"
+      },
+      "require": {
+        "types": "./dist/cjs/heat.d.ts",
+        "default": "./dist/cjs/heat.cjs"
+      }
+    },
+    "./material": {
+      "import": {
+        "types": "./dist/es/material.d.ts",
+        "default": "./dist/es/material.js"
+      },
+      "require": {
+        "types": "./dist/cjs/material.d.ts",
+        "default": "./dist/cjs/material.cjs"
+      }
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/es/utils.d.ts",
+        "default": "./dist/es/utils.js"
+      },
+      "require": {
+        "types": "./dist/cjs/utils.d.ts",
+        "default": "./dist/cjs/utils.cjs"
+      }
+    },
+    "./dist/*": "./dist/*"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "threejs",
+    "3d",
+    "components",
+    "webgl"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "gsap": ">=3.0.0",
+    "three": ">=0.150.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "gsap": "^3.15.0",
+    "three": "^0.185.0",
+    "typedoc": "^0.28.19",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-dts": "^4.5.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "docs": "typedoc",
+    "docs:serve": "vite docs --open",
+    "prepublishOnly": "npm run build"
+  }
+}

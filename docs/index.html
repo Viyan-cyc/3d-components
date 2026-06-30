@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>@cyc/3d-components — Docs</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h1>@cyc/3d-components</h1>
+    <span class="ver">v0.1.0</span>
+  </div>
+  <div class="search-wrap">
+    <input type="text" id="search" placeholder="Search..." autocomplete="off" />
+  </div>
+  <nav class="nav-tree" id="nav-tree">
+    <a href="#guide" class="nav-item nav-page" data-page="guide">快速开始</a>
+    <div class="nav-divider"></div>
+
+    <div class="nav-group" data-group="core">
+      <button class="nav-folder">通用组件</button>
+      <div class="nav-children">
+        <a href="#basegroup" class="nav-item nav-page" data-page="basegroup">BaseGroup</a>
+      </div>
+    </div>
+    <div class="nav-divider"></div>
+
+    <div class="nav-group" data-group="heat">
+      <button class="nav-folder">热力组件</button>
+      <div class="nav-children">
+        <a href="#heatmesh" class="nav-item nav-page" data-page="heatmesh">HeatMesh</a>
+      </div>
+    </div>
+    <div class="nav-divider"></div>
+
+    <div class="nav-group" data-group="material">
+      <button class="nav-folder">材质组件</button>
+      <div class="nav-children">
+        <a href="#shinymaterial" class="nav-item nav-page" data-page="shinymaterial">ShinyMaterial</a>
+      </div>
+    </div>
+    <div class="nav-divider"></div>
+
+    <div class="nav-group" data-group="utils">
+      <button class="nav-folder">工具 · Util</button>
+      <div class="nav-children">
+        <a href="#utils" class="nav-item nav-page" data-page="utils">概览</a>
+        <span class="nav-label">Math</span>
+        <span class="nav-fn" data-search="clamp">clamp</span>
+        <span class="nav-fn" data-search="lerp">lerp</span>
+        <span class="nav-fn" data-search="mapRange">mapRange</span>
+        <span class="nav-fn" data-search="degToRad">degToRad</span>
+        <span class="nav-fn" data-search="radToDeg">radToDeg</span>
+        <span class="nav-fn" data-search="randomRange">randomRange</span>
+        <span class="nav-fn" data-search="randomInt">randomInt</span>
+        <span class="nav-fn" data-search="distance">distance</span>
+        <span class="nav-fn" data-search="smoothstep">smoothstep</span>
+        <span class="nav-label">Color</span>
+        <span class="nav-fn" data-search="hexToRgb">hexToRgb</span>
+        <span class="nav-fn" data-search="rgbToHex">rgbToHex</span>
+        <span class="nav-fn" data-search="hslToRgb">hslToRgb</span>
+        <span class="nav-fn" data-search="blendColors">blendColors</span>
+        <span class="nav-label">Geometry</span>
+        <span class="nav-fn" data-search="createGrid">createGrid</span>
+        <span class="nav-fn" data-search="createCircle">createCircle</span>
+        <span class="nav-fn" data-search="createSphere">createSphere</span>
+        <span class="nav-fn" data-search="createSpiral">createSpiral</span>
+      </div>
+    </div>
+  </nav>
+</aside>
+
+<!-- ==================== CONTENT AREA ==================== -->
+<main class="content">
+
+  <!-- ===== PAGE: guide ===== -->
+  <div class="page" id="page-guide">
+    <h2>快速开始</h2>
+
+    <h3>安装</h3>
+    <p>本库依赖 <code>three</code> 和 <code>gsap</code>（peer dependencies）:</p>
+    <pre><code>npm install three gsap
+npm install @cyc/3d-components</code></pre>
+
+    <h3>引入方式</h3>
+    <p>支持<strong>整包引入</strong>和<strong>按需引入</strong>（tree-shaking），兼容 ESM / CJS：</p>
+
+    <h4>整包 (ESM)</h4>
+    <pre><code>import { BaseGroup, HeatMesh, ShinyMaterial, Util } from '@cyc/3d-components';</code></pre>
+
+    <h4>按需引入（推荐）</h4>
+    <pre><code>import { BaseGroup } from '@cyc/3d-components/core';
+import { HeatMesh } from '@cyc/3d-components/heat';
+import { ShinyMaterial } from '@cyc/3d-components/material';
+import { Util } from '@cyc/3d-components/utils';</code></pre>
+
+    <h4>CommonJS</h4>
+    <pre><code>const { BaseGroup } = require('@cyc/3d-components/core');
+const { Util } = require('@cyc/3d-components/utils');</code></pre>
+
+    <h3>快速示例</h3>
+    <pre><code>import * as THREE from 'three';
+import { BaseGroup } from '@cyc/3d-components/core';
+import { ShinyMaterial } from '@cyc/3d-components/material';
+
+const widget = new BaseGroup({ name: 'widget', scale: 1.5 });
+widget.add(new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 32, 32),
+  new ShinyMaterial({ color: 0x3366ff, metalness: 0.3 })
+));
+scene.add(widget);</code></pre>
+
+    <h3>模块一览</h3>
+    <table class="pt">
+      <thead><tr><th>子路径</th><th>说明</th><th>主要导出</th></tr></thead>
+      <tbody>
+        <tr><td><code>/core</code></td><td>通用组件</td><td><code>BaseGroup</code> (extends THREE.Group)</td></tr>
+        <tr><td><code>/heat</code></td><td>热力组件</td><td><code>HeatMesh</code> (extends THREE.Mesh)</td></tr>
+        <tr><td><code>/material</code></td><td>材质组件</td><td><code>ShinyMaterial</code> (extends THREE.MeshStandardMaterial)</td></tr>
+        <tr><td><code>/utils</code></td><td>工具类</td><td><code>Util</code> 命名空间 (math/color/geometry)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ========== PAGE: BaseGroup ========== -->
+  <div class="page" id="page-basegroup">
+    <h2>BaseGroup</h2>
+    <span class="tag">extends <code>THREE.Group</code></span>
+    <span class="tag">implements <code>IUpdatable</code>, <code>IDisposable</code></span>
+    <p class="desc">通用 Group 包装器。接受声明式配置，自动处理子节点添加、缩放、资源释放。适合作为所有 group 类组件的基础。</p>
+
+    <!-- Demo -->
+    <div class="demo-card">
+      <canvas id="c-basegroup"></canvas>
+      <div class="demo-ctrl" id="ctrl-basegroup"></div>
+    </div>
+
+    <h3>Constructor</h3>
+    <div class="sig"><span class="kw">new</span> BaseGroup(options?: BaseGroupOptions)</div>
+
+    <h4>Parameters — <code>BaseGroupOptions</code></h4>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+        <tr><td>scale</td><td><code>number</code></td><td>1</td><td>初始缩放 (uniform)</td></tr>
+        <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+        <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+        <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>子节点数组，自动 <code>add()</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Methods</h3>
+    <div class="method">
+      <div class="sig">.update(<strong>delta</strong>: number): void</div>
+      <p>每帧调用。在子类中覆盖实现逐帧行为。默认空操作。</p>
+      <table class="pt">
+        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody><tr><td>delta</td><td><code>number</code></td><td>距上一帧秒数（上限 100ms）</td></tr></tbody>
+      </table>
+    </div>
+    <div class="method">
+      <div class="sig">.dispose(): void</div>
+      <p>释放所有资源。遍历子节点释放 geometry / material，清空 children。覆盖时最后调用 <code>super.dispose()</code>。</p>
+    </div>
+  </div>
+
+  <!-- ========== PAGE: HeatMesh ========== -->
+  <div class="page" id="page-heatmesh">
+    <h2>HeatMesh</h2>
+    <span class="tag">extends <code>THREE.Mesh</code></span>
+    <span class="tag">implements <code>IUpdatable</code>, <code>IDisposable</code></span>
+    <p class="desc">热力图可视化 Mesh。以半透明球体表示热力区域，支持动态强度控制、GSAP 动画、每帧自动脉冲效果。</p>
+
+    <div class="demo-card">
+      <canvas id="c-heatmesh"></canvas>
+      <div class="demo-ctrl" id="ctrl-heatmesh"></div>
+    </div>
+
+    <h3>Constructor</h3>
+    <div class="sig"><span class="kw">new</span> HeatMesh(options?: HeatMeshOptions)</div>
+
+    <h4>Parameters — <code>HeatMeshOptions</code></h4>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+        <tr><td>count</td><td><code>number</code></td><td>64</td><td>球体顶点分辨率</td></tr>
+        <tr><td>radius</td><td><code>number</code></td><td>1</td><td>热力区域半径</td></tr>
+        <tr><td>intensity</td><td><code>number</code></td><td>0.5</td><td>初始强度 0–1</td></tr>
+        <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+        <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Properties</h3>
+    <table class="pt">
+      <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>heatIntensity</td><td><code>number</code></td><td>当前热力强度 0–1</td></tr>
+        <tr><td>heatRadius</td><td><code>number</code></td><td>当前热力半径</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Methods</h3>
+    <div class="method">
+      <div class="sig">.update(<strong>delta</strong>: number): void</div>
+      <p>每帧更新，应用基于 <code>heatIntensity</code> 的脉冲透明度效果。</p>
+    </div>
+    <div class="method">
+      <div class="sig">.setIntensity(<strong>value</strong>: number): <span class="kw">this</span></div>
+      <p>设置热力强度。自动钳制到 0–1。返回 <code>this</code> 支持链式调用。</p>
+      <table class="pt">
+        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody><tr><td>value</td><td><code>number</code></td><td>新强度值，越界自动钳制</td></tr></tbody>
+      </table>
+    </div>
+    <div class="method">
+      <div class="sig">.dispose(): void</div>
+      <p>释放 geometry 和 material。</p>
+    </div>
+  </div>
+
+  <!-- ========== PAGE: ShinyMaterial ========== -->
+  <div class="page" id="page-shinymaterial">
+    <h2>ShinyMaterial</h2>
+    <span class="tag">extends <code>THREE.MeshStandardMaterial</code></span>
+    <p class="desc">预配置的高光 PBR 材质。基于 <code>MeshStandardMaterial</code>，提供合理的金属/粗糙度默认值。所有修改方法支持链式调用。适合产品展示、UI 光泽元素。</p>
+
+    <div class="demo-card">
+      <canvas id="c-shinymaterial"></canvas>
+      <div class="demo-ctrl" id="ctrl-shinymaterial"></div>
+    </div>
+
+    <h3>Constructor</h3>
+    <div class="sig"><span class="kw">new</span> ShinyMaterial(options?: ShinyMaterialOptions)</div>
+
+    <h4>Parameters — <code>ShinyMaterialOptions</code></h4>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0xffffff</td><td>基础颜色 (hex / CSS / THREE.Color)</td></tr>
+        <tr><td>metalness</td><td><code>number</code></td><td>0.1</td><td>金属度 0 (塑料) → 1 (金属)</td></tr>
+        <tr><td>roughness</td><td><code>number</code></td><td>0.2</td><td>粗糙度 0 (镜面) → 1 (磨砂)</td></tr>
+        <tr><td>emissive</td><td><code>ColorRepresentation</code></td><td>0x000000</td><td>自发光颜色</td></tr>
+        <tr><td>emissiveIntensity</td><td><code>number</code></td><td>0</td><td>自发光强度</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Methods</h3>
+    <div class="method">
+      <div class="sig">.setColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+      <p>设置基础颜色。接受 hex、CSS 字符串或 THREE.Color 实例。自动 <code>needsUpdate</code>。</p>
+    </div>
+    <div class="method">
+      <div class="sig">.setShininess(<strong>metalness</strong>: number, <strong>roughness</strong>: number): <span class="kw">this</span></div>
+      <p>同时调整金属度和粗糙度。自动 <code>needsUpdate</code>。</p>
+      <table class="pt">
+        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>metalness</td><td><code>number</code></td><td>金属度 0–1</td></tr>
+          <tr><td>roughness</td><td><code>number</code></td><td>粗糙度 0–1</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== PAGE: Utils ========== -->
+  <div class="page" id="page-utils">
+    <h2>Util</h2>
+    <p class="desc">Math / Color / Geometry 三大类工具函数。通过 <code>Util.xxx()</code> 调用，也支持按名单独导入（tree-shaking）。</p>
+
+    <pre><code>import { Util } from '@cyc/3d-components/utils';
+Util.clamp(5, 0, 10);
+Util.createSphere(2, 500);</code></pre>
+
+    <div class="demo-card">
+      <canvas id="c-utils"></canvas>
+      <div class="demo-ctrl" id="ctrl-utils"></div>
+    </div>
+
+    <h3>Math</h3>
+    <table class="pt">
+      <thead><tr><th>函数签名</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr id="fn-clamp"><td><code>clamp(value, min, max): number</code></td><td>钳制到 [min, max]</td></tr>
+        <tr id="fn-lerp"><td><code>lerp(a, b, t): number</code></td><td>线性插值 (t=0→a, t=1→b)</td></tr>
+        <tr id="fn-mapRange"><td><code>mapRange(v, inMin, inMax, outMin, outMax): number</code></td><td>范围映射</td></tr>
+        <tr id="fn-degToRad"><td><code>degToRad(degrees): number</code></td><td>度 → 弧度</td></tr>
+        <tr id="fn-radToDeg"><td><code>radToDeg(radians): number</code></td><td>弧度 → 度</td></tr>
+        <tr id="fn-randomRange"><td><code>randomRange(min, max): number</code></td><td>[min, max) 随机浮点数</td></tr>
+        <tr id="fn-randomInt"><td><code>randomInt(min, max): number</code></td><td>[min, max] 随机整数</td></tr>
+        <tr id="fn-distance"><td><code>distance(a: Vec3, b: Vec3): number</code></td><td>3D 欧几里得距离</td></tr>
+        <tr id="fn-smoothstep"><td><code>smoothstep(edge0, edge1, x): number</code></td><td>Hermite 平滑插值</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Color</h3>
+    <table class="pt">
+      <thead><tr><th>函数签名</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr id="fn-hexToRgb"><td><code>hexToRgb(hex): ColorRGBA</code></td><td>hex → RGB (0–1)</td></tr>
+        <tr id="fn-rgbToHex"><td><code>rgbToHex(r, g, b): string</code></td><td>RGB (0–255) → "#rrggbb"</td></tr>
+        <tr id="fn-hslToRgb"><td><code>hslToRgb(h, s, l): ColorRGBA</code></td><td>HSL (0–1) → RGB (0–1)</td></tr>
+        <tr id="fn-blendColors"><td><code>blendColors(a, b, t): ColorRGBA</code></td><td>混合颜色 (t=0→a, t=1→b)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Geometry</h3>
+    <table class="pt">
+      <thead><tr><th>函数签名</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr id="fn-createGrid"><td><code>createGrid(rows, cols, spacing): Vec3[]</code></td><td>2D 网格点阵</td></tr>
+        <tr id="fn-createCircle"><td><code>createCircle(radius, segments): Vec3[]</code></td><td>圆环点阵</td></tr>
+        <tr id="fn-createSphere"><td><code>createSphere(radius, count): Vec3[]</code></td><td>Fibonacci 球面分布</td></tr>
+        <tr id="fn-createSpiral"><td><code>createSpiral(turns, ptsPerTurn, radius): Vec3[]</code></td><td>阿基米德螺线</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

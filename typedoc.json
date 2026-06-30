@@ -1,0 +1,18 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "name": "@cyc/3d-components",
+  "includeVersion": true,
+  "readme": "none",
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "categorizeByGroup": true,
+  "searchInComments": true,
+  "sort": ["source-order"]
+}
