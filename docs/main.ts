@@ -5,6 +5,7 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import bash from 'highlight.js/lib/languages/bash';
 import 'highlight.js/styles/github.css';
 import { BaseGroup } from '../src/core/BaseGroup';
+import { Wall } from '../src/core/Wall';
 import { HeatMesh } from '../src/heat/HeatMesh';
 import { ShinyMaterial } from '../src/material/ShinyMaterial';
 import { Util } from '../src/utils/index';
@@ -130,6 +131,7 @@ function initDemo(name: string) {
 
   switch (name) {
     case 'basegroup': initBaseGroupDemo(); break;
+    case 'wall': initWallDemo(); break;
     case 'heatmesh': initHeatMeshDemo(); break;
     case 'shinymaterial': initShinyMaterialDemo(); break;
     case 'utils': initUtilsDemo(); break;
@@ -170,6 +172,96 @@ function initBaseGroupDemo() {
     grp.update(dt);
     grp.rotation.y += dt * 0.5;
   });
+}
+
+// ---- Wall Demo ----
+function initWallDemo() {
+  const canvas = document.getElementById('c-wall') as HTMLCanvasElement;
+  const ctrl = document.getElementById('ctrl-wall')!;
+  const { renderer, scene, camera, resize } = createScene(canvas);
+
+  // Floor to catch wall shadows
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(40, 40),
+    new THREE.MeshStandardMaterial({ color: 0xeef0f3, roughness: 1 }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.01;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  camera.position.set(6.5, 5, 8.5);
+  camera.lookAt(0, 1.2, 0);
+
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xdad3c8, roughness: 0.85, metalness: 0 });
+  // 四个拐角（按 path 顶点顺序）：左前 / 右前 / 右后 / 左后
+  const corners = ['左前', '右前', '右后', '左后'];
+  const params = { height: 2.6, corners: [1, 1, 1, 1], close: true, door: true };
+  let wall: Wall | null = null;
+
+  function rebuild() {
+    if (wall) { scene.remove(wall); wall.dispose(); }
+    // 门洞在第 0 段（前墙 [-3,-2]→[3,-2]）的立面上：沿墙 1.5~2.5m、高 0~2.1m，贯通墙体厚度
+    const hole = params.door
+      ? [{ segment: 0, path: [[1.5, 0], [2.5, 0], [2.5, 2.1], [1.5, 2.1]] as [number, number][], radius: 0.1 }]
+      : [];
+    wall = new Wall({
+      walls: [{
+        // 6×4 矩形房间（围绕原点）
+        path: [[-3, 0, -2], [3, 0, -2], [3, 0, 2], [-3, 0, 2]],
+        width: 0.25,
+        height: params.height,
+        radius: params.corners,           // 每个拐角单独的半径数组
+        radiusSegments: 16,
+        close: params.close,
+        hole,
+      }],
+      material: wallMaterial,
+    });
+    scene.add(wall);
+  }
+  rebuild();
+  addSimpleOrbit(canvas, camera, () => new THREE.Vector3(0, 1.2, 0));
+
+  const cornerSliders = corners
+    .map(
+      (name, i) =>
+        `<label><span>${name}: <code id="v-wall-c${i}">1.00</code></span>` +
+        `<input type="range" class="inp-wall-corner" data-idx="${i}" min="0" max="2" step="0.05" value="1"></label>`,
+    )
+    .join('');
+
+  ctrl.innerHTML = `
+    <label><span>高度 Height: <code id="v-wall-h">2.6</code></span>
+    <input type="range" id="inp-wall-h" min="1" max="4" step="0.1" value="2.6"></label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px">${cornerSliders}</div>
+    <label class="check"><input type="checkbox" id="inp-wall-c" checked>闭合 close</label>
+    <label class="check"><input type="checkbox" id="inp-wall-d" checked>门洞 hole</label>`;
+
+  ctrl.querySelector('#inp-wall-h')!.addEventListener('input', (e) => {
+    params.height = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-wall-h')!.textContent = params.height.toFixed(1);
+    rebuild();
+  });
+  ctrl.querySelectorAll<HTMLInputElement>('.inp-wall-corner').forEach((inp) => {
+    inp.addEventListener('input', (e) => {
+      const t = e.target as HTMLInputElement;
+      const idx = +(t.dataset.idx ?? '0');
+      params.corners[idx] = +t.value;
+      ctrl.querySelector(`#v-wall-c${idx}`)!.textContent = params.corners[idx].toFixed(2);
+      rebuild();
+    });
+  });
+  ctrl.querySelector('#inp-wall-c')!.addEventListener('change', (e) => {
+    params.close = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-wall-d')!.addEventListener('change', (e) => {
+    params.door = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+
+  startLoop(renderer, scene, camera, resize, () => {});
 }
 
 // ---- HeatMesh Demo ----

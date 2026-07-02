@@ -22,21 +22,21 @@ export default defineConfig({
       },
     },
     rollupOptions: {
-      external: ['three', 'gsap'],
+      external: ['three', 'gsap', 'three-bvh-csg', 'three-mesh-bvh'],
       output: [
         {
           format: 'es',
           dir: 'dist/es',
           entryFileNames: '[name].js',
           chunkFileNames: 'shared/[name]-[hash].js',
-          globals: { three: 'THREE', gsap: 'gsap' },
+          globals: { three: 'THREE', gsap: 'gsap', 'three-bvh-csg': 'three-bvh-csg', 'three-mesh-bvh': 'three-mesh-bvh' },
         },
         {
           format: 'cjs',
           dir: 'dist/cjs',
           entryFileNames: '[name].cjs',
           chunkFileNames: 'shared/[name]-[hash].cjs',
-          globals: { three: 'THREE', gsap: 'gsap' },
+          globals: { three: 'THREE', gsap: 'gsap', 'three-bvh-csg': 'three-bvh-csg', 'three-mesh-bvh': 'three-mesh-bvh' },
           exports: 'named',
         },
       ],

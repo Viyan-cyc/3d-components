@@ -19,3 +19,6 @@
  */
 export { BaseGroup } from './BaseGroup';
 export type { BaseGroupOptions } from './BaseGroup';
+
+export { Wall } from './Wall';
+export type { WallOptions, WallData, WallHole, Vec3Tuple } from './Wall';

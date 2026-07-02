@@ -25,6 +25,7 @@
       <button class="nav-folder">通用组件</button>
       <div class="nav-children">
         <a href="#basegroup" class="nav-item nav-page" data-page="basegroup">BaseGroup</a>
+        <a href="#wall" class="nav-item nav-page" data-page="wall">Wall</a>
       </div>
     </div>
     <div class="nav-divider"></div>
@@ -167,6 +168,99 @@ scene.add(widget);</code></pre>
       <div class="sig">.dispose(): void</div>
       <p>释放所有资源。遍历子节点释放 geometry / material，清空 children。覆盖时最后调用 <code>super.dispose()</code>。</p>
     </div>
+  </div>
+
+  <!-- ========== PAGE: Wall ========== -->
+  <div class="page" id="page-wall">
+    <h2>Wall</h2>
+    <span class="tag">extends <code>THREE.Group</code></span>
+    <span class="tag">implements <code>IDisposable</code></span>
+    <p class="desc">墙体绘制组件。接收一组墙体数据，为每面墙生成带<strong>圆角拐角</strong>、可选<strong>墙洞</strong>的挤出几何体。路径定义在 XZ 平面（y 被忽略），墙体从 <code>y = 0</code> 向上生长。适合建筑户型、园区围栏、室内隔墙等场景。</p>
+
+    <!-- Demo -->
+    <div class="demo-card">
+      <canvas id="c-wall"></canvas>
+      <div class="demo-ctrl" id="ctrl-wall"></div>
+    </div>
+
+    <h3>Constructor</h3>
+    <div class="sig"><span class="kw">new</span> Wall(options: WallOptions)</div>
+
+    <h4>Parameters — <code>WallOptions</code></h4>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>walls</td><td><code>WallData[]</code></td><td>—</td><td><strong>必填</strong>。一组墙体数据，每个元素绘制一面墙</td></tr>
+        <tr><td>material</td><td><code>THREE.Material</code></td><td>—</td><td>共享材质（所有墙体复用）。不传则使用默认 <code>MeshStandardMaterial</code></td></tr>
+        <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+        <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+        <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+        <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+      </tbody>
+    </table>
+
+    <h4>Data — <code>WallData</code>（单面墙）</h4>
+    <table class="pt">
+      <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>path</td><td><code>[number, number, number][]</code></td><td>—</td><td>墙体中心线路径，XZ 平面坐标 <code>[x, y, z]</code>（<strong>y 被忽略</strong>）。路径定义走向，墙体按 <code>width</code> 向两侧加厚</td></tr>
+        <tr><td>width</td><td><code>number</code></td><td>—</td><td>墙体厚度（向路径两侧各加厚 <code>width / 2</code>）</td></tr>
+        <tr><td>height</td><td><code>number</code></td><td>—</td><td>墙体高度（沿 Y 轴挤出）</td></tr>
+        <tr><td>radius</td><td><code>number | number[]</code></td><td>0</td><td>拐角圆角半径。数值 ⇒ 所有拐角统一；数组 ⇒ 按 <code>path</code> 顶点索引<strong>逐拐角单独指定</strong>（元素 <code>0</code> = 直角）。小于 <code>width/2</code> 的半径自动按直角处理</td></tr>
+        <tr><td>radiusSegments</td><td><code>number</code></td><td>8</td><td>圆角分段数（越大越圆滑）</td></tr>
+        <tr><td>close</td><td><code>boolean</code></td><td>false</td><td>首尾是否闭合（闭合时形成环形墙体）</td></tr>
+        <tr><td>hole</td><td><code>WallHole[]</code></td><td>—</td><td>墙洞（窗 / 门）列表，画在墙的立面上，按 <code>segment</code> 归属到对应墙段并贯通墙体厚度</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Data — <code>WallHole</code>（单个墙洞 · 窗 / 门）</h4>
+    <p class="desc">墙洞画在墙的<strong>立面</strong>上（沿墙方向 × 高度），沿墙体厚度方向<strong>贯通</strong>。每个墙洞归属于某一段墙体，用该段的局部 2D 坐标描述轮廓。</p>
+    <table class="pt">
+      <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>segment</td><td><code>number</code></td><td>—</td><td>所属墙段索引（段 <code>i</code> = <code>path[i] → path[i+1]</code>）</td></tr>
+        <tr><td>path</td><td><code>[number, number][]</code></td><td>—</td><td>轮廓，该段局部坐标 <code>[x, y]</code>：<code>x</code> = 沿直墙段距离（从段起点计），<code>y</code> = 高度（<code>0</code> 为墙底）。首尾自动闭合</td></tr>
+        <tr><td>radius</td><td><code>number</code></td><td>0</td><td>拐角圆角半径</td></tr>
+        <tr><td>radiusSegments</td><td><code>number</code></td><td>8</td><td>圆角分段数</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Methods</h3>
+    <div class="method">
+      <div class="sig">.dispose(): void</div>
+      <p>释放所有墙体几何体；若材质由本组件创建则一并释放（外部传入的 <code>material</code> 不会被释放）。</p>
+    </div>
+
+    <h3>示例</h3>
+    <pre><code class="language-ts">import { Wall } from '@cyc/3d-components/core';
+
+const wall = new Wall({
+  walls: [
+    {
+      // 闭合矩形房间，带圆角
+      path: [[0, 0, 0], [6, 0, 0], [6, 0, 5], [0, 0, 5]],
+      width: 0.25,
+      height: 3,
+      radius: 1,
+      radiusSegments: 16,
+      close: true,
+      hole: [
+        // 第 0 段（[0,0,0]→[6,0,0]）上的一扇门：沿墙 2~4m、高 0~2.1m
+        { segment: 0, path: [[2, 0], [4, 0], [4, 2.1], [2, 2.1]] },
+        // 第 1 段（[6,0,0]→[6,0,5]）上的一扇窗：沿墙 1.5~3.5m、离地 1~1.8m
+        { segment: 1, path: [[1.5, 1], [3.5, 1], [3.5, 1.8], [1.5, 1.8]], radius: 0.15 },
+      ],
+    },
+    {
+      // 开放隔墙，圆角拐角（首尾不闭合）
+      path: [[-2, 0, 8], [2, 0, 8], [2, 0, 11]],
+      width: 0.2,
+      height: 2.5,
+      radius: 0.8,
+    },
+  ],
+});
+scene.add(wall);</code></pre>
   </div>
 
   <!-- ========== PAGE: HeatMesh ========== -->

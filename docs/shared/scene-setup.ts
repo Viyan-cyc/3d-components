@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /**
  * Minimal Three.js scene setup shared across all demos.
@@ -78,86 +79,26 @@ export function startLoop(
   };
 }
 
-/** Orbit-like rotation around Y axis via pointer drag + wheel zoom */
+/**
+ * Orbit controls — a thin wrapper around three.js' built-in `OrbitControls`.
+ *
+ * - Left drag      → orbit (yaw + pitch)
+ * - Right drag     → pan
+ * - Wheel / pinch  → dolly zoom
+ *
+ * Returns the `OrbitControls` instance so callers can tweak it further.
+ * (Enable `controls.enableDamping` and call `controls.update()` in the render
+ * loop if you want inertia.)
+ */
 export function addSimpleOrbit(
   canvas: HTMLCanvasElement,
   camera: THREE.Object3D,
   getTarget?: () => THREE.Vector3,
-) {
-  let mode: 'none' | 'rotate' | 'pan' = 'none';
-  let prevX = 0;
-  let prevY = 0;
-  const t0 = getTarget?.() ?? new THREE.Vector3(0, 0, 0);
-  let angle = Math.atan2(camera.position.z - t0.z, camera.position.x - t0.x);
-  const target = () => getTarget?.() ?? t0;
-  const MIN_DIST = 0.5;
-  const MAX_DIST = 30;
-
-  // Prevent right-click context menu on canvas
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  canvas.addEventListener('pointerdown', (e) => {
-    prevX = e.clientX;
-    prevY = e.clientY;
-    // Right button or Shift+left → pan; left button → rotate
-    if (e.button === 2 || e.shiftKey) {
-      mode = 'pan';
-      canvas.style.cursor = 'grabbing';
-    } else if (e.button === 0) {
-      mode = 'rotate';
-    }
-  });
-
-  window.addEventListener('pointerup', () => {
-    mode = 'none';
-    canvas.style.cursor = '';
-  });
-
-  window.addEventListener('pointermove', (e) => {
-    if (mode === 'none') return;
-    const dx = e.clientX - prevX;
-    const dy = e.clientY - prevY;
-    prevX = e.clientX;
-    prevY = e.clientY;
-
-    if (mode === 'rotate') {
-      angle += dx * 0.005;
-
-      const t = target();
-      const dxz = camera.position.x - t.x;
-      const dz = camera.position.z - t.z;
-      const r = Math.sqrt(dxz * dxz + dz * dz);
-      camera.position.x = t.x + Math.cos(angle) * r;
-      camera.position.z = t.z + Math.sin(angle) * r;
-      camera.lookAt(t);
-    } else if (mode === 'pan') {
-      const t = target();
-      const dist = camera.position.distanceTo(t);
-      const speed = dist * 0.002;
-
-      // Camera-local axes in world space
-      const forward = new THREE.Vector3();
-      camera.getWorldDirection(forward);
-      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-
-      const offset = right.multiplyScalar(-dx * speed).add(up.multiplyScalar(dy * speed));
-      camera.position.add(offset);
-      // Also move target so orbit stays centered on same world point
-      if (!getTarget) t0.add(offset);
-      camera.lookAt(target());
-    }
-  });
-
-  // Wheel / pinch zoom
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const t = target();
-    const dir = camera.position.clone().sub(t);
-    const dist = dir.length();
-    const zoom = 1 + e.deltaY * 0.001;
-    const newDist = Math.max(MIN_DIST, Math.min(MAX_DIST, dist * zoom));
-    dir.normalize().multiplyScalar(newDist);
-    camera.position.copy(t).add(dir);
-  }, { passive: false });
+): OrbitControls {
+  const controls = new OrbitControls(camera as THREE.Camera, canvas);
+  controls.target.copy(getTarget?.() ?? new THREE.Vector3(0, 0, 0));
+  controls.minDistance = 0.5;
+  controls.maxDistance = 30;
+  controls.update();
+  return controls;
 }
