@@ -1,0 +1,42 @@
+<div class="page">
+  <h2>ShinyMaterial</h2>
+  <span class="tag">extends <code>THREE.MeshStandardMaterial</code></span>
+  <p class="desc">预配置的高光 PBR 材质。基于 <code>MeshStandardMaterial</code>，提供合理的金属/粗糙度默认值。所有修改方法支持链式调用。适合产品展示、UI 光泽元素。</p>
+
+  <div class="demo-card">
+    <canvas id="c-shinymaterial"></canvas>
+    <div class="demo-ctrl" id="ctrl-shinymaterial"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> ShinyMaterial(options?: ShinyMaterialOptions)</div>
+
+  <h4>Parameters — <code>ShinyMaterialOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0xffffff</td><td>基础颜色 (hex / CSS / THREE.Color)</td></tr>
+      <tr><td>metalness</td><td><code>number</code></td><td>0.1</td><td>金属度 0 (塑料) → 1 (金属)</td></tr>
+      <tr><td>roughness</td><td><code>number</code></td><td>0.2</td><td>粗糙度 0 (镜面) → 1 (磨砂)</td></tr>
+      <tr><td>emissive</td><td><code>ColorRepresentation</code></td><td>0x000000</td><td>自发光颜色</td></tr>
+      <tr><td>emissiveIntensity</td><td><code>number</code></td><td>0</td><td>自发光强度</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置基础颜色。接受 hex、CSS 字符串或 THREE.Color 实例。自动 <code>needsUpdate</code>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setShininess(<strong>metalness</strong>: number, <strong>roughness</strong>: number): <span class="kw">this</span></div>
+    <p>同时调整金属度和粗糙度。自动 <code>needsUpdate</code>。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>metalness</td><td><code>number</code></td><td>金属度 0–1</td></tr>
+        <tr><td>roughness</td><td><code>number</code></td><td>粗糙度 0–1</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

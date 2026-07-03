@@ -1,0 +1,110 @@
+<div class="page">
+  <h2>Grid</h2>
+  <span class="tag">extends <code>THREE.Mesh</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">无限参考网格。基于屏幕空间四边形 + 着色器实现（移植自 t3d.js <code>InfiniteGridShader</code>），把整屏四边形反投影成世界射线、与网格平面求交来绘制<strong>无边界</strong>网格——无论相机如何移动或拉远，网格始终铺满屏幕。写入 <code>gl_FragDepth</code>，能被场景中的物体正确遮挡。自带主 / 次双层网格、坐标轴高亮（X 红、Z/Y 蓝）与距离淡出。</p>
+
+  <div class="demo-card">
+    <canvas id="c-grid"></canvas>
+    <div class="demo-ctrl" id="ctrl-grid"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Grid(options?: GridOptions)</div>
+
+  <h4>Parameters — <code>GridOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>primaryScale</td><td><code>number</code></td><td>5</td><td>主网格（粗线）间距缩放，每隔该距离一条粗线</td></tr>
+      <tr><td>secondaryScale</td><td><code>number</code></td><td>1</td><td>次级网格（细线）间距缩放，叠加在主网格上形成细分</td></tr>
+      <tr><td>showAxis</td><td><code>boolean</code></td><td>true</td><td>是否显示坐标轴高亮（X 轴 + Z/Y 轴）。关闭后仅显示普通网格</td></tr>
+      <tr><td>primaryFade</td><td><code>number</code></td><td>0.7</td><td>主网格淡出系数，乘到主网格线条 alpha 上</td></tr>
+      <tr><td>secondaryFade</td><td><code>number</code></td><td>0.4</td><td>次级网格淡出系数，乘到次级网格线条 alpha 上</td></tr>
+      <tr><td>linearFade</td><td><code>boolean</code></td><td>true</td><td>是否启用基于相机距离的线性淡出（远处网格逐渐消失）</td></tr>
+      <tr><td>fadeStart</td><td><code>number</code></td><td>30</td><td>线性淡出起始距离（世界单位），小于该距离不淡出</td></tr>
+      <tr><td>fadeEnd</td><td><code>number</code></td><td>100</td><td>线性淡出结束距离（世界单位），大于该距离完全透明</td></tr>
+      <tr><td>plane</td><td><code>'xz' | 'xy'</code></td><td>'xz'</td><td>网格平面：<code>'xz'</code> 水平地面（Y=0），<code>'xy'</code> 面向 +Z 的立面（Z=0）</td></tr>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0x333333</td><td>网格线颜色（直接决定最终线色，颜色越深线越暗）</td></tr>
+      <tr><td>xAxisColor</td><td><code>ColorRepresentation</code></td><td>0xff0000</td><td>X 轴高亮颜色</td></tr>
+      <tr><td>zAxisColor</td><td><code>ColorRepresentation</code></td><td>0x0000ff</td><td>Z 轴（地面模式）/ Y 轴（立面模式）高亮颜色</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>plane</td><td><code>'xz' | 'xy'</code></td><td>当前网格平面（只读，用 <code>setPlane()</code> 修改）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setPlane(<strong>plane</strong>: 'xz' | 'xy', <strong>animate</strong>?: boolean): <span class="kw">this</span></div>
+    <p>切换网格平面。<code>'xz'</code> → 地面，<code>'xy'</code> → 立面。默认用 GSAP 平滑过渡（约 0.6s），传 <code>animate = false</code> 立即切换。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setPrimaryScale(<strong>scale</strong>: number): <span class="kw">this</span></div>
+    <p>设置主网格间距。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setSecondaryScale(<strong>scale</strong>: number): <span class="kw">this</span></div>
+    <p>设置次级网格间距。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setShowAxis(<strong>show</strong>: boolean): <span class="kw">this</span></div>
+    <p>开关坐标轴高亮。<code>false</code> 时仅显示普通网格。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置网格线颜色（hex / CSS 字符串 / <code>THREE.Color</code>）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setXAxisColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置 X 轴高亮颜色。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setZAxisColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置 Z 轴（地面模式）/ Y 轴（立面模式）高亮颜色。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setFade(<strong>start</strong>: number, <strong>end</strong>: number): <span class="kw">this</span></div>
+    <p>设置线性淡出起止距离。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setLinearFade(<strong>enabled</strong>: boolean): <span class="kw">this</span></div>
+    <p>开启 / 关闭距离淡出。通过编译宏 <code>USE_LINEARFADE</code> 控制，切换时重新编译着色器（一次性开销）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.onBeforeRender(renderer, scene, camera): void</div>
+    <p>由 Three.js 渲染前自动调用，按当前相机刷新反投影矩阵。<strong>无需手动调用</strong>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放 geometry 与 material，并终止进行中的 GSAP 补间。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Grid } from '@cyc/3d-components/core';
+
+// 作为无限地面参考网，自定义网格与坐标轴颜色
+const grid = new Grid({
+  primaryScale: 5,
+  secondaryScale: 1,
+  color: '#9aa7b8',       // 网格线颜色
+  xAxisColor: 0xff5555,   // X 轴
+  zAxisColor: 0x55aaff,   // Z / Y 轴
+});
+scene.add(grid);
+
+// 运行时调整样式（所有 setter 链式调用）
+grid.setShowAxis(false).setLinearFade(true).setFade(20, 80);
+grid.setColor('#ffffff').setXAxisColor('red');
+
+// 平滑切换到 2D 立面网格（GSAP 动画）
+grid.setPlane('xy');</code></pre>
+</div>

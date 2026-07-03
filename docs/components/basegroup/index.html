@@ -1,0 +1,41 @@
+<div class="page">
+  <h2>BaseGroup</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IUpdatable</code>, <code>IDisposable</code></span>
+  <p class="desc">通用 Group 包装器。接受声明式配置，自动处理子节点添加、缩放、资源释放。适合作为所有 group 类组件的基础。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-basegroup"></canvas>
+    <div class="demo-ctrl" id="ctrl-basegroup"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> BaseGroup(options?: BaseGroupOptions)</div>
+
+  <h4>Parameters — <code>BaseGroupOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>scale</td><td><code>number</code></td><td>1</td><td>初始缩放 (uniform)</td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>子节点数组，自动 <code>add()</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>: number): void</div>
+    <p>每帧调用。在子类中覆盖实现逐帧行为。默认空操作。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>delta</td><td><code>number</code></td><td>距上一帧秒数（上限 100ms）</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有资源。遍历子节点释放 geometry / material，清空 children。覆盖时最后调用 <code>super.dispose()</code>。</p>
+  </div>
+</div>

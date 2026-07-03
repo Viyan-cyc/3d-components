@@ -183,9 +183,10 @@ body {
   padding: 28px 36px 56px;
 }
 
-.page { display: none; }
-.page.active { display: block; }
-.page { max-width: 960px; }
+/* #page-host 一次只承载一个 .page 片段（由 main.ts 按 hash 动态加载），
+   无需再靠 .active class 切换显隐。 */
+#page-host .page { display: block; }
+#page-host .page { max-width: 960px; }
 
 h2 {
   font-size: 22px;

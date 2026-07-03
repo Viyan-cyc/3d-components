@@ -1,0 +1,47 @@
+<div class="page">
+  <h2>快速开始</h2>
+
+  <h3>安装</h3>
+  <p>本库依赖 <code>three</code> 和 <code>gsap</code>（peer dependencies）:</p>
+  <pre><code class="language-bash">npm install three gsap
+npm install @cyc/3d-components</code></pre>
+
+  <h3>引入方式</h3>
+  <p>支持<strong>整包引入</strong>和<strong>按需引入</strong>（tree-shaking），兼容 ESM / CJS：</p>
+
+  <h4>整包 (ESM)</h4>
+  <pre><code class="language-ts">import { BaseGroup, HeatMesh, ShinyMaterial, Util } from '@cyc/3d-components';</code></pre>
+
+  <h4>按需引入（推荐）</h4>
+  <pre><code class="language-ts">import { BaseGroup } from '@cyc/3d-components/core';
+import { HeatMesh } from '@cyc/3d-components/heat';
+import { ShinyMaterial } from '@cyc/3d-components/material';
+import { Util } from '@cyc/3d-components/utils';</code></pre>
+
+  <h4>CommonJS</h4>
+  <pre><code class="language-ts">const { BaseGroup } = require('@cyc/3d-components/core');
+const { Util } = require('@cyc/3d-components/utils');</code></pre>
+
+  <h3>快速示例</h3>
+  <pre><code class="language-ts">import * as THREE from 'three';
+import { BaseGroup } from '@cyc/3d-components/core';
+import { ShinyMaterial } from '@cyc/3d-components/material';
+
+const widget = new BaseGroup({ name: 'widget', scale: 1.5 });
+widget.add(new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 32, 32),
+  new ShinyMaterial({ color: 0x3366ff, metalness: 0.3 })
+));
+scene.add(widget);</code></pre>
+
+  <h3>模块一览</h3>
+  <table class="pt">
+    <thead><tr><th>子路径</th><th>说明</th><th>主要导出</th></tr></thead>
+    <tbody>
+      <tr><td><code>/core</code></td><td>通用组件</td><td><code>BaseGroup</code> (extends THREE.Group)</td></tr>
+      <tr><td><code>/heat</code></td><td>热力组件</td><td><code>HeatMesh</code> (extends THREE.Mesh)</td></tr>
+      <tr><td><code>/material</code></td><td>材质组件</td><td><code>ShinyMaterial</code> (extends THREE.MeshStandardMaterial)</td></tr>
+      <tr><td><code>/utils</code></td><td>工具类</td><td><code>Util</code> 命名空间 (math/color/geometry)</td></tr>
+    </tbody>
+  </table>
+</div>

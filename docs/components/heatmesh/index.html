@@ -1,0 +1,54 @@
+<div class="page">
+  <h2>HeatMesh</h2>
+  <span class="tag">extends <code>THREE.Mesh</code></span>
+  <span class="tag">implements <code>IUpdatable</code>, <code>IDisposable</code></span>
+  <p class="desc">热力图可视化 Mesh。以半透明球体表示热力区域，支持动态强度控制、GSAP 动画、每帧自动脉冲效果。</p>
+
+  <div class="demo-card">
+    <canvas id="c-heatmesh"></canvas>
+    <div class="demo-ctrl" id="ctrl-heatmesh"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> HeatMesh(options?: HeatMeshOptions)</div>
+
+  <h4>Parameters — <code>HeatMeshOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>count</td><td><code>number</code></td><td>64</td><td>球体顶点分辨率</td></tr>
+      <tr><td>radius</td><td><code>number</code></td><td>1</td><td>热力区域半径</td></tr>
+      <tr><td>intensity</td><td><code>number</code></td><td>0.5</td><td>初始强度 0–1</td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>heatIntensity</td><td><code>number</code></td><td>当前热力强度 0–1</td></tr>
+      <tr><td>heatRadius</td><td><code>number</code></td><td>当前热力半径</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>: number): void</div>
+    <p>每帧更新，应用基于 <code>heatIntensity</code> 的脉冲透明度效果。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setIntensity(<strong>value</strong>: number): <span class="kw">this</span></div>
+    <p>设置热力强度。自动钳制到 0–1。返回 <code>this</code> 支持链式调用。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>value</td><td><code>number</code></td><td>新强度值，越界自动钳制</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放 geometry 和 material。</p>
+  </div>
+</div>
