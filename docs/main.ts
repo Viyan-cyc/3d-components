@@ -6,6 +6,7 @@ import bash from 'highlight.js/lib/languages/bash';
 import 'highlight.js/styles/github.css';
 import { BaseGroup } from '../src/core/BaseGroup';
 import { Wall } from '../src/core/Wall';
+import { Path } from '../src/core/Path';
 import { HeatMesh } from '../src/heat/HeatMesh';
 import { ShinyMaterial } from '../src/material/ShinyMaterial';
 import { Util } from '../src/utils/index';
@@ -132,6 +133,7 @@ function initDemo(name: string) {
   switch (name) {
     case 'basegroup': initBaseGroupDemo(); break;
     case 'wall': initWallDemo(); break;
+    case 'path': initPathDemo(); break;
     case 'heatmesh': initHeatMeshDemo(); break;
     case 'shinymaterial': initShinyMaterialDemo(); break;
     case 'utils': initUtilsDemo(); break;
@@ -174,6 +176,49 @@ function initBaseGroupDemo() {
   });
 }
 
+/**
+ * 程序生成一面「窗户」贴图：墙底色 + 一扇带窗框 / 中梃的窗。
+ * 画布纵向按墙高设计：窗台约在 35% 墙高、窗顶约在 81% 墙高（建筑常规比例）。
+ * repeat 模式下 `repeat.y = 1 / height`，让一个 tile 恰好铺满整墙高度 → 窗位始终正确。
+ */
+function makeWindowTexture(): THREE.CanvasTexture {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d')!;
+  // 墙体底色
+  ctx.fillStyle = '#e6ddca';
+  ctx.fillRect(0, 0, s, s);
+  // 窗户区域（画布 y 从顶部算；窗顶 0.19s、窗台 0.65s ≈ 墙高 81% / 35%）
+  const winLeft = s * 0.12;
+  const winRight = s * 0.88;
+  const winTop = s * 0.19;
+  const winBottom = s * 0.65;
+  const w = winRight - winLeft;
+  const h = winBottom - winTop;
+  // 玻璃（自上而下渐变）
+  const grad = ctx.createLinearGradient(0, winTop, 0, winBottom);
+  grad.addColorStop(0, '#aacbe0');
+  grad.addColorStop(1, '#6e94ad');
+  ctx.fillStyle = grad;
+  ctx.fillRect(winLeft, winTop, w, h);
+  // 中梃（十字分格）
+  ctx.strokeStyle = '#e6ddca';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(winLeft + w / 2, winTop); ctx.lineTo(winLeft + w / 2, winBottom);
+  ctx.moveTo(winLeft, winTop + h / 2); ctx.lineTo(winRight, winTop + h / 2);
+  ctx.stroke();
+  // 窗框
+  ctx.strokeStyle = '#5b5246';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(winLeft, winTop, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 // ---- Wall Demo ----
 function initWallDemo() {
   const canvas = document.getElementById('c-wall') as HTMLCanvasElement;
@@ -194,9 +239,13 @@ function initWallDemo() {
   camera.lookAt(0, 1.2, 0);
 
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xdad3c8, roughness: 0.85, metalness: 0 });
+  const wallTexture = makeWindowTexture();
   // 四个拐角（按 path 顶点顺序）：左前 / 右前 / 右后 / 左后
   const corners = ['左前', '右前', '右后', '左后'];
-  const params = { height: 2.6, corners: [1, 1, 1, 1], close: true, door: true };
+  const params = {
+    height: 2.6, corners: [1, 1, 1, 1], close: true, door: true,
+    texture: true, uvMode: 'repeat' as 'repeat' | 'stretch',
+  };
   let wall: Wall | null = null;
 
   function rebuild() {
@@ -214,10 +263,25 @@ function initWallDemo() {
         radius: params.corners,           // 每个拐角单独的半径数组
         radiusSegments: 16,
         close: params.close,
+        uvMode: params.uvMode,            // repeat=按米平铺 / stretch=一张铺满
         hole,
       }],
       material: wallMaterial,
     });
+    // 贴图：repeat 模式下 u/v 为米，一个窗模块 = 1.5m 宽 × 整墙高；
+    // stretch 模式下 u/v 已归一化，一张贴图铺满整面墙。
+    if (params.texture) {
+      wallTexture.repeat.set(
+        params.uvMode === 'stretch' ? 1 : 1 / 1.5,
+        params.uvMode === 'stretch' ? 1 : 1 / params.height,
+      );
+      wallMaterial.map = wallTexture;
+      wallMaterial.color.set(0xffffff);
+    } else {
+      wallMaterial.map = null;
+      wallMaterial.color.set(0xdad3c8);
+    }
+    wallMaterial.needsUpdate = true;
     scene.add(wall);
   }
   rebuild();
@@ -236,7 +300,13 @@ function initWallDemo() {
     <input type="range" id="inp-wall-h" min="1" max="4" step="0.1" value="2.6"></label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px">${cornerSliders}</div>
     <label class="check"><input type="checkbox" id="inp-wall-c" checked>闭合 close</label>
-    <label class="check"><input type="checkbox" id="inp-wall-d" checked>门洞 hole</label>`;
+    <label class="check"><input type="checkbox" id="inp-wall-d" checked>门洞 hole</label>
+    <label class="check"><input type="checkbox" id="inp-wall-t" checked>贴图 texture</label>
+    <label><span>UV:</span>
+      <select id="sel-wall-uv">
+        <option value="repeat" selected>repeat · 按米平铺</option>
+        <option value="stretch">stretch · 铺满整墙</option>
+      </select></label>`;
 
   ctrl.querySelector('#inp-wall-h')!.addEventListener('input', (e) => {
     params.height = +(e.target as HTMLInputElement).value;
@@ -258,6 +328,184 @@ function initWallDemo() {
   });
   ctrl.querySelector('#inp-wall-d')!.addEventListener('change', (e) => {
     params.door = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-wall-t')!.addEventListener('change', (e) => {
+    params.texture = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#sel-wall-uv')!.addEventListener('change', (e) => {
+    params.uvMode = (e.target as HTMLSelectElement).value as 'repeat' | 'stretch';
+    rebuild();
+  });
+
+  startLoop(renderer, scene, camera, resize, () => {});
+}
+
+// ---- Path Demo ----
+// 路径数据：2D Hilbert 曲线，移植自 t3d.js geometry_builder_lines 示例的 CurveUtils.hilbert2D。
+// 参考：https://github.com/uinosoft/t3d.js/blob/dev/examples/geometry_builder_lines.html
+
+type Pt = [number, number, number];
+
+/** 2D Hilbert 曲线（点落在 y = cy 的 XZ 平面上）。移植自 t3d CurveUtils.hilbert2D。 */
+function hilbert2D(cx: number, cy: number, cz: number, size: number, iter: number,
+  v0: number, v1: number, v2: number, v3: number): Pt[] {
+  const half = size / 2;
+  const vec_s: Pt[] = [
+    [cx - half, cy, cz - half],
+    [cx - half, cy, cz + half],
+    [cx + half, cy, cz + half],
+    [cx + half, cy, cz - half],
+  ];
+  const vec = [vec_s[v0], vec_s[v1], vec_s[v2], vec_s[v3]];
+  if (--iter >= 0) {
+    return [
+      ...hilbert2D(vec[0][0], vec[0][1], vec[0][2], half, iter, v0, v3, v2, v1),
+      ...hilbert2D(vec[1][0], vec[1][1], vec[1][2], half, iter, v0, v1, v2, v3),
+      ...hilbert2D(vec[2][0], vec[2][1], vec[2][2], half, iter, v0, v1, v2, v3),
+      ...hilbert2D(vec[3][0], vec[3][1], vec[3][2], half, iter, v2, v1, v0, v3),
+    ];
+  }
+  return vec;
+}
+
+/**
+ * 程序化贴图：棋盘底 + 中央指向 +U 的箭头。
+ * repeat 模式下沿路径反复平铺（能看到多个小箭头），stretch 模式下一张铺满整条路径（一个大箭头）。
+ * wrapS = RepeatWrapping：Path 在 repeat 模式下 u 会超过 1，靠它自动平铺。
+ */
+function makePathTexture(): THREE.Texture {
+  const s = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#4a90e2'; ctx.fillRect(0, 0, s, s);
+  ctx.fillStyle = '#cfe0f7';
+  const n = 4;
+  const cell = s / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if ((x + y) % 2 === 0) ctx.fillRect(x * cell, y * cell, cell, cell);
+  // 中央箭头（指向 +U = 沿路径方向）
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(s * 0.72, s * 0.5);
+  ctx.lineTo(s * 0.3, s * 0.28);
+  ctx.lineTo(s * 0.3, s * 0.72);
+  ctx.closePath();
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function initPathDemo() {
+  const canvas = document.getElementById('c-path') as HTMLCanvasElement;
+  const ctrl = document.getElementById('ctrl-path')!;
+  const { renderer, scene, camera, resize } = createScene(canvas);
+
+  camera.position.set(5, 4.5, 7);
+  camera.lookAt(0, 1, 0);
+
+  // 共享材质（外部传入，dispose 时不会被 Path 释放）
+  const pathMaterial = new THREE.MeshStandardMaterial({ color: 0x4a90e2, roughness: 0.45, metalness: 0.1 });
+
+  // 演示路径数据：2D Hilbert 曲线（XZ 平面），参考 t3d geometry_builder_lines 示例。
+  const basePoints = hilbert2D(0, 0, 0, 4, 1, 0, 1, 2, 3);
+
+  const params = {
+    mode: 'tube' as 'tube' | 'plane',
+    bevelRadius: 0.5,
+    size: 0.2,          // tube=radius / plane=width
+    close: false,
+    sharp: true,
+    arrow: false,
+    caps: true,
+  };
+  let path: Path | null = null;
+
+  function rebuild() {
+    if (path) { scene.remove(path); path.dispose(); }
+    path = new Path({
+      paths: [{
+        path: basePoints,
+        mode: params.mode,
+        bevelRadius: params.bevelRadius,
+        close: params.close,
+        up: [0, 1, 0],
+        ...(params.mode === 'tube'
+          ? {
+              radius: params.size,
+              radialSegments: 12,
+              generateStartCap: params.caps,
+              generateEndCap: params.caps,
+            }
+          : {
+              width: params.size,
+              side: 'both' as const,
+              sharp: params.sharp,
+              arrow: params.arrow,
+            }),
+      }],
+      material: pathMaterial,
+    });
+    scene.add(path);
+  }
+  rebuild();
+  addSimpleOrbit(canvas, camera, () => new THREE.Vector3(0, 1, 0));
+
+  ctrl.innerHTML = `
+    <label><span>模式 Mode:</span>
+      <select id="sel-p-mode">
+        <option value="tube" selected>tube · 圆管</option>
+        <option value="plane">plane · 扁平带</option>
+      </select></label>
+    <label><span>圆角 bevelRadius: <code id="v-p-bev">0.50</code></span>
+      <input type="range" id="inp-p-bev" min="0" max="1.2" step="0.05" value="0.5"></label>
+    <label><span>尺寸 size: <code id="v-p-size">0.20</code></span>
+      <input type="range" id="inp-p-size" min="0.05" max="0.6" step="0.01" value="0.2"></label>
+    <label class="check"><input type="checkbox" id="inp-p-close">闭合 close</label>
+    <label class="check"><input type="checkbox" id="inp-p-sharp" checked>锐角修补 sharp <em>(plane)</em></label>
+    <label class="check"><input type="checkbox" id="inp-p-arrow">末端箭头 arrow <em>(plane)</em></label>
+    <label class="check"><input type="checkbox" id="inp-p-caps" checked>封盖 caps <em>(tube)</em></label>`;
+
+  function updateDisabled() {
+    const plane = params.mode === 'plane';
+    (ctrl.querySelector('#inp-p-sharp') as HTMLInputElement).disabled = !plane;
+    (ctrl.querySelector('#inp-p-arrow') as HTMLInputElement).disabled = !plane;
+    (ctrl.querySelector('#inp-p-caps') as HTMLInputElement).disabled = plane;
+  }
+  updateDisabled();
+
+  ctrl.querySelector('#sel-p-mode')!.addEventListener('change', (e) => {
+    params.mode = (e.target as HTMLSelectElement).value as 'tube' | 'plane';
+    updateDisabled();
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-bev')!.addEventListener('input', (e) => {
+    params.bevelRadius = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-p-bev')!.textContent = params.bevelRadius.toFixed(2);
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-size')!.addEventListener('input', (e) => {
+    params.size = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-p-size')!.textContent = params.size.toFixed(2);
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-close')!.addEventListener('change', (e) => {
+    params.close = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-sharp')!.addEventListener('change', (e) => {
+    params.sharp = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-arrow')!.addEventListener('change', (e) => {
+    params.arrow = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-caps')!.addEventListener('change', (e) => {
+    params.caps = (e.target as HTMLInputElement).checked;
     rebuild();
   });
 

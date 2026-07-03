@@ -26,6 +26,7 @@
       <div class="nav-children">
         <a href="#basegroup" class="nav-item nav-page" data-page="basegroup">BaseGroup</a>
         <a href="#wall" class="nav-item nav-page" data-page="wall">Wall</a>
+        <a href="#path" class="nav-item nav-page" data-page="path">Path</a>
       </div>
     </div>
     <div class="nav-divider"></div>
@@ -261,6 +262,104 @@ const wall = new Wall({
   ],
 });
 scene.add(wall);</code></pre>
+  </div>
+
+  <!-- ========== PAGE: Path ========== -->
+  <div class="page" id="page-path">
+    <h2>Path</h2>
+    <span class="tag">extends <code>THREE.Group</code></span>
+    <span class="tag">implements <code>IDisposable</code></span>
+    <p class="desc">路径绘制组件。把一组 3D 顶点先经「直线段 + 二次贝塞尔圆角」构造曲线，再经 Frenet 标架采样，最后扫掠成<strong>管道（tube）</strong>或<strong>扁平带（plane）</strong>两种几何体。算法移植自 t3d.js 的 <code>CurvePath3</code> / <code>TubeBuilder</code> / <code>RouteBuilder</code>。适合管线、电路走线、路网导航带、3D 路径动画轨道等场景。</p>
+
+    <!-- Demo -->
+    <div class="demo-card">
+      <canvas id="c-path"></canvas>
+      <div class="demo-ctrl" id="ctrl-path"></div>
+    </div>
+    <p class="desc">上方 demo 的路径数据采用 <strong>2D Hilbert 曲线</strong>（移植自 t3d.js <code>CurveUtils.hilbert2D</code>），参考 <a href="https://github.com/uinosoft/t3d.js/blob/dev/examples/geometry_builder_lines.html" target="_blank">t3d geometry_builder_lines</a> 示例。</p>
+
+    <h3>Constructor</h3>
+    <div class="sig"><span class="kw">new</span> Path(options: PathOptions)</div>
+
+    <h4>Parameters — <code>PathOptions</code></h4>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>paths</td><td><code>PathData[]</code></td><td>—</td><td><strong>必填</strong>。一组路径数据，每个元素生成一条管道或扁平带</td></tr>
+        <tr><td>material</td><td><code>THREE.Material</code></td><td>—</td><td>共享材质（所有路径复用）。不传则使用默认 <code>MeshStandardMaterial</code>（<code>dispose()</code> 时一并释放）</td></tr>
+        <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+        <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+        <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+        <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+      </tbody>
+    </table>
+
+    <h4>Data — <code>PathData</code>（单条路径）</h4>
+    <table class="pt">
+      <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>path</td><td><code>[number, number, number][]</code></td><td>—</td><td><strong>必填</strong>。路径顶点（3D）。相邻重复点自动去重；少于 2 个有效点时该条跳过</td></tr>
+        <tr><td>mode</td><td><code>'tube' | 'plane'</code></td><td>'tube'</td><td>生成模式：<code>'tube'</code> = 圆管扫掠；<code>'plane'</code> = 扁平带状面</td></tr>
+        <tr><td>bevelRadius</td><td><code>number</code></td><td>0</td><td>拐角圆角半径。<code>&gt; 0</code> 时拐角用二次贝塞尔曲线倒圆角；<code>0</code> 时为纯折线（直角拐角）</td></tr>
+        <tr><td>close</td><td><code>boolean</code></td><td>false</td><td>路径是否自动闭合（首尾相连成环，需 ≥ 3 个顶点）</td></tr>
+        <tr><td>up</td><td><code>[number, number, number]</code></td><td>—</td><td>up 向量，决定标架法向（进而决定平面带朝向与管道截面起始朝向）。不传则用 Frenet 自动选取（与 three.js <code>TubeGeometry</code> 一致）</td></tr>
+        <tr><td>divisions</td><td><code>number</code></td><td>12</td><td>非直线段（贝塞尔曲线）的采样分段数</td></tr>
+        <tr><td>uvMode</td><td><code>'repeat' | 'stretch'</code></td><td>'repeat'</td><td>贴图沿路径方向的映射：<code>'repeat'</code> = 按物理长度平铺（<code>u = 弧长 / 截面周长或带宽</code>，配合 <code>RepeatWrapping</code> 可重复贴图）；<code>'stretch'</code> = 一张贴图从头铺到尾（<code>u</code> 归一化到 <code>[0,1]</code>）</td></tr>
+        <tr><td colspan="4" style="font-weight:600;background:#f4f6f9">tube 模式专用</td></tr>
+        <tr><td>radius</td><td><code>number</code></td><td>0.1</td><td>管道半径（≤ 0 时该条跳过）</td></tr>
+        <tr><td>radialSegments</td><td><code>number</code></td><td>8</td><td>圆周分段数（越大越圆滑，最小 2）</td></tr>
+        <tr><td>startRad</td><td><code>number</code></td><td>0</td><td>截面起始角偏移（弧度）</td></tr>
+        <tr><td>generateStartCap</td><td><code>boolean</code></td><td>false</td><td>是否生成起点封盖（需 <code>radialSegments ≥ 3</code>）</td></tr>
+        <tr><td>generateEndCap</td><td><code>boolean</code></td><td>false</td><td>是否生成终点封盖（需 <code>radialSegments ≥ 3</code>）</td></tr>
+        <tr><td colspan="4" style="font-weight:600;background:#f4f6f9">plane 模式专用</td></tr>
+        <tr><td>width</td><td><code>number</code></td><td>0.1</td><td>带宽（≤ 0 时该条跳过）</td></tr>
+        <tr><td>side</td><td><code>'both' | 'left' | 'right'</code></td><td>'both'</td><td>带相对中心线的偏侧：<code>'both'</code> 居中、<code>'left'</code> / <code>'right'</code> 仅一侧</td></tr>
+        <tr><td>sharp</td><td><code>boolean</code></td><td>false</td><td>是否在锐角拐角做几何修补（避免带面撕裂）</td></tr>
+        <tr><td>arrow</td><td><code>boolean</code></td><td>false</td><td>末端是否生成箭头</td></tr>
+      </tbody>
+    </table>
+
+    <div class="method">
+      <p class="desc"><strong>关于 UV：</strong>管道的 <code>v</code> 沿圆周 <code>[0,1]</code>，<code>u</code> 沿路径方向；扁平带的 <code>v</code> 沿带宽 <code>[0,1]</code>，<code>u</code> 沿路径方向。<code>uvMode</code> 只影响 <code>u</code>。<code>'repeat'</code> 模式下若要贴图重复，需把材质贴图的 <code>wrapS</code> 设为 <code>THREE.RepeatWrapping</code>。</p>
+    </div>
+
+    <h3>Methods</h3>
+    <div class="method">
+      <div class="sig">.dispose(): void</div>
+      <p>释放所有路径几何体；若材质由本组件创建则一并释放（外部传入的 <code>material</code> 不会被释放）。</p>
+    </div>
+
+    <h3>示例</h3>
+    <pre><code class="language-ts">import { Path } from '@cyc/3d-components/core';
+
+// 3D 折线 → 圆管（拐角倒圆角 + 起终点封盖）
+const tube = new Path({
+  paths: [{
+    path: [[0,0,0],[3,0,0],[3,3,0],[0,3,0]],
+    mode: 'tube', bevelRadius: 0.5, radius: 0.15,
+    generateStartCap: true, generateEndCap: true,
+  }],
+});
+scene.add(tube);
+
+// 2D 折线 → 扁平带（锐角修补 + 末端箭头）
+const route = new Path({
+  paths: [{
+    path: [[0,0,0],[3,0,0],[3,0,3],[0,0,3]],
+    mode: 'plane', bevelRadius: 0, width: 0.5,
+    side: 'both', sharp: true, arrow: true, up: [0,1,0],
+  }],
+});
+scene.add(route);
+
+// 闭合环形管道（首尾自动相连，标架同步）
+const ring = new Path({
+  paths: [{
+    path: [[2,0,0],[0,0,2],[-2,0,0],[0,0,-2]],
+    mode: 'tube', close: true, radius: 0.1, radialSegments: 12,
+  }],
+});
+scene.add(ring);</code></pre>
   </div>
 
   <!-- ========== PAGE: HeatMesh ========== -->

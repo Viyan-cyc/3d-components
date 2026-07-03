@@ -22,3 +22,6 @@ export type { BaseGroupOptions } from './BaseGroup';
 
 export { Wall } from './Wall';
 export type { WallOptions, WallData, WallHole, Vec3Tuple } from './Wall';
+
+export { Path } from './Path';
+export type { PathOptions, PathData, PathMode } from './Path';
