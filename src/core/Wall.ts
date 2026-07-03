@@ -57,6 +57,20 @@ export interface WallData {
   radiusSegments?: number;
   /** 墙体首尾是否闭合（闭合时形成环形墙体）。 @default false */
   close?: boolean;
+  /**
+   * 墙面贴图的 UV 映射方式（参考 {@link Path} 的 `uvMode`）。
+   *
+   * 默认 `ExtrudeGeometry` 的 UV 来自墙体俯视轮廓的 2D 形状坐标，与墙面毫无关系——
+   * 贴上去的纹理（砖墙 / 窗户）会被任意拉伸错位。本组件会重算 UV，让纹理沿墙长、墙高铺贴：
+   *  - `'repeat'`（默认）= 按物理尺寸平铺：`u = 沿墙弧长(米)`、`v = 墙高(米)`。
+   *    一个 UV 单位 = 1 米，配合 `THREE.RepeatWrapping` 与 `texture.repeat` 即可重复贴图
+   *    （如整面砖墙、一排等距窗户）。
+   *  - `'stretch'` = 一张贴图铺满整面墙：`u` 归一化到 `[0,1]`（沿整段墙长）、`v = y / height`。
+   *
+   * 墙洞（窗 / 门）由 CSG 挖出，其表面 UV 由布尔运算插值继承，贴图会在开口周围连续过渡。
+   * @default 'repeat'
+   */
+  uvMode?: 'repeat' | 'stretch';
   /** 墙洞（窗户 / 门）列表，按 `segment` 归属到对应墙段，贯通墙体厚度。 */
   hole?: WallHole[];
 }
@@ -215,6 +229,80 @@ function toShape2D(p: Vec3Tuple): V2 {
 }
 
 /**
+ * 重算墙体 UV，让纹理沿墙长（u = 圆角中心线弧长）向上铺贴（v = 世界高度），
+ * 与 {@link Path} 的 `'repeat'` / `'stretch'` 两种 uv 模式一致。
+ *
+ * 默认 `ExtrudeGeometry` 的 UV 来自俯视轮廓的 2D 形状坐标，与墙面没有对应关系，
+ * 贴图会被任意拉伸。把每个顶点投影到中心线、取其弧长作为 u，能得到稳定可预期的映射：
+ *  - `'repeat'`：`u` = 沿墙距离（米）、`v` = 墙高（米），用 `texture.repeat` + `RepeatWrapping` 平铺；
+ *  - `'stretch'`：`u`、`v` 归一化到 `[0,1]`，一张贴图铺满整面墙。
+ *
+ * `samples` 为圆角中心线（shape space `(x, -z)`）；该空间下距离与世界 XZ 距离一致（纯反射）。
+ * three-bvh-csg 的 Evaluator 默认会插值 `uv` 属性，因此 CSG 挖出的墙洞会继承这些 UV，
+ * 贴图在开口周围连续过渡。
+ */
+function applyWallUV(
+  geo: THREE.BufferGeometry,
+  samples: V2[],
+  height: number,
+  uvMode: 'repeat' | 'stretch',
+  closed: boolean,
+): void {
+  const posAttr = geo.getAttribute('position');
+  const uvAttr = geo.getAttribute('uv');
+  if (!posAttr || !uvAttr) return;
+
+  const m = samples.length;
+  if (m < 2) return;
+
+  // 各段长度 + 累积弧长（闭合时含末段→首段的回环段）。
+  const segLen = new Float64Array(m);
+  for (let i = 0; i < m - 1; i++) segLen[i] = samples[i].distanceTo(samples[i + 1]);
+  if (closed) segLen[m - 1] = samples[m - 1].distanceTo(samples[0]);
+  const cum = new Float64Array(m);
+  for (let i = 1; i < m; i++) cum[i] = cum[i - 1] + segLen[i - 1];
+  const totalLen = closed ? cum[m - 1] + segLen[m - 1] : cum[m - 1];
+
+  const uScale = uvMode === 'stretch' ? totalLen || 1 : 1; // repeat → 原始米数
+  const vScale = uvMode === 'stretch' ? height || 1 : 1;
+
+  const segCount = closed ? m : m - 1;
+  const count = posAttr.count;
+  for (let i = 0; i < count; i++) {
+    // 世界顶点 (x, y, z) → 中心线 shape space (x, -z)。
+    const qx = posAttr.getX(i);
+    const qy = -posAttr.getZ(i);
+
+    // 投影到最近的中心线段 → 弧长参数。
+    let bestDist = Infinity;
+    let bestArc = 0;
+    for (let s = 0; s < segCount; s++) {
+      const a = samples[s];
+      const b = samples[(s + 1) % m];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 > EPS ? ((qx - a.x) * dx + (qy - a.y) * dy) / len2 : 0;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      const px = a.x + dx * t;
+      const py = a.y + dy * t;
+      const dd = (px - qx) * (px - qx) + (py - qy) * (py - qy);
+      if (dd < bestDist) {
+        bestDist = dd;
+        bestArc = cum[s] + t * segLen[s];
+      }
+    }
+
+    const u = bestArc / uScale;
+    const vWorld = posAttr.getY(i);
+    const v = uvMode === 'stretch' ? vWorld / vScale : vWorld;
+    uvAttr.setXY(i, u, v);
+  }
+  uvAttr.needsUpdate = true;
+}
+
+/**
  * Build the wall BODY as a single water-tight extruded footprint: the rounded thick-stroke
  * outline of the centerline (closed ⇒ outer rail + inner rail hole; open ⇒ single outline),
  * extruded upward by `height`. Smooth rounded corners, crisp edges, no seams.
@@ -271,6 +359,8 @@ function buildBodyGeometry(data: WallData, radius: number | number[], radiusSegm
 
   const geo = new THREE.ExtrudeGeometry(shape, { depth: data.height, bevelEnabled: false, steps: 1 });
   geo.rotateX(-Math.PI / 2); // shape space (x, -z, height) → world (x, height, z)
+  // 用沿墙长 / 墙高的 UV 覆盖 ExtrudeGeometry 默认的俯视轮廓 UV（墙洞经 CSG 插值继承）。
+  applyWallUV(geo, samples, data.height, data.uvMode ?? 'repeat', close);
   return geo;
 }
 
@@ -366,6 +456,8 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
  * - 墙体路径定义在 XZ 平面（y 被忽略），从 `y = 0` 向上生长至 `y = height`
  * - 每个拐角按 `radius` / `radiusSegments` 倒圆角；`close = true` 时形成环形墙体
  * - 支持每段独立的墙洞（{@link WallHole}，窗 / 门），按段局部坐标描述并贯通墙体厚度
+ * - UV 沿墙长（u）/ 墙高（v）重算，支持 `uvMode: 'repeat' | 'stretch'`，便于整面贴图（砖墙 / 窗户）；
+ *   墙洞经 CSG 挖出后贴图在开口周围连续过渡
  * - 所有墙体共享同一材质；未传入材质时使用默认 `MeshStandardMaterial`
  * - 实现 {@link IDisposable} —— `dispose()` 释放全部几何体（自建材质一并释放）
  *

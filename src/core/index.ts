@@ -25,3 +25,5 @@ export type { WallOptions, WallData, WallHole, Vec3Tuple } from './Wall';
 
 export { Grid } from './Grid';
 export type { GridOptions, GridPlane } from './Grid';
+export { Path } from './Path';
+export type { PathOptions, PathData, PathMode } from './Path';

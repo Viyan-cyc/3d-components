@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sL \"https://raw.githubusercontent.com/uinosoft/t3d.js/dev/examples/geometry_builder_lines.html\" -o /tmp/gbl.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/uinosoft/t3d.js/dev/examples/jsm/math/curves/CurveUtils.js\" -o /tmp/CurveUtils.js)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(npx --no-install playwright --version)"
+    ]
+  }
+}
