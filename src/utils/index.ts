@@ -65,3 +65,8 @@ export const Util = {
 export * from './math';
 export * from './color';
 export * from './geometry';
+
+// Font / SDF utilities
+export { DynamicFont } from './dynamicFont';
+export type { DynamicFontOptions, FontData, FontChar } from './dynamicFont';
+export { DistanceTransform } from './distanceTransform';

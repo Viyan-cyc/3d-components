@@ -1,0 +1,163 @@
+<div class="page">
+  <h2>BitmapText</h2>
+  <span class="tag">extends <code>THREE.Mesh</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">SDF 位图文字组件。基于 Canvas 2D 在运行时栅格化字符，经 <code>DistanceTransform</code> 生成 Signed Distance Field 图集，用自定义 GLSL 着色器渲染——任意缩放不锯齿，自带阴影、描边、CJK 自动换行。移植自 t3d.js <code>BitmapTextMaterial</code> + <code>DynamicFont</code>，无需字体文件或第三方插件。</p>
+
+  <div class="demo-card">
+    <canvas id="c-bitmaptext"></canvas>
+    <div class="demo-ctrl" id="ctrl-bitmaptext"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> BitmapText(options?: BitmapTextOptions)</div>
+
+  <h4>Parameters — <code>BitmapTextOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">文本内容</td></tr>
+      <tr><td>text</td><td><code>string</code></td><td>''</td><td>要渲染的文字字符串</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">字体选项（传入 DynamicFont）</td></tr>
+      <tr><td>fontSize</td><td><code>number</code></td><td>72</td><td>字体大小（像素），决定 SDF 精度</td></tr>
+      <tr><td>fontFamily</td><td><code>string</code></td><td>'sans-serif'</td><td>CSS font-family</td></tr>
+      <tr><td>fontWeight</td><td><code>string</code></td><td>'normal'</td><td>CSS font-weight</td></tr>
+      <tr><td>fontStyle</td><td><code>string</code></td><td>'normal'</td><td>CSS font-style</td></tr>
+      <tr><td>atlasWidth</td><td><code>number</code></td><td>2048</td><td>SDF 图集宽度</td></tr>
+      <tr><td>atlasHeight</td><td><code>number</code></td><td>2048</td><td>SDF 图集高度</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">排版</td></tr>
+      <tr><td>width</td><td><code>number</code></td><td>1000</td><td>最大行宽（字体单位），超出自动换行</td></tr>
+      <tr><td>mode</td><td><code>'nowrap' | 'pre' | 'word-wrapper'</code></td><td>'word-wrapper'</td><td>换行模式：<code>'nowrap'</code> 不换行，<code>'pre'</code> 保留空白与换行，<code>'word-wrapper'</code> 英文按词换行 / CJK 逐字换行</td></tr>
+      <tr><td>align</td><td><code>'left' | 'center' | 'right'</code></td><td>'left'</td><td>文本对齐</td></tr>
+      <tr><td>letterSpacing</td><td><code>number</code></td><td>0</td><td>字符间距（字体单位）</td></tr>
+      <tr><td>lineHeight</td><td><code>number</code></td><td>fontSize</td><td>行高（字体单位）</td></tr>
+      <tr><td>baseline</td><td><code>number</code></td><td>fontSize × 0.8</td><td>基线偏移（字体单位）</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">SDF 渲染</td></tr>
+      <tr><td>halo</td><td><code>number</code></td><td>0.75</td><td>SDF 阈值，控制笔画粗细</td></tr>
+      <tr><td>gamma</td><td><code>number</code></td><td>1</td><td>SDF 平滑度，越大越模糊</td></tr>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0xffffff</td><td>文字颜色</td></tr>
+      <tr><td>opacity</td><td><code>number</code></td><td>1</td><td>不透明度（0–1）</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">阴影 Shadow</td></tr>
+      <tr><td>shadow</td><td><code>boolean</code></td><td>false</td><td>是否启用投影</td></tr>
+      <tr><td>shadowColor</td><td><code>ColorRepresentation</code></td><td>0x4d4d4d</td><td>投影颜色</td></tr>
+      <tr><td>shadowOffset</td><td><code>[number, number]</code></td><td>[0.001, -0.001]</td><td>投影 UV 偏移 [x, y]</td></tr>
+      <tr><td>shadowGamma</td><td><code>number</code></td><td>1</td><td>投影平滑度</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">描边 Outline</td></tr>
+      <tr><td>outline</td><td><code>boolean</code></td><td>false</td><td>是否启用描边</td></tr>
+      <tr><td>outlineColor</td><td><code>ColorRepresentation</code></td><td>0xff0000</td><td>描边颜色</td></tr>
+      <tr><td>outlineWidth</td><td><code>number</code></td><td>0.05</td><td>描边宽度（SDF 单位）</td></tr>
+      <tr><td>outlineGamma</td><td><code>number</code></td><td>1</td><td>描边平滑度</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">其他</td></tr>
+      <tr><td>billboard</td><td><code>boolean</code></td><td>false</td><td>文字始终朝向相机</td></tr>
+      <tr><td>scale</td><td><code>number</code></td><td>0.01</td><td>世界空间缩放系数</td></tr>
+      <tr><td>centerX</td><td><code>number</code></td><td>0.5</td><td>水平居中偏移（0–1），0.5 = 居中</td></tr>
+      <tr><td>centerY</td><td><code>number</code></td><td>0.5</td><td>垂直居中偏移（0–1），0.5 = 居中</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>text</td><td><code>string</code></td><td>当前文字内容（只读，用 <code>setText()</code> 修改）</td></tr>
+      <tr><td>font</td><td><code>DynamicFont</code></td><td>底层 DynamicFont 实例（只读）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setText(<strong>text</strong>: string): <span class="kw">this</span></div>
+    <p>更新文字内容。若遇到图集中不存在的字符会自动增量添加到图集并刷新纹理。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setLayout(<strong>params</strong>: Partial&lt;LayoutOptions&gt;): <span class="kw">this</span></div>
+    <p>更新排版参数并重建几何体。<code>params</code> 可包含 <code>width</code>、<code>mode</code>、<code>align</code>、<code>letterSpacing</code>、<code>lineHeight</code>、<code>baseline</code>、<code>centerX</code>、<code>centerY</code>。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置文字颜色。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOpacity(<strong>opacity</strong>: number): <span class="kw">this</span></div>
+    <p>设置不透明度（0–1）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setHalo(<strong>halo</strong>: number): <span class="kw">this</span></div>
+    <p>设置 SDF 阈值（halo），控制笔画粗细。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setGamma(<strong>gamma</strong>: number): <span class="kw">this</span></div>
+    <p>设置 SDF 平滑度（gamma），越大越模糊。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setShadow(<strong>enabled</strong>: boolean): <span class="kw">this</span></div>
+    <p>开关投影。切换 <code>USE_SHADOW</code> 宏，首次启用需重新编译着色器（一次性开销）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setShadowParams(<strong>color</strong>, <strong>offsetX</strong>, <strong>offsetY</strong>, <strong>gamma</strong>): <span class="kw">this</span></div>
+    <p>设置投影颜色、UV 偏移 [x, y]、平滑度。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOutline(<strong>enabled</strong>: boolean): <span class="kw">this</span></div>
+    <p>开关描边。切换 <code>USE_OUTLINE</code> 宏，首次启用需重新编译着色器（一次性开销）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOutlineParams(<strong>color</strong>, <strong>width</strong>, <strong>gamma</strong>): <span class="kw">this</span></div>
+    <p>设置描边颜色、宽度（SDF 单位）、平滑度。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setScale(<strong>scale</strong>: number): <span class="kw">this</span></div>
+    <p>设置世界空间缩放系数。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有 GPU 资源（geometry、material、纹理、图集缓冲区）。</p>
+  </div>
+
+  <h3>原理说明</h3>
+  <div class="method">
+    <p class="desc"><strong>SDF 图集生成</strong>：组件内部使用 <code>DynamicFont</code> 在 Canvas 2D 上逐字符调用 <code>fillText</code> 栅格化字形，再经 <code>DistanceTransform</code>（Felzenszwalb & Huttenlocher 线性时间 EDT）将 alpha 通道转换为有符号距离场。所有字符打包进一张 <code>DataTexture(RedFormat)</code> 单通道纹理。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><strong>排版引擎</strong>：<code>TextLayout</code> 负责 word-wrap（英文按词断行 / CJK 逐字断行）、对齐（左 / 中 / 右）、字符间距和行高计算，输出每个字符的屏幕坐标和 UV。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><strong>着色器渲染</strong>：片段着色器对 SDF 距离值做 <code>smoothstep(halo - γ, halo + γ, dist)</code> 生成 alpha，先合成阴影层，再合成描边层，最后合成文字颜色。gamma 乘以 <code>1.5 × length(fwidth(v_Size))</code> 实现屏幕空间自适应抗锯齿。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { BitmapText } from '@cyc/3d-components/core';
+
+// 基础中文文本
+const text = new BitmapText({
+  text: 'Hello 世界',
+  fontSize: 72,
+  width: 1000,
+  align: 'center',
+});
+scene.add(text);
+
+// 带描边和阴影
+const fancy = new BitmapText({
+  text: '道可道，非常道',
+  fontSize: 64,
+  outline: true,
+  outlineColor: 0x00bbff,
+  outlineWidth: 0.06,
+  shadow: true,
+  scale: 0.01,
+});
+scene.add(fancy);
+
+// 运行时更新
+text.setText('新的文字内容');
+text.setColor(0xffcc00);
+fancy.setOutline(true);
+fancy.setOutlineParams(0xff0000, 0.08, 1);
+
+// 清理
+text.dispose();</code></pre>
+</div>

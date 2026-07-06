@@ -33,3 +33,6 @@ export type { OutlinesOptions } from './Outlines';
 
 export { Wireframe } from './Wireframe';
 export type { WireframeOptions } from './Wireframe';
+
+export { BitmapText } from './BitmapText';
+export type { BitmapTextOptions, TextMode, TextAlign, BitmapType } from './BitmapText';
