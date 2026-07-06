@@ -1,0 +1,82 @@
+<div class="page">
+  <h2>Outlines</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">描边（轮廓）组件。取父级 <code>Mesh</code> 的几何体，按折痕角度分裂法线后生成一个<strong>背面渲染</strong>的描边网格，在顶点着色器里沿法线把几何外扩 <code>thickness</code>，再叠回父级之下，形成轮廓描边效果。算法移植自 pmndrs/drei 的 <a href="https://github.com/pmndrs/drei/blob/master/src/core/Outlines.tsx" target="_blank"><code>Outlines</code></a>，但实现为原生 Three.js 类，不依赖 React/R3F。支持普通 <code>Mesh</code>、<code>SkinnedMesh</code>（绑定骨架）、<code>InstancedMesh</code>（复用实例矩阵）。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-outlines"></canvas>
+    <div class="demo-ctrl" id="ctrl-outlines"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Outlines(options: OutlinesOptions)</div>
+
+  <h4>Parameters — <code>OutlinesOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>mesh</td><td><code>Mesh | SkinnedMesh | InstancedMesh</code></td><td>—</td><td><strong>必填</strong>。要描边的父级网格</td></tr>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>'black'</td><td>描边颜色</td></tr>
+      <tr><td>opacity</td><td><code>number</code></td><td>1</td><td>描边不透明度</td></tr>
+      <tr><td>transparent</td><td><code>boolean</code></td><td>false</td><td>描边是否透明</td></tr>
+      <tr><td>screenspace</td><td><code>boolean</code></td><td>false</td><td>线宽是否与缩放无关（屏幕空间恒定）。<code>true</code> = 沿世界法线偏移，与摄像机距离无关；<code>false</code> = 在裁剪空间沿投影法线偏移，近处粗、远处细（体积感更自然）</td></tr>
+      <tr><td>thickness</td><td><code>number</code></td><td>0.05</td><td>描边线宽</td></tr>
+      <tr><td>angle</td><td><code>number</code></td><td>Math.PI</td><td>几何折痕角度（弧度）。<code>0</code> = 不分裂、直接复用父级法线；<code>Math.PI</code> = 在每个硬边处分裂法线，使描边沿轮廓外扩、平面区域不被描边</td></tr>
+      <tr><td>renderOrder</td><td><code>number</code></td><td>0</td><td>渲染顺序</td></tr>
+      <tr><td>polygonOffset</td><td><code>boolean</code></td><td>false</td><td>是否启用多边形偏移（避免与父级表面 Z-fighting）</td></tr>
+      <tr><td>polygonOffsetFactor</td><td><code>number</code></td><td>0</td><td>多边形偏移因子</td></tr>
+      <tr><td>toneMapped</td><td><code>boolean</code></td><td>true</td><td>是否参与色调映射</td></tr>
+      <tr><td>clippingPlanes</td><td><code>THREE.Plane[]</code></td><td>—</td><td>裁剪平面列表</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="method">
+    <p class="desc"><strong>关于 <code>screenspace</code>：</strong>裁剪空间模式（默认）下，描边厚度会随摄像机远近变化——近处更粗、远处更细，体积感更自然；屏幕空间模式下线宽恒定，适合 UI / 卡通描边风格。后者需要调用 <code>attachRenderer()</code> 让组件读取绘图缓冲尺寸做归一化。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><strong>关于 <code>angle</code>：</strong>Three.js 默认法线是<strong>平滑</strong>的（顶点法线 = 邻接面法线平均），直接拿来做描边会让相邻面的描边互相「吃掉」，平面区域也被描边。<code>toCreasedNormals</code> 在折痕角度 &gt; <code>angle</code> 的硬边处把顶点分裂成多份，使每个面拥有独立法线，描边只沿真实轮廓外扩。<code>angle = 0</code> 则跳过此步、直接复用父级几何（不拷贝、不释放父级资源）。</p>
+  </div>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.attachRenderer(<strong>renderer</strong>: THREE.WebGLRenderer): void</div>
+    <p>绑定渲染器以读取绘图缓冲尺寸（<code>screenspace</code> 偏移归一化用），并监听 canvas resize。仅在 <code>screenspace = true</code> 时有必要调用；不传则 <code>size</code> 默认为 1×1。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setAngle(<strong>angle</strong>: number): void</div>
+    <p>变更折痕角度并重建描边网格（仅当与当前值不同时才重建）。<code>0</code> = 不分裂法线。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.refresh(): void</div>
+    <p>父级几何体被替换后，调用此方法重建描边（旧的自建几何体会被释放）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放描边几何体与材质，并断开 resize 监听。不会触碰父级网格的资源（几何体 / 材质由父级自行管理）。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Outlines } from '@cyc/3d-components/core';
+
+// 给一个普通网格加描边
+const mesh = new THREE.Mesh(geometry, material);
+const outline = new Outlines({ mesh, color: 'red', thickness: 0.05 });
+mesh.add(outline); // 描边作为 mesh 的子级，自动跟随变换 / 骨架
+scene.add(mesh);
+
+// 屏幕空间恒定线宽（卡通描边风格）
+const toon = new Outlines({
+  mesh, color: 'black', thickness: 0.01, screenspace: true,
+});
+toon.attachRenderer(renderer); // 让组件读取画布尺寸做归一化
+mesh.add(toon);
+
+// 切换折痕角度（运行时重建）
+outline.setAngle(Math.PI / 4);</code></pre>
+</div>

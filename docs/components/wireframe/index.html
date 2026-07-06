@@ -1,0 +1,83 @@
+<div class="page">
+  <h2>Wireframe</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">线框化组件。基于<strong>重心坐标（barycentric）</strong>在每个三角形内计算到三条边的最小距离，用 <code>fwidth</code> 抗锯齿画出线条；支持虚线、收窄、正反面不同色、半透明填充。算法移植自 pmndrs/drei 的 <a href="https://github.com/pmndrs/drei/blob/master/src/materials/WireframeMaterial.tsx" target="_blank"><code>WireframeMaterial</code></a>，实现为原生 Three.js 类，不依赖 React/R3F。</p>
+
+  <p class="desc">提供两种模式：<strong>独立线框</strong>（默认，<code>overrideMaterial = false</code>）在父级网格下挂一个子 <code>Mesh</code>，用独立 <code>ShaderMaterial</code> 渲染线框 + 填充，父级原材质不变；<strong>材质覆盖</strong>（<code>overrideMaterial = true</code>）通过 <code>onBeforeCompile</code> 把线框注入父级材质，与原 PBR 光照混合渲染，适合「带光照的线框模型」。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-wireframe"></canvas>
+    <div class="demo-ctrl" id="ctrl-wireframe"></div>
+  </div>
+  <p class="desc">两种模式都要求几何体具备 <code>barycentric</code> 属性——本组件会在初始化时自动调用 <code>applyBarycentric</code> 计算（<strong>就地修改父级几何体</strong>：索引几何会被转为非索引，必要时请传入副本）。</p>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Wireframe(options: WireframeOptions)</div>
+
+  <h4>Parameters — <code>WireframeOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>mesh</td><td><code>THREE.Mesh</code></td><td>—</td><td><strong>必填</strong>。要线框化的父级网格</td></tr>
+      <tr><td>stroke</td><td><code>ColorRepresentation</code></td><td>'#ff0000'</td><td>线条（描边）颜色</td></tr>
+      <tr><td>backfaceStroke</td><td><code>ColorRepresentation</code></td><td>'#0000ff'</td><td>背面线条颜色（仅在 <code>colorBackfaces</code> 为真时用于背面）</td></tr>
+      <tr><td>fill</td><td><code>ColorRepresentation</code></td><td>'#00ff00'</td><td>填充颜色（三角形内部）</td></tr>
+      <tr><td>strokeOpacity</td><td><code>number</code></td><td>1</td><td>线条不透明度</td></tr>
+      <tr><td>fillOpacity</td><td><code>number</code></td><td>0.25</td><td>填充不透明度</td></tr>
+      <tr><td>fillMix</td><td><code>number</code></td><td>0</td><td>填充色与原材质 <code>diffuse</code> 的混合比例（仅 <code>overrideMaterial</code> 模式有效）。<code>0</code> = 完全用 <code>fill</code>；<code>1</code> = 完全用原材质漫反射色</td></tr>
+      <tr><td>thickness</td><td><code>number</code></td><td>0.05</td><td>线条粗细（0–1，经 <code>map(0,1,0,0.34)</code> 映射为实际像素厚度）</td></tr>
+      <tr><td>colorBackfaces</td><td><code>boolean</code></td><td>false</td><td>是否给背面单独着色（用 <code>backfaceStroke</code>）</td></tr>
+      <tr><td colspan="4" style="font-weight:600;background:#f4f6f9">虚线 Dash</td></tr>
+      <tr><td>dash</td><td><code>boolean</code></td><td>false</td><td>是否启用虚线</td></tr>
+      <tr><td>dashInvert</td><td><code>boolean</code></td><td>true</td><td>虚线是否反转（亮 / 暗段互换）</td></tr>
+      <tr><td>dashRepeats</td><td><code>number</code></td><td>4</td><td>虚线重复次数（每条边重复几段）</td></tr>
+      <tr><td>dashLength</td><td><code>number</code></td><td>0.5</td><td>虚线一段中「亮」的占比（0–1）</td></tr>
+      <tr><td colspan="4" style="font-weight:600;background:#f4f6f9">收窄 Squeeze</td></tr>
+      <tr><td>squeeze</td><td><code>boolean</code></td><td>false</td><td>是否启用中间收窄（线条向段中心变细）</td></tr>
+      <tr><td>squeezeMin</td><td><code>number</code></td><td>0.2</td><td>收窄最小值</td></tr>
+      <tr><td>squeezeMax</td><td><code>number</code></td><td>1</td><td>收窄最大值</td></tr>
+      <tr><td colspan="4" style="font-weight:600;background:#f4f6f9">渲染</td></tr>
+      <tr><td>renderOrder</td><td><code>number</code></td><td>0</td><td>渲染顺序</td></tr>
+      <tr><td>toneMapped</td><td><code>boolean</code></td><td>false</td><td>是否参与色调映射</td></tr>
+      <tr><td>overrideMaterial</td><td><code>boolean</code></td><td>false</td><td>是否覆盖父级材质（<code>onBeforeCompile</code> 注入），而非生成独立线框网格。<code>true</code> = 把线框融入原 PBR 渲染，适合「带光照的线框化模型」，此模式下 <code>fillMix</code> 生效</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setUniform(<strong>key</strong>: keyof WireframeOptions, <strong>value</strong>: unknown): <span class="kw">this</span></div>
+    <p>运行时更新某个 uniform（链式）。<code>key</code> 如 <code>'thickness'</code>、<code>'stroke'</code>、<code>'dash'</code>；颜色项接受 <code>ColorRepresentation</code>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放资源。独立模式：释放线框几何体副本与线框材质；覆盖模式：仅释放线框材质（uniform 容器），<strong>不还原父级材质 / 几何体</strong>（<code>onBeforeCompile</code> 注入无法安全撤销；如需还原请重建父级材质）。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Wireframe } from '@cyc/3d-components/core';
+
+// 独立线框（父级材质不受影响）
+const mesh = new THREE.Mesh(geometry, standardMaterial);
+const wf = new Wireframe({
+  mesh, stroke: '#ff0000', thickness: 0.1, dash: true,
+});
+mesh.add(wf); // 作为子级，自动跟随父级变换
+scene.add(mesh);
+
+// 带光照的线框模型（注入 PBR 材质）
+const lit = new Wireframe({
+  mesh, overrideMaterial: true,
+  fillMix: 0.5,    // 一半原色 / 一半 fill
+  stroke: '#111111', fill: '#88ccff',
+});
+mesh.add(lit);
+
+// 运行时调参（链式）
+wf.setUniform('thickness', 0.2).setUniform('stroke', 'blue');</code></pre>
+</div>

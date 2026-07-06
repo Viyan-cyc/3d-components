@@ -27,3 +27,9 @@ export { Grid } from './Grid';
 export type { GridOptions, GridPlane } from './Grid';
 export { Path } from './Path';
 export type { PathOptions, PathData, PathMode } from './Path';
+
+export { Outlines } from './Outlines';
+export type { OutlinesOptions } from './Outlines';
+
+export { Wireframe } from './Wireframe';
+export type { WireframeOptions } from './Wireframe';
