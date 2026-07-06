@@ -1,0 +1,170 @@
+<div class="page">
+  <h2>HeatMap</h2>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">Canvas 热力图纹理生成器。基于 <a href="https://github.com/pa7/heatmap.js" target="_blank">heatmap.js</a> 的两遍 Alpha 通道算法：第一遍在阴影 Canvas 上绘制径向渐变圆累积强度，第二遍将 Alpha 通道映射为颜色梯度。输出 <code>THREE.CanvasTexture</code>，可直接赋给任意材质的 <code>map</code> 属性。</p>
+
+  <div class="demo-card">
+    <canvas id="c-heatmap"></canvas>
+    <div class="demo-ctrl" id="ctrl-heatmap"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> HeatMap(options?: HeatMapOptions)</div>
+
+  <h4>Parameters — <code>HeatMapOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>width</td><td><code>number</code></td><td>256</td><td>Canvas 宽度（像素）</td></tr>
+      <tr><td>height</td><td><code>number</code></td><td>256</td><td>Canvas 高度（像素）</td></tr>
+      <tr><td>radius</td><td><code>number</code></td><td>40</td><td>默认热力点半径（像素）</td></tr>
+      <tr><td>opacity</td><td><code>number</code></td><td>0.6</td><td>全局不透明度 0–1</td></tr>
+      <tr><td>gradient</td><td><code>HeatMapGradient</code></td><td>蓝→绿→黄→红</td><td>颜色梯度映射</td></tr>
+    </tbody>
+  </table>
+
+  <h4>HeatMapPoint</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>x</td><td><code>number</code></td><td>X 坐标（像素，0 – width）</td></tr>
+      <tr><td>y</td><td><code>number</code></td><td>Y 坐标（像素，0 – height）</td></tr>
+      <tr><td>value</td><td><code>number</code></td><td>强度 / 权重，归一化到 max / min</td></tr>
+    </tbody>
+  </table>
+
+  <h4>HeatMapData</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>data</td><td><code>HeatMapPoint[]</code></td><td>数据点数组</td></tr>
+      <tr><td>max</td><td><code>number</code></td><td>归一化最大值，省略则自动取数据最大值</td></tr>
+      <tr><td>min</td><td><code>number</code></td><td>归一化最小值，默认 0</td></tr>
+    </tbody>
+  </table>
+
+  <h4>HeatMapGradient</h4>
+  <p class="desc">颜色梯度类型，键为 [0, 1] 区间位置，值为 CSS 颜色字符串。</p>
+  <pre><code class="language-ts">type HeatMapGradient = Record&lt;number, string&gt;;
+
+// 示例
+const gradient: HeatMapGradient = {
+  0.25: 'rgb(0,0,255)',
+  0.55: 'rgb(0,255,0)',
+  0.85: 'rgb(255,255,0)',
+  1.0:  'rgb(255,0,0)',
+};</code></pre>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>texture</td><td><code>THREE.CanvasTexture</code></td><td>Three.js 纹理，赋给材质 <code>map</code></td></tr>
+      <tr><td>canvas</td><td><code>HTMLCanvasElement</code></td><td>底层显示 Canvas，可用于非 Three.js 场景</td></tr>
+      <tr><td>width</td><td><code>number</code></td><td>Canvas 宽度（只读）</td></tr>
+      <tr><td>height</td><td><code>number</code></td><td>Canvas 高度（只读）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setData(<strong>data</strong>: HeatMapData): <span class="kw">this</span></div>
+    <p>设置热力图数据并重新渲染。替换已有数据，Canvas 和纹理立即更新。返回 <code>this</code> 支持链式调用。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>data</td><td><code>HeatMapData</code></td><td>数据集，包含 data 数组及可选 max / min</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.addData(<strong>point</strong>: HeatMapPoint): <span class="kw">this</span></div>
+    <p>追加单个数据点并重新渲染。若新点 value 超过当前 max 则自动更新。返回 <code>this</code>。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>point</td><td><code>HeatMapPoint</code></td><td>要添加的数据点</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.setGradient(<strong>gradient</strong>: HeatMapGradient): <span class="kw">this</span></div>
+    <p>替换颜色梯度并重新渲染。返回 <code>this</code>。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>gradient</td><td><code>HeatMapGradient</code></td><td>新的颜色梯度定义</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.setRadius(<strong>radius</strong>: number): <span class="kw">this</span></div>
+    <p>设置默认热力点半径并重新渲染。用于未指定 radius 的数据点。值自动钳制到 ≥ 1。返回 <code>this</code>。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>radius</td><td><code>number</code></td><td>新默认半径（像素），≥ 1</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.setOpacity(<strong>opacity</strong>: number): <span class="kw">this</span></div>
+    <p>设置全局不透明度并重新渲染。值自动钳制到 0–1。返回 <code>this</code>。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody><tr><td>opacity</td><td><code>number</code></td><td>新不透明度 0–1</td></tr></tbody>
+    </table>
+  </div>
+  <div class="method">
+    <div class="sig">.getData(): Readonly&lt;HeatMapData&gt;</div>
+    <p>返回当前数据集的只读引用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.clear(): <span class="kw">this</span></div>
+    <p>清空所有数据并重新渲染。返回 <code>this</code>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放 CanvasTexture 资源。离屏 Canvas 将被 GC 回收。</p>
+  </div>
+
+  <h3>Example</h3>
+  <pre><code class="language-ts">import { HeatMap } from '@cyc/3d-components/heat';
+import * as THREE from 'three';
+
+// 创建热力图
+const heatMap = new HeatMap({
+  width: 512,
+  height: 512,
+  radius: 50,
+  opacity: 0.7,
+  gradient: {
+    0.25: 'rgb(0,0,255)',
+    0.55: 'rgb(0,255,0)',
+    0.85: 'rgb(255,255,0)',
+    1.0:  'rgb(255,0,0)',
+  },
+});
+
+// 设置数据
+heatMap.setData({
+  max: 100,
+  data: [
+    { x: 100, y: 100, value: 80 },
+    { x: 300, y: 200, value: 50 },
+    { x: 400, y: 350, value: 100 },
+  ],
+});
+
+// 用作 Three.js 贴图
+const material = new THREE.MeshBasicMaterial({
+  map: heatMap.texture,
+  transparent: true,
+});
+const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  material,
+);
+scene.add(plane);
+
+// 运行时动态更新
+heatMap.addData({ x: 250, y: 250, value: 60 });
+heatMap.setOpacity(0.5);
+heatMap.setGradient({
+  0.0: 'rgb(0,0,0)',
+  0.5: 'rgb(128,0,255)',
+  1.0: 'rgb(255,255,255)',
+});</code></pre>
+</div>
