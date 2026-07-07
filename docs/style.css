@@ -359,6 +359,8 @@ pre code {
   font-size: 12px;
   min-width: 148px;
   max-width: 210px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
   z-index: 10;
 }
 .demo-ctrl label {
@@ -440,6 +442,36 @@ pre code {
   line-height: 1.5;
 }
 .demo-ctrl .info code { color: var(--color-primary); }
+.demo-ctrl label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.demo-ctrl label.check input[type="checkbox"],
+.demo-ctrl label.check input[type="radio"] {
+  flex-shrink: 0;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  vertical-align: middle;
+}
+.demo-ctrl label.check input[type="color"] {
+  flex-shrink: 0;
+  margin: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+/* Thin scrollbar for demo-ctrl */
+.demo-ctrl::-webkit-scrollbar { width: 4px; }
+.demo-ctrl::-webkit-scrollbar-track { background: transparent; }
+.demo-ctrl::-webkit-scrollbar-thumb { background: var(--border-base); border-radius: 999px; }
+.demo-ctrl::-webkit-scrollbar-thumb:hover { background: var(--text-placeholder); }
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 900px) {
