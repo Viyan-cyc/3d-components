@@ -1,0 +1,296 @@
+<div class="page">
+  <h2>InstancedMesh2</h2>
+  <span class="tag">extends <code>THREE.Mesh</code></span>
+  <p class="desc">高性能实例化渲染器。基于<strong>间接实例化</strong>（Indirect Instancing）架构，通过 <code>instanceIndex</code> 属性索引 DataTexture 中的逐实例矩阵、颜色、骨骼和自定义 Uniform，实现零缓冲区重分配的逐实例视锥裁剪、LOD 切换与部分 GPU 更新。内置 BVH 空间索引加速视锥裁剪、射线检测与 LOD 距离判定；支持逐实例骨骼动画、变形目标与自定义 Uniform。</p>
+
+  <div class="demo-card">
+    <canvas id="c-instancedmesh2"></canvas>
+    <div class="demo-ctrl" id="ctrl-instancedmesh2"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> InstancedMesh2&lt;TData, TGeometry, TMaterial&gt;(geometry, material, params?, LOD?)</div>
+
+  <h4>Parameters — <code>InstancedMesh2Params</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>capacity</td><td><code>number</code></td><td>1000</td><td>缓冲区最大容量（实例数），超出时自动扩容</td></tr>
+      <tr><td>createEntities</td><td><code>boolean</code></td><td>false</td><td>是否创建 <code>instances</code> 实体数组，开启后可通过 <code>InstancedEntity</code> 逐实例操作 position / rotation / scale</td></tr>
+      <tr><td>allowsEuler</td><td><code>boolean</code></td><td>false</td><td>允许 <code>InstancedEntity.rotation</code>（Euler），与 quaternion 双向同步</td></tr>
+      <tr><td>renderer</td><td><code>WebGLRenderer</code></td><td>—</td><td>若提供则立即初始化缓冲区；否则延迟到首次渲染</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>count</td><td><code>number</code></td><td>上一帧实际渲染的实例数（只读）</td></tr>
+      <tr><td>capacity</td><td><code>number</code></td><td>缓冲区容量（只读）</td></tr>
+      <tr><td>instancesCount</td><td><code>number</code></td><td>当前活跃实例数（只读）</td></tr>
+      <tr><td>instances</td><td><code>Entity&lt;TData&gt;[] | null</code></td><td>逐实例实体数组（仅 <code>createEntities: true</code> 时可用）</td></tr>
+      <tr><td>instanceIndex</td><td><code>GLInstancedBufferAttribute | null</code></td><td>实例索引属性</td></tr>
+      <tr><td>matricesTexture</td><td><code>SquareDataTexture</code></td><td>逐实例 4×4 变换矩阵纹理</td></tr>
+      <tr><td>colorsTexture</td><td><code>SquareDataTexture | null</code></td><td>逐实例 RGBA 颜色纹理（懒创建）</td></tr>
+      <tr><td>boneTexture</td><td><code>SquareDataTexture | null</code></td><td>逐实例骨骼矩阵纹理</td></tr>
+      <tr><td>uniformsTexture</td><td><code>SquareDataTexture | null</code></td><td>逐实例自定义 Uniform 纹理</td></tr>
+      <tr><td>bvh</td><td><code>InstancedMeshBVH | null</code></td><td>BVH 空间索引</td></tr>
+      <tr><td>LODinfo</td><td><code>LODInfo | null</code></td><td>LOD 管理数据</td></tr>
+      <tr><td>perObjectFrustumCulled</td><td><code>boolean</code></td><td>逐实例视锥裁剪（默认 true）</td></tr>
+      <tr><td>sortObjects</td><td><code>boolean</code></td><td>渲染前按深度排序（默认 false）</td></tr>
+      <tr><td>customSort</td><td><code>CustomSortCallback | null</code></td><td>自定义排序函数</td></tr>
+      <tr><td>raycastOnlyFrustum</td><td><code>boolean</code></td><td>射线检测仅对视锥内实例生效（默认 false）</td></tr>
+      <tr><td>autoUpdate</td><td><code>boolean</code></td><td>渲染前自动执行视锥裁剪（默认 true）</td></tr>
+      <tr><td>autoUpdateBVH</td><td><code>boolean</code></td><td>矩阵变更时自动更新 BVH（默认 true）</td></tr>
+      <tr><td>onFrustumEnter</td><td><code>OnFrustumEnterCallback | null</code></td><td>实例进入视锥时的回调</td></tr>
+      <tr><td>skeleton</td><td><code>Skeleton | null</code></td><td>逐实例骨骼动画骨架</td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods — 实例管理</h3>
+  <div class="method">
+    <div class="sig">.addInstances(<strong>count</strong>: number, <strong>onCreation</strong>?: UpdateEntityCallback): <span class="kw">this</span></div>
+    <p>添加实例。可选回调初始化每个新实例的位置/颜色等。返回 <code>this</code> 支持链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.removeInstances(<strong>...ids</strong>: number[]): <span class="kw">this</span></div>
+    <p>按 ID 移除实例。ID 被回收复用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.clearInstances(): <span class="kw">this</span></div>
+    <p>清除所有实例。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.updateInstances(<strong>onUpdate</strong>: UpdateEntityCallback): <span class="kw">this</span></div>
+    <p>遍历所有活跃实例，调用回调后更新矩阵（position + quaternion + scale）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.updateInstancesPosition(<strong>onUpdate</strong>: UpdateEntityCallback): <span class="kw">this</span></div>
+    <p>同上，但仅更新位置（更快，适合纯位移场景）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.resizeBuffers(<strong>capacity</strong>: number): <span class="kw">this</span></div>
+    <p>手动调整缓冲区容量。</p>
+  </div>
+
+  <h3>Methods — 矩阵</h3>
+  <div class="method">
+    <div class="sig">.setMatrixAt(<strong>id</strong>: number, <strong>matrix</strong>: Matrix4): void</div>
+    <p>设置指定实例的变换矩阵。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getMatrixAt(<strong>id</strong>: number, <strong>matrix</strong>?: Matrix4): Matrix4</div>
+    <p>获取指定实例的变换矩阵。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getPositionAt(<strong>index</strong>: number, <strong>target</strong>?: Vector3): Vector3</div>
+    <p>从矩阵中提取实例位置。</p>
+  </div>
+
+  <h3>Methods — 可见性 / 激活</h3>
+  <div class="method">
+    <div class="sig">.setVisibilityAt(<strong>id</strong>: number, <strong>visible</strong>: boolean): void</div>
+    <p>设置实例可见性。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getVisibilityAt(<strong>id</strong>: number): boolean</div>
+    <p>获取实例可见性。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setActiveAt(<strong>id</strong>: number, <strong>active</strong>: boolean): void</div>
+    <p>设置实例激活状态（非激活实例不参与裁剪和渲染）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getActiveAt(<strong>id</strong>: number): boolean</div>
+    <p>获取实例激活状态。</p>
+  </div>
+
+  <h3>Methods — 颜色 / 透明度</h3>
+  <div class="method">
+    <div class="sig">.setColorAt(<strong>id</strong>: number, <strong>color</strong>: Color): void</div>
+    <p>设置逐实例颜色（首次调用时自动创建 <code>colorsTexture</code>）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getColorAt(<strong>id</strong>: number, <strong>color</strong>?: Color): Color</div>
+    <p>获取逐实例颜色。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOpacityAt(<strong>id</strong>: number, <strong>value</strong>: number): void</div>
+    <p>设置逐实例透明度（启用 <code>USE_COLOR_ALPHA</code> 宏）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getOpacityAt(<strong>id</strong>: number): number</div>
+    <p>获取逐实例透明度。</p>
+  </div>
+
+  <h3>Methods — BVH</h3>
+  <div class="method">
+    <div class="sig">.computeBVH(<strong>config</strong>?: BVHParams): void</div>
+    <p>创建并计算 BVH 空间索引，加速视锥裁剪、射线检测和 LOD 距离判定。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.disposeBVH(): void</div>
+    <p>销毁 BVH。</p>
+  </div>
+
+  <h4>BVHParams</h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>margin</td><td><code>number</code></td><td>0</td><td>包围盒外扩边距，适合动画/移动对象</td></tr>
+      <tr><td>getBBoxFromBSphere</td><td><code>boolean</code></td><td>false</td><td>从包围球计算 AABB（更快但精度低，仅适用于中心在原点的几何体）</td></tr>
+      <tr><td>accurateCulling</td><td><code>boolean</code></td><td>true</td><td>启用精确视锥裁剪（无 margin）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods — LOD</h3>
+  <div class="method">
+    <div class="sig">.setFirstLODDistance(<strong>distance</strong>: number): <span class="kw">this</span></div>
+    <p>初始化 LOD 系统，设置 LOD0（基础网格）的切换距离。必须在 <code>addLOD</code> 之前调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.addLOD(<strong>geometry</strong>: BufferGeometry, <strong>material</strong>: Material, <strong>distance</strong>?: number, <strong>hysteresis</strong>?: number): <span class="kw">this</span></div>
+    <p>添加渲染 LOD 级别。每个级别创建一个共享数据纹理的子 <code>InstancedMesh2</code>。<code>distance</code> 为距离阈值（内部取平方），<code>hysteresis</code> 为滞后因子（0-1~1，防止 LOD 抖动）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.addShadowLOD(<strong>geometry</strong>: BufferGeometry, <strong>distance</strong>?: number, <strong>hysteresis</strong>?: number): <span class="kw">this</span></div>
+    <p>添加阴影专用 LOD 级别（<code>castShadow = true</code>）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.updateLOD(<strong>levelIndex</strong>: number, <strong>distance</strong>?: number, <strong>hysteresis</strong>?: number): <span class="kw">this</span></div>
+    <p>更新指定渲染 LOD 级别的参数（不可修改 LOD0）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.updateAllLOD(<strong>distances</strong>?: number[], <strong>hysteresis</strong>?: number): <span class="kw">this</span></div>
+    <p>批量更新所有渲染 LOD 距离/滞后。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.removeLOD(<strong>levelIndex</strong>: number, <strong>removeObject</strong>?: boolean): <span class="kw">this</span></div>
+    <p>移除 LOD 级别（LOD0 存在时不可移除）。</p>
+  </div>
+
+  <h3>Methods — 骨骼动画</h3>
+  <div class="method">
+    <div class="sig">.initSkeleton(<strong>skeleton</strong>: Skeleton, <strong>disableMatrixAutoUpdate</strong>?: boolean): void</div>
+    <p>初始化逐实例骨骼动画。创建 <code>boneTexture</code>，默认禁用骨骼的 <code>matrixAutoUpdate</code> 以提升性能。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setBonesAt(<strong>id</strong>: number, <strong>updateBonesMatrices</strong>?: boolean, <strong>excludeBonesSet</strong>?: Set&lt;string&gt;): void</div>
+    <p>设置指定实例的骨骼矩阵。可排除特定骨骼不更新。</p>
+  </div>
+
+  <h3>Methods — 自定义 Uniform</h3>
+  <div class="method">
+    <div class="sig">.initUniformsPerInstance(<strong>schema</strong>: UniformSchemaShader): void</div>
+    <p>初始化逐实例 Uniform 系统。<code>schema</code> 格式为 <code>{ vertex?: { name: UniformType }, fragment?: { name: UniformType } }</code>，类型支持 <code>'float'</code>、<code>'vec2'</code>、<code>'vec3'</code>、<code>'vec4'</code>、<code>'mat3'</code>、<code>'mat4'</code>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setUniformAt(<strong>id</strong>: number, <strong>name</strong>: string, <strong>value</strong>: UniformValue): void</div>
+    <p>设置指定实例的 Uniform 值。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getUniformAt(<strong>id</strong>: number, <strong>name</strong>: string, <strong>target</strong>?: UniformValueObj): UniformValue</div>
+    <p>获取指定实例的 Uniform 值。</p>
+  </div>
+
+  <h3>Methods — 变形目标</h3>
+  <div class="method">
+    <div class="sig">.setMorphAt(<strong>id</strong>: number, <strong>object</strong>: Mesh): void</div>
+    <p>设置指定实例的变形目标权重。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getMorphAt(<strong>id</strong>: number, <strong>object</strong>?: Mesh): Mesh</div>
+    <p>获取指定实例的变形目标权重。</p>
+  </div>
+
+  <h3>Methods — 视锥裁剪</h3>
+  <div class="method">
+    <div class="sig">.performFrustumCulling(<strong>camera</strong>: Camera, <strong>cameraLOD</strong>?: Camera): void</div>
+    <p>手动执行视锥裁剪。若存在 LOD 信息，自动使用 LOD 感知裁剪。<code>cameraLOD</code> 为 LOD 距离计算用的相机（默认与渲染相机相同）。</p>
+  </div>
+
+  <h3>Methods — 射线检测</h3>
+  <div class="method">
+    <div class="sig">.raycast(<strong>raycaster</strong>: Raycaster, <strong>result</strong>: Intersection[]): void</div>
+    <p>重写 <code>Mesh.raycast</code>，支持 BVH 加速和逐实例命中。命中结果包含 <code>instanceId</code>。</p>
+  </div>
+
+  <h3>Methods — 包围盒</h3>
+  <div class="method">
+    <div class="sig">.computeBoundingBox(): void</div>
+    <p>从所有活跃实例计算包围盒。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.computeBoundingSphere(): void</div>
+    <p>从所有活跃实例计算包围球。</p>
+  </div>
+
+  <h3>Methods — 克隆 / 销毁</h3>
+  <div class="method">
+    <div class="sig">.clone(<strong>recursive</strong>?: boolean): <span class="kw">this</span></div>
+    <p>克隆，保留相同参数。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.copy(<strong>source</strong>: InstancedMesh2, <strong>recursive</strong>?: boolean): <span class="kw">this</span></div>
+    <p>深拷贝纹理和状态。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有纹理和 GPU 资源。</p>
+  </div>
+
+  <h3>InstancedEntity</h3>
+  <p>当 <code>createEntities: true</code> 时，每个实例对应一个 <code>InstancedEntity</code> 对象，提供类似 <code>Object3D</code> 的操作接口：</p>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td><code>number</code></td><td>实例唯一 ID（只读）</td></tr>
+      <tr><td>position</td><td><code>Vector3</code></td><td>局部位置</td></tr>
+      <tr><td>scale</td><td><code>Vector3</code></td><td>局部缩放（默认 1,1,1）</td></tr>
+      <tr><td>quaternion</td><td><code>Quaternion</code></td><td>局部旋转（四元数）</td></tr>
+      <tr><td>rotation</td><td><code>Euler | undefined</code></td><td>局部旋转（Euler，需 <code>allowsEuler: true</code>）</td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>可见性（代理到 owner）</td></tr>
+      <tr><td>active</td><td><code>boolean</code></td><td>激活状态（代理到 owner）</td></tr>
+      <tr><td>color</td><td><code>Color</code></td><td>颜色（代理到 owner）</td></tr>
+      <tr><td>opacity</td><td><code>number</code></td><td>透明度（代理到 owner）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { InstancedMesh2 } from '@cyc/3d-components/core';
+import * as THREE from 'three';
+
+// 基础用法：创建 5000 个实例
+const mesh = new InstancedMesh2(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x44aa88 }),
+  { capacity: 5000, createEntities: true, allowsEuler: true },
+);
+
+mesh.addInstances(5000, (obj, i) => {
+  obj.position.set(Math.random() * 100 - 50, 0, Math.random() * 100 - 50);
+  obj.rotation.y = Math.random() * Math.PI * 2;
+  obj.updateMatrix();
+});
+scene.add(mesh);
+
+// 启用 BVH 加速视锥裁剪
+mesh.computeBVH({ getBBoxFromBSphere: true });
+
+// LOD：4 级细节，距离越远越简化
+mesh.setFirstLODDistance(0);
+mesh.addLOD(geoL1, matL1, 15);   // 15 单位内用 L1
+mesh.addLOD(geoL2, matL2, 40);   // 40 单位内用 L2
+mesh.addLOD(geoL3, matL3, 80);   // 80 单位内用 L3
+
+// 逐实例颜色
+mesh.setColorAt(0, new THREE.Color('red'));
+
+// 逐实例自定义 Uniform
+mesh.initUniformsPerInstance({
+  vertex: { windStrength: 'float', windDir: 'vec2' },
+});
+mesh.setUniformAt(0, 'windStrength', 0.8);
+mesh.setUniformAt(0, 'windDir', new THREE.Vector2(1, 0));</code></pre>
+</div>
