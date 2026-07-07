@@ -36,3 +36,6 @@ export type { WireframeOptions } from './Wireframe';
 
 export { BitmapText } from './BitmapText';
 export type { BitmapTextOptions, TextMode, TextAlign, BitmapType } from './BitmapText';
+
+export { Html } from './Html';
+export type { HtmlOptions, PointerEventsValue, OccludeMode } from './Html';

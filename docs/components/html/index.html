@@ -1,0 +1,176 @@
+<div class="page">
+  <h2>Html</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IUpdatable</code>, <code>IDisposable</code></span>
+  <p class="desc">3D 空间中的 HTML 覆盖层组件。将 DOM 元素定位在 Three.js 场景的 3D 坐标上，每帧根据相机投影自动更新屏幕位置。支持两种定位模式：2D 投影（默认）和 CSS3D 变换。参考 drei <code>Html</code> 组件，以纯 Three.js 重写，无 React 依赖。</p>
+
+  <div class="demo-card">
+    <canvas id="c-html"></canvas>
+    <div class="demo-ctrl" id="ctrl-html"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Html(options?: HtmlOptions)</div>
+
+  <h4>Parameters — <code>HtmlOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">DOM 元素</td></tr>
+      <tr><td>el</td><td><code>HTMLElement</code></td><td>—</td><td>要定位的 DOM 元素。若未提供则自动创建 <code>&lt;div&gt;</code></td></tr>
+      <tr><td>as</td><td><code>string</code></td><td>'div'</td><td>自动创建元素的标签名（<code>el</code> 已提供时忽略）</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">Portal</td></tr>
+      <tr><td>portal</td><td><code>HTMLElement</code></td><td>—</td><td>挂载目标父元素，默认为 canvas 父节点</td></tr>
+      <tr><td>prepend</td><td><code>boolean</code></td><td>false</td><td>是否插入到 portal 首位而非末尾</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">定位</td></tr>
+      <tr><td>center</td><td><code>boolean</code></td><td>false</td><td>居中元素 <code>translate3d(-50%,-50%,0)</code></td></tr>
+      <tr><td>fullscreen</td><td><code>boolean</code></td><td>false</td><td>将元素撑满整个视口</td></tr>
+      <tr><td>eps</td><td><code>number</code></td><td>0.001</td><td>位置/缩放变化阈值，低于此值跳过 DOM 更新以提升性能</td></tr>
+      <tr><td>distanceFactor</td><td><code>number</code></td><td>—</td><td>距离缩放因子。设置后 HTML 元素随距相机的远近自动缩放，典型值 5–20</td></tr>
+      <tr><td>sprite</td><td><code>boolean</code></td><td>false</td><td>始终面向相机（仅 transform 模式）</td></tr>
+      <tr><td>transform</td><td><code>boolean</code></td><td>false</td><td>CSS3D 变换模式。从 Three.js 矩阵构建完整 <code>matrix3d</code> CSS 变换，实现真正 3D 透视</td></tr>
+      <tr><td>zIndexRange</td><td><code>[number, number]</code></td><td>[16777271, 0]</td><td>Z-index 映射范围 <code>[max, min]</code>，近处对象获得更高 z-index</td></tr>
+      <tr><td>calculatePosition</td><td><code>(object, camera, w, h) =&gt; [x, y]</code></td><td>—</td><td>自定义位置计算函数</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">样式</td></tr>
+      <tr><td>wrapperClass</td><td><code>string</code></td><td>—</td><td>包裹元素的 CSS 类名</td></tr>
+      <tr><td>pointerEvents</td><td><code>PointerEventsValue</code></td><td>'auto'</td><td>CSS <code>pointer-events</code> 值</td></tr>
+      <tr><td>style</td><td><code>Partial&lt;CSSStyleDeclaration&gt; | string</code></td><td>—</td><td>内容元素的行内样式</td></tr>
+      <tr><td>className</td><td><code>string</code></td><td>—</td><td>内容元素的 CSS 类名</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">遮挡 Occlusion</td></tr>
+      <tr><td>occlude</td><td><code>boolean | 'raycast' | 'blending' | Object3D[]</code></td><td>false</td><td>遮挡模式：<code>true</code> 渲染不可见深度写入网格；<code>'raycast'</code> 射线检测遮挡后隐藏 HTML；<code>'blending'</code> z-index 混合合成；<code>Object3D[]</code> 对指定对象做射线遮挡</td></tr>
+      <tr><td>onOcclude</td><td><code>(hidden: boolean) =&gt; void</code></td><td>—</td><td>遮挡状态变化时的回调</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">遮挡网格</td></tr>
+      <tr><td>occludeGeometry</td><td><code>BufferGeometry</code></td><td>PlaneGeometry</td><td>遮挡网格的自定义几何体</td></tr>
+      <tr><td>occludeMaterial</td><td><code>Material</code></td><td>ShaderMaterial</td><td>遮挡网格的自定义材质</td></tr>
+      <tr><td>castShadow</td><td><code>boolean</code></td><td>false</td><td>遮挡网格是否投射阴影</td></tr>
+      <tr><td>receiveShadow</td><td><code>boolean</code></td><td>false</td><td>遮挡网格是否接收阴影</td></tr>
+      <tr><td colspan="4" style="background:#f0f4f8;font-weight:600">基础（继承自 ComponentOptions）</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>element</td><td><code>HTMLElement</code></td><td>底层 DOM 元素（只读）</td></tr>
+      <tr><td>transformOuter</td><td><code>HTMLDivElement | null</code></td><td>transform 模式下的外层包裹 div（只读）</td></tr>
+      <tr><td>transformInner</td><td><code>HTMLDivElement | null</code></td><td>transform 模式下的内层包裹 div（只读）</td></tr>
+      <tr><td>occlusionMesh</td><td><code>THREE.Mesh | null</code></td><td>遮挡网格（仅 <code>occlude: true</code> 时创建，只读）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.mount(<strong>renderer</strong>: WebGLRenderer): void</div>
+    <p>将 HTML 元素挂载到 DOM。添加到场景后调用，若未手动调用则首次 <code>update()</code> 时自动挂载。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>: number, <strong>camera</strong>: Camera, <strong>renderer</strong>: WebGLRenderer): void</div>
+    <p>每帧更新 — 投影 3D 位置到屏幕坐标，更新 DOM 元素的 transform、z-index 和可见性。在渲染循环中调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.refreshContent(): void</div>
+    <p>重建 DOM 内容结构。修改内部 HTML 或切换 transform 模式后调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOcclude(<strong>mode</strong>: OccludeMode): <span class="kw">this</span></div>
+    <p>运行时切换遮挡模式。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setDistanceFactor(<strong>factor</strong>: number): <span class="kw">this</span></div>
+    <p>设置距离缩放因子。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setWrapperClass(<strong>className</strong>: string): <span class="kw">this</span></div>
+    <p>设置包裹元素 CSS 类名。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setClassName(<strong>className</strong>: string): <span class="kw">this</span></div>
+    <p>设置内容元素 CSS 类名。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setStyle(<strong>style</strong>: Partial&lt;CSSStyleDeclaration&gt; | string): <span class="kw">this</span></div>
+    <p>设置内容元素行内样式。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有资源：从 DOM 移除 HTML 元素、恢复 canvas 样式、释放遮挡网格 GPU 资源、清空子对象。</p>
+  </div>
+
+  <h3>定位模式说明</h3>
+  <div class="method">
+    <p class="desc"><strong>2D 投影模式</strong>（<code>transform: false</code>，默认）：通过 <code>Vector3.project(camera)</code> 将 3D 世界坐标投影为 NDC，再转换为屏幕像素坐标，用 CSS <code>translate3d</code> 定位 DOM 元素。简单高效，适合标签、信息卡片等 2D 覆盖场景。配合 <code>distanceFactor</code> 可实现近大远小的透视缩放。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><strong>CSS3D 变换模式</strong>（<code>transform: true</code>）：从 Three.js 相机矩阵和对象矩阵构建完整 <code>matrix3d</code> CSS 变换，实现 DOM 元素在 3D 空间中的真正透视变换——元素会随相机旋转产生倾斜、近大远小等 3D 效果，类似 CSS3DRenderer 但无需额外渲染器。外层 div 承载相机变换，内层 div 承载对象变换。</p>
+  </div>
+
+  <h3>遮挡模式说明</h3>
+  <div class="method">
+    <p class="desc"><code>occlude: true</code> — 在 3D 场景中渲染一个不可见的平面网格（片段着色器输出全透明，但写入深度缓冲），3D 物体在 HTML 元素前方时会遮挡住 HTML。该网格会自动根据 HTML 元素尺寸调整大小。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><code>occlude: 'raycast'</code> — 每帧从相机向 HTML 元素发射射线，检测是否被场景中的几何体遮挡。若被遮挡则隐藏 HTML 元素（或触发 <code>onOcclude</code> 回调）。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><code>occlude: 'blending'</code> — 通过调整 canvas 的 z-index 将其置于 HTML 层之间，使 3D 场景与 HTML 产生混合合成效果。</p>
+  </div>
+  <div class="method">
+    <p class="desc"><code>occlude: [obj1, obj2, ...]</code> — 对指定 Object3D 数组做射线遮挡检测，而非整个场景，性能更优。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Html } from '@cyc/3d-components/core';
+
+// ── 基础标签 ──
+const label = new Html({ center: true });
+label.position.set(0, 2, 0);
+label.element.innerHTML = '&lt;div style="background:#fff;padding:8px 16px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15)"&gt;Hello 3D!&lt;/div&gt;';
+scene.add(label);
+
+// ── 带距离缩放 ──
+const info = new Html({
+  distanceFactor: 10,
+  center: true,
+  style: 'background:rgba(0,0,0,.75);color:#fff;padding:10px;border-radius:6px;',
+});
+info.position.set(1, 1.5, -1);
+info.element.innerHTML = '距离缩放标签';
+scene.add(info);
+
+// ── CSS3D 变换模式 ──
+const panel = new Html({
+  transform: true,
+  distanceFactor: 10,
+});
+panel.position.set(0, 1.2, -3);
+panel.element.innerHTML = '&lt;div style="width:300px;background:white;padding:20px"&gt;3D 面板&lt;/div&gt;';
+scene.add(panel);
+
+// ── 射线遮挡 ──
+const occluded = new Html({
+  center: true,
+  occlude: 'raycast',
+  onOcclude: (hidden) => console.log('遮挡状态:', hidden),
+});
+occluded.position.set(0, 0.5, 0);
+scene.add(occluded);
+
+// ── 渲染循环 ──
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  label.update(delta, camera, renderer);
+  info.update(delta, camera, renderer);
+  panel.update(delta, camera, renderer);
+  occluded.update(delta, camera, renderer);
+  renderer.render(scene, camera);
+}
+
+// ── 清理 ──
+label.dispose();
+info.dispose();</code></pre>
+</div>
