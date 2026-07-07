@@ -41,3 +41,5 @@ export { InstancedMesh2 } from './InstancedMesh2';
 export type { InstancedMesh2Params, BVHParams, Entity, UpdateEntityCallback, LODInfo, LODLevel, LODRenderList, CustomSortCallback, OnFrustumEnterCallback, UniformType, UniformValue, UniformValueObj } from './InstancedMesh2';
 export { InstancedEntity } from './InstancedMesh2';
 export { InstancedMeshBVH } from './InstancedMesh2';
+export { Html } from './Html';
+export type { HtmlOptions, PointerEventsValue, OccludeMode } from './Html';
