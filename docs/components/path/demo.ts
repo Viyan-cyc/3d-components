@@ -38,6 +38,11 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
 
   // 共享材质（外部传入，dispose 时不会被 Path 释放）
   const pathMaterial = new THREE.MeshStandardMaterial({ color: 0x4a90e2, roughness: 0.45, metalness: 0.1 });
+  const pathTexture = new THREE.TextureLoader().load('../../uv.jpg', (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 8;
+    rebuild();
+  });
 
   // 演示路径数据：2D Hilbert 曲线（XZ 平面），参考 t3d geometry_builder_lines 示例。
   const basePoints = hilbert2D(0, 0, 0, 4, 1, 0, 1, 2, 3);
@@ -50,6 +55,8 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
     sharp: true,
     arrow: false,
     caps: true,
+    texture: true,
+    uvMode: 'repeat' as 'repeat' | 'stretch',
   };
   let path: Path | null = null;
 
@@ -61,6 +68,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
         mode: params.mode,
         bevelRadius: params.bevelRadius,
         close: params.close,
+        uvMode: params.uvMode,
         up: [0, 1, 0],
         ...(params.mode === 'tube'
           ? {
@@ -78,6 +86,15 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
       }],
       material: pathMaterial,
     });
+    // 贴图设置
+    if (params.texture) {
+      pathMaterial.map = pathTexture;
+      pathMaterial.color.set(0xffffff);
+    } else {
+      pathMaterial.map = null;
+      pathMaterial.color.set(0x4a90e2);
+    }
+    pathMaterial.needsUpdate = true;
     scene.add(path);
   }
   rebuild();
@@ -96,7 +113,13 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
     <label class="check"><input type="checkbox" id="inp-p-close">闭合 close</label>
     <label class="check"><input type="checkbox" id="inp-p-sharp" checked>锐角修补 sharp <em>(plane)</em></label>
     <label class="check"><input type="checkbox" id="inp-p-arrow">末端箭头 arrow <em>(plane)</em></label>
-    <label class="check"><input type="checkbox" id="inp-p-caps" checked>封盖 caps <em>(tube)</em></label>`;
+    <label class="check"><input type="checkbox" id="inp-p-caps" checked>封盖 caps <em>(tube)</em></label>
+    <label class="check"><input type="checkbox" id="inp-p-t" checked>贴图 texture</label>
+    <label><span>UV:</span>
+      <select id="sel-p-uv">
+        <option value="repeat" selected>repeat · 按米平铺</option>
+        <option value="stretch">stretch · 铺满</option>
+      </select></label>`;
 
   function updateDisabled() {
     const plane = params.mode === 'plane';
@@ -135,6 +158,14 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   });
   ctrl.querySelector('#inp-p-caps')!.addEventListener('change', (e) => {
     params.caps = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#inp-p-t')!.addEventListener('change', (e) => {
+    params.texture = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#sel-p-uv')!.addEventListener('change', (e) => {
+    params.uvMode = (e.target as HTMLSelectElement).value as 'repeat' | 'stretch';
     rebuild();
   });
 

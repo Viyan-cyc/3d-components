@@ -2,36 +2,6 @@ import * as THREE from 'three';
 import { Shape } from '../../../src/core/Shape';
 import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
 
-/**
- * 程序生成一个棋盘格贴图，用于验证 UV repeat/stretch 模式。
- */
-function makeTileTexture(): THREE.CanvasTexture {
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d')!;
-  const tileSize = s / 4;
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      ctx.fillStyle = (row + col) % 2 === 0 ? '#e8ddd0' : '#c4b8a8';
-      ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
-    }
-  }
-  // 网格线
-  ctx.strokeStyle = '#a09080';
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= 4; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * tileSize, 0); ctx.lineTo(i * tileSize, s);
-    ctx.moveTo(0, i * tileSize); ctx.lineTo(s, i * tileSize);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
-  return tex;
-}
-
 // ---- Shape Demo ----
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   const { renderer, scene, camera, resize } = createScene(canvas);
@@ -50,7 +20,11 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   camera.lookAt(2, 0.3, 2.5);
 
   const shapeMaterial = new THREE.MeshStandardMaterial({ color: 0xdad3c8, roughness: 0.85, metalness: 0 });
-  const tileTexture = makeTileTexture();
+  const tileTexture = new THREE.TextureLoader().load('../../uv.jpg', (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 8;
+    rebuild();
+  });
 
   // L 形轮廓的 6 个拐角名称
   const cornerNames = ['A', 'B', 'C', 'D', 'E', 'F'];

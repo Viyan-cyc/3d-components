@@ -2,49 +2,6 @@ import * as THREE from 'three';
 import { Wall } from '../../../src/core/Wall';
 import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
 
-/**
- * 程序生成一面「窗户」贴图：墙底色 + 一扇带窗框 / 中梃的窗。
- * 画布纵向按墙高设计：窗台约在 35% 墙高、窗顶约在 81% 墙高（建筑常规比例）。
- * repeat 模式下 `repeat.y = 1 / height`，让一个 tile 恰好铺满整墙高度 → 窗位始终正确。
- */
-function makeWindowTexture(): THREE.CanvasTexture {
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d')!;
-  // 墙体底色
-  ctx.fillStyle = '#e6ddca';
-  ctx.fillRect(0, 0, s, s);
-  // 窗户区域（画布 y 从顶部算；窗顶 0.19s、窗台 0.65s ≈ 墙高 81% / 35%）
-  const winLeft = s * 0.12;
-  const winRight = s * 0.88;
-  const winTop = s * 0.19;
-  const winBottom = s * 0.65;
-  const w = winRight - winLeft;
-  const h = winBottom - winTop;
-  // 玻璃（自上而下渐变）
-  const grad = ctx.createLinearGradient(0, winTop, 0, winBottom);
-  grad.addColorStop(0, '#aacbe0');
-  grad.addColorStop(1, '#6e94ad');
-  ctx.fillStyle = grad;
-  ctx.fillRect(winLeft, winTop, w, h);
-  // 中梃（十字分格）
-  ctx.strokeStyle = '#e6ddca';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(winLeft + w / 2, winTop); ctx.lineTo(winLeft + w / 2, winBottom);
-  ctx.moveTo(winLeft, winTop + h / 2); ctx.lineTo(winRight, winTop + h / 2);
-  ctx.stroke();
-  // 窗框
-  ctx.strokeStyle = '#5b5246';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(winLeft, winTop, w, h);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
-  return tex;
-}
-
 // ---- Wall Demo ----
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   const { renderer, scene, camera, resize } = createScene(canvas);
@@ -63,7 +20,11 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   camera.lookAt(0, 1.2, 0);
 
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xdad3c8, roughness: 0.85, metalness: 0 });
-  const wallTexture = makeWindowTexture();
+  const wallTexture = new THREE.TextureLoader().load('../../uv.jpg', (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 8;
+    rebuild();
+  });
   // 四个拐角（按 path 顶点顺序）：左前 / 右前 / 右后 / 左后
   const cornerNames = ['左前', '右前', '右后', '左后'];
   const params = {
@@ -102,11 +63,10 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
       }],
       material: wallMaterial,
     });
-    // 贴图：repeat 模式下 u/v 为米，一个窗模块 = 1.5m 宽 × 整墙高；
-    // stretch 模式下 u/v 已归一化，一张贴图铺满整面墙。
+    // 贴图：repeat 模式下 u/v 为米，1m 重复一次；stretch 模式下一张铺满整面墙。
     if (params.texture) {
       wallTexture.repeat.set(
-        params.uvMode === 'stretch' ? 1 : 1 / 1.5,
+        params.uvMode === 'stretch' ? 1 : 1,
         params.uvMode === 'stretch' ? 1 : 1 / params.height,
       );
       wallMaterial.map = wallTexture;
