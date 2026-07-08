@@ -63,6 +63,9 @@ export interface ShapeOptions extends GroupComponentOptions {
  *
  * 顶/底面：使用平面投影 UV（`u = x 范围`、`v = z 范围`），
  * 适合地板/台面等需要按平面铺贴的场景。
+ *
+ * 使用 ExtrudeGeometry 的 group 信息区分封盖（group 0）和侧面（group 1），
+ * 避免侧面边缘顶点（y=0 或 y=height）被误判为封盖。
  */
 function applyShapeUV(
   geo: THREE.BufferGeometry,
@@ -76,6 +79,33 @@ function applyShapeUV(
 
   const m = samples.length;
   if (m < 3) return;
+
+  // ---- 使用 group 区分封盖 vs 侧面 ----
+  // ExtrudeGeometry: group 0 = 封盖(顶/底), group 1 = 侧面
+  const groups = geo.groups;
+  const count = posAttr.count;
+
+  // 构建每个顶点是否属于封盖的查找表
+  const isCapVertex = new Uint8Array(count); // 0 = 侧面, 1 = 封盖
+  for (const group of groups) {
+    if (group.materialIndex === 0) {
+      // 封盖 group — 标记其索引范围内的顶点
+      const end = group.start + group.count;
+      // group 使用索引，需要通过 index buffer 映射到顶点
+      const indexAttr = geo.getIndex();
+      if (indexAttr) {
+        for (let i = group.start; i < end; i++) {
+          const vi = indexAttr.getX(i);
+          isCapVertex[vi] = 1;
+        }
+      } else {
+        // 无索引缓冲（非索引几何体）
+        for (let i = group.start; i < end; i++) {
+          isCapVertex[i] = 1;
+        }
+      }
+    }
+  }
 
   // ---- 侧面弧长参数（与 Wall 一致） ----
   const segLen = new Float64Array(m);
@@ -104,20 +134,19 @@ function applyShapeUV(
   const uScaleTop = uvMode === 'stretch' ? rangeX : 1;
   const vScaleTop = uvMode === 'stretch' ? rangeZ : 1;
 
-  const count = posAttr.count;
   for (let i = 0; i < count; i++) {
     const wx = posAttr.getX(i);
     const wy = posAttr.getY(i);
     const wz = posAttr.getZ(i);
 
-    // 判断顶面/底面 vs 侧面：ExtrudeGeometry 的封盖顶点 y 精确在 0 或 height
-    const isTop = Math.abs(wy - height) < 0.001;
-    const isBottom = Math.abs(wy) < 0.001;
-
-    if (isTop || isBottom) {
+    if (isCapVertex[i]) {
       // 顶/底面：平面投影 UV
       const u = (wx - minX) / uScaleTop;
-      const v = (wz - minZ) / vScaleTop;
+      // 顶面（wy ≈ height）从上方俯视时 Z 轴方向与底面仰视相反，需翻转 v
+      const isTopCap = Math.abs(wy - height) < 0.001;
+      const v = isTopCap
+        ? (maxZ - wz) / vScaleTop  // 顶面：翻转 Z 方向，使俯视纹理与底面一致
+        : (wz - minZ) / vScaleTop; // 底面：正常方向
       uvAttr.setXY(i, u, v);
     } else {
       // 侧面：弧长投影 UV（与 Wall 一致）
