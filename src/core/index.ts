@@ -46,3 +46,6 @@ export { InstancedEntity } from './InstancedMesh2';
 export { InstancedMeshBVH } from './InstancedMesh2';
 export { Html } from './Html';
 export type { HtmlOptions, PointerEventsValue, OccludeMode } from './Html';
+
+export { Sky } from './Sky';
+export type { SkyOptions } from './Sky';

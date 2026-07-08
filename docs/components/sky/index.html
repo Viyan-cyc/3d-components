@@ -1,0 +1,75 @@
+<div class="page">
+  <h2>Sky</h2>
+  <span class="tag">extends <code>THREE.Mesh</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">天空穹顶。基于内翻球体（<code>BackSide</code>）+ 着色器实现，通过从地平线到天顶的幂次渐变模拟天空大气效果。球体始终从内部可见，相机应位于球体内部。天顶与地平线颜色可独立配置，渐变指数与偏移量可灵活调整渐变曲线。</p>
+
+  <div class="demo-card">
+    <canvas id="c-sky"></canvas>
+    <div class="demo-ctrl" id="ctrl-sky"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Sky(options?: SkyOptions)</div>
+
+  <h4>Parameters — <code>SkyOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>size</td><td><code>number</code></td><td>1000</td><td>天空球半径（世界单位），应足够大以包围场景但不超过相机远裁剪面</td></tr>
+      <tr><td>topColor</td><td><code>ColorRepresentation</code></td><td>0x109df4</td><td>天顶颜色（球体最高处的颜色），天蓝</td></tr>
+      <tr><td>bottomColor</td><td><code>ColorRepresentation</code></td><td>0xf5f5f5</td><td>地平线 / 底部颜色，浅灰白</td></tr>
+      <tr><td>offset</td><td><code>number</code></td><td>0</td><td>世界坐标偏移量，增大使渐变整体上移，地平线附近更偏 bottomColor</td></tr>
+      <tr><td>exponent</td><td><code>number</code></td><td>0.6</td><td>渐变指数，值越大过渡越陡峭（天顶色区域更集中），值越小过渡越平缓</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setColors(<strong>top</strong>: ColorRepresentation, <strong>bottom</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>同时设置天顶与地平线颜色。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setTopColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置天顶颜色（hex / CSS 字符串 / <code>THREE.Color</code>）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setBottomColor(<strong>color</strong>: ColorRepresentation): <span class="kw">this</span></div>
+    <p>设置地平线 / 底部颜色。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOffset(<strong>value</strong>: number): <span class="kw">this</span></div>
+    <p>设置世界坐标偏移量。增大该值使渐变整体上移。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setExponent(<strong>value</strong>: number): <span class="kw">this</span></div>
+    <p>设置渐变指数。值越大天顶色区域越集中，值越小过渡越平缓。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放 geometry 与 material。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Sky } from '@cyc/3d-components/core';
+
+// 天空穹顶
+const sky = new Sky({
+  size: 500,
+  topColor: 0x109df4,
+  bottomColor: 0xf5f5f5,
+  offset: 0,
+  exponent: 0.6,
+});
+scene.add(sky);
+
+// 运行时调整颜色（所有 setter 链式调用）
+sky.setTopColor(0x1a8af4).setBottomColor(0xe0e0e0);
+sky.setOffset(10).setExponent(0.8);
+
+// 同时设置天顶与地平线颜色
+sky.setColors(0x109df4, 0xf5f5f5);</code></pre>
+</div>
