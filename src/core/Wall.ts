@@ -2,13 +2,24 @@
 import * as THREE from 'three';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import type { GroupComponentOptions, IDisposable } from '../types';
+import {
+  type Vec3Tuple,
+  type V2,
+  type Corner,
+  EPS,
+  dedupe,
+  radiusAtWithDefault,
+  computeCorner,
+  filletPolyline,
+  signedArea,
+  ensureCCW,
+  ensureCW,
+  traceContour,
+  toShape2D,
+} from '../utils/filletUtils';
 
-/** 2D point used internally. */
-type V2 = THREE.Vector2;
-/** A 3D coordinate tuple, e.g. `[x, y, z]`. */
-export type Vec3Tuple = [number, number, number];
-
-const EPS = 1e-6;
+// Re-export Vec3Tuple for backward compatibility
+export type { Vec3Tuple };
 
 /**
  * 单个墙洞（窗户 / 门）的配置。
@@ -46,13 +57,14 @@ export interface WallData {
   height: number;
   /**
    * 拐角圆角半径。可为：
-   *  - 统一数值：所有拐角使用同一半径；
-   *  - 数组：按 `path` 顶点索引逐个指定，**每个拐角独立调弧度**（元素 `0` = 该拐角直角）。
+   *  - 统一数值：所有拐角使用同一半径（全局值）；
+   *  - 数组：按 `path` 顶点索引逐个指定，**有值用该值，`undefined` 回退到全局 `radius`**。
    *
+   * 例如 `radius: [1, undefined, 0.5]` 表示第 0 个拐角 1、第 1 个用全局值、第 2 个 0.5。
    * 小于墙体半厚（`width / 2`）的半径会自动按直角处理（内侧无法圆角）。
    * @default 0
    */
-  radius?: number | number[];
+  radius?: number | (number | undefined)[];
   /** 圆角分段数（越大越圆滑）。 @default 8 */
   radiusSegments?: number;
   /** 墙体首尾是否闭合（闭合时形成环形墙体）。 @default false */
@@ -84,59 +96,8 @@ export interface WallOptions extends GroupComponentOptions {
 }
 
 // ===================== internal 2D helpers =====================
-
-function dedupe(input: V2[]): V2[] {
-  const out: V2[] = [];
-  for (const p of input) {
-    const last = out[out.length - 1];
-    if (!last || last.distanceTo(p) > EPS) out.push(p);
-  }
-  return out;
-}
-
-/** Resolve a per-vertex radius from either a scalar or an array (missing → 0). */
-function radiusAt(radius: number | number[], i: number): number {
-  return Array.isArray(radius) ? radius[i] ?? 0 : radius;
-}
-
-/** Rounded corner arc between two segments (or null if straight / degenerate). */
-interface Corner {
-  t1: V2;
-  t2: V2;
-  center: V2;
-  rEff: number;
-  a1: number;
-  delta: number;
-}
-
-function computeCorner(prev: V2, cur: V2, next: V2, r: number): Corner | null {
-  const d1x = cur.x - prev.x;
-  const d1y = cur.y - prev.y;
-  const d2x = next.x - cur.x;
-  const d2y = next.y - cur.y;
-  const len1 = Math.hypot(d1x, d1y);
-  const len2 = Math.hypot(d2x, d2y);
-  if (len1 <= EPS || len2 <= EPS) return null;
-  const u1x = d1x / len1;
-  const u1y = d1y / len1;
-  const u2x = d2x / len2;
-  const u2y = d2y / len2;
-  const dot = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
-  if (dot > 0.999999) return null;
-  const cross = u1x * u2y - u1y * u2x;
-  const turnSign = cross >= 0 ? 1 : -1;
-  const alpha = Math.acos(dot);
-  let t = r * Math.tan(alpha / 2);
-  const maxT = Math.min(len1, len2) * 0.5;
-  if (t > maxT) t = maxT;
-  if (t <= EPS) return null;
-  const rEff = t / Math.tan(alpha / 2);
-  const t1 = new THREE.Vector2(cur.x - u1x * t, cur.y - u1y * t);
-  const t2 = new THREE.Vector2(cur.x + u2x * t, cur.y + u2y * t);
-  const cx = t1.x - u1y * turnSign * rEff;
-  const cy = t1.y + u1x * turnSign * rEff;
-  return { t1, t2, center: new THREE.Vector2(cx, cy), rEff, a1: Math.atan2(t1.y - cy, t1.x - cx), delta: turnSign * alpha };
-}
+// (dedupe, radiusAt, computeCorner, filletPolyline, signedArea, ensureCCW, ensureCW,
+//  traceContour, toShape2D are now imported from ./filletUtils)
 
 /** A straight run between (possibly rounded) corners. */
 interface Run {
@@ -146,7 +107,7 @@ interface Run {
 }
 
 /** Decompose a world-XZ path into straight runs (for hole placement). */
-function decomposePath(input: V2[], radius: number | number[], close: boolean): Run[] {
+function decomposePath(input: V2[], radius: number[], close: boolean): Run[] {
   const pts = dedupe(input);
   const n = pts.length;
   if (n < 2) return [];
@@ -155,7 +116,7 @@ function decomposePath(input: V2[], radius: number | number[], close: boolean): 
   for (let i = 0; i < n; i++) {
     const internal = close ? n >= 3 : i >= 1 && i <= n - 2;
     if (!internal) continue;
-    cornerAt[i] = computeCorner(pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n], radiusAt(radius, i));
+    cornerAt[i] = computeCorner(pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n], radius[i] ?? 0);
   }
   const runs: Run[] = [];
   for (let i = 0; i < nSeg; i++) {
@@ -168,64 +129,6 @@ function decomposePath(input: V2[], radius: number | number[], close: boolean): 
     runs.push({ start, end, len: start.distanceTo(end) });
   }
   return runs;
-}
-
-/** Round the corners of a polyline into a dense point list (centerline / hole outline). */
-function filletPolyline(input: V2[], radius: number | number[], segments: number, close: boolean): V2[] {
-  const pts = dedupe(input);
-  const n = pts.length;
-  if (n < 2) return pts.map((p) => p.clone());
-  const seg = Math.max(1, Math.floor(segments));
-  const out: V2[] = [];
-  const handle = (i: number, prev: V2, cur: V2, next: V2) => {
-    const c = computeCorner(prev, cur, next, Math.max(0, radiusAt(radius, i)));
-    if (!c) {
-      out.push(cur.clone());
-      return;
-    }
-    out.push(c.t1);
-    for (let k = 1; k < seg; k++) {
-      const a = c.a1 + (c.delta * k) / seg;
-      out.push(new THREE.Vector2(c.center.x + c.rEff * Math.cos(a), c.center.y + c.rEff * Math.sin(a)));
-    }
-    out.push(c.t2);
-  };
-  if (close && n >= 3) {
-    for (let i = 0; i < n; i++) handle(i, pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n]);
-  } else {
-    out.push(pts[0].clone());
-    for (let i = 1; i < n - 1; i++) handle(i, pts[i - 1], pts[i], pts[i + 1]);
-    out.push(pts[n - 1].clone());
-  }
-  return out;
-}
-
-function signedArea(poly: V2[]): number {
-  let a = 0;
-  const n = poly.length;
-  for (let i = 0; i < n; i++) {
-    const p = poly[i];
-    const q = poly[(i + 1) % n];
-    a += p.x * q.y - q.x * p.y;
-  }
-  return a / 2;
-}
-function ensureCCW(poly: V2[]): void {
-  if (signedArea(poly) < 0) poly.reverse();
-}
-function ensureCW(poly: V2[]): void {
-  if (signedArea(poly) > 0) poly.reverse();
-}
-function traceContour(path: THREE.Path | THREE.Shape, poly: V2[]): void {
-  if (poly.length === 0) return;
-  path.moveTo(poly[0].x, poly[0].y);
-  for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
-  path.closePath();
-}
-
-/** Convert a path point into 2D shape space (x, -z) so extrude + rotateX lands in the XZ plane. */
-function toShape2D(p: Vec3Tuple): V2 {
-  return new THREE.Vector2(p[0], -p[2]);
 }
 
 /**
@@ -406,14 +309,16 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
   if (!Array.isArray(data.path) || data.path.length < 2 || data.width <= 0 || data.height <= 0) return null;
   const close = data.close === true && data.path.length >= 3;
   const radiusSegments = data.radiusSegments ?? 8;
-  // Resolve per-vertex radii (scalar broadcasts to all; array is indexed by path vertex),
-  // snapping any radius ≤ halfWidth to 0 (sharp): a smaller radius makes the inner offset
+  // Resolve per-vertex radii with global fallback:
+  // scalar → all corners use the same radius; array → per-vertex, undefined → global value.
+  // Then snap any radius ≤ halfWidth to 0 (sharp): a smaller radius makes the inner offset
   // rail self-intersect (negative inner radius) and corrupts the top-face triangulation,
   // and it can't be rounded on the inside anyway.
   const halfWidth = data.width / 2;
   const radiusInput = data.radius ?? 0;
+  const globalR = typeof radiusInput === 'number' ? radiusInput : 0;
   const radii: number[] = data.path.map((_, i) => {
-    const r = radiusAt(radiusInput, i);
+    const r = radiusAtWithDefault(radiusInput, globalR, i);
     return r > halfWidth ? r : 0;
   });
 
@@ -454,7 +359,7 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
  * **特性:**
  * - 继承 `THREE.Group`，可直接加入任意 Three.js 场景
  * - 墙体路径定义在 XZ 平面（y 被忽略），从 `y = 0` 向上生长至 `y = height`
- * - 每个拐角按 `radius` / `radiusSegments` 倒圆角；`close = true` 时形成环形墙体
+ * - 每个拐角按 `radius` 倒圆角；数组形式可逐顶点指定，`undefined` 回退到全局值；`close = true` 时形成环形墙体
  * - 支持每段独立的墙洞（{@link WallHole}，窗 / 门），按段局部坐标描述并贯通墙体厚度
  * - UV 沿墙长（u）/ 墙高（v）重算，支持 `uvMode: 'repeat' | 'stretch'`，便于整面贴图（砖墙 / 窗户）；
  *   墙洞经 CSG 挖出后贴图在开口周围连续过渡

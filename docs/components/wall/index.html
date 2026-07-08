@@ -33,7 +33,7 @@
       <tr><td>path</td><td><code>[number, number, number][]</code></td><td>—</td><td>墙体中心线路径，XZ 平面坐标 <code>[x, y, z]</code>（<strong>y 被忽略</strong>）。路径定义走向，墙体按 <code>width</code> 向两侧加厚</td></tr>
       <tr><td>width</td><td><code>number</code></td><td>—</td><td>墙体厚度（向路径两侧各加厚 <code>width / 2</code>）</td></tr>
       <tr><td>height</td><td><code>number</code></td><td>—</td><td>墙体高度（沿 Y 轴挤出）</td></tr>
-      <tr><td>radius</td><td><code>number | number[]</code></td><td>0</td><td>拐角圆角半径。数值 ⇒ 所有拐角统一；数组 ⇒ 按 <code>path</code> 顶点索引<strong>逐拐角单独指定</strong>（元素 <code>0</code> = 直角）。小于 <code>width/2</code> 的半径自动按直角处理</td></tr>
+      <tr><td>radius</td><td><code>number | (number | undefined)[]</code></td><td>0</td><td>拐角圆角半径。数值 ⇒ 所有拐角统一（全局值）；数组 ⇒ 按 <code>path</code> 顶点索引<strong>逐拐角指定</strong>，<code>undefined</code> 回退到全局值。小于 <code>width/2</code> 的半径自动按直角处理</td></tr>
       <tr><td>radiusSegments</td><td><code>number</code></td><td>8</td><td>圆角分段数（越大越圆滑）</td></tr>
       <tr><td>close</td><td><code>boolean</code></td><td>false</td><td>首尾是否闭合（闭合时形成环形墙体）</td></tr>
       <tr><td>hole</td><td><code>WallHole[]</code></td><td>—</td><td>墙洞（窗 / 门）列表，画在墙的立面上，按 <code>segment</code> 归属到对应墙段并贯通墙体厚度</td></tr>

@@ -1,0 +1,86 @@
+<div class="page">
+  <h2>Shape</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">异形面绘制组件。接收 XZ 平面上的轮廓点，挤出指定高度，生成带<strong>圆角拐角</strong>的实心几何体。轮廓<strong>总是闭合</strong>（首尾自动相连）。适合台面、地板异形区域、建筑平台等场景。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-shape"></canvas>
+    <div class="demo-ctrl" id="ctrl-shape"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Shape(options: ShapeOptions)</div>
+
+  <h4>Parameters — <code>ShapeOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>shapes</td><td><code>ShapeData[]</code></td><td>—</td><td><strong>必填</strong>。一组异形面数据，每个元素生成一个挤出几何体</td></tr>
+      <tr><td>material</td><td><code>THREE.Material</code></td><td>—</td><td>共享材质（所有异形面复用）。不传则使用默认 <code>MeshStandardMaterial</code></td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Data — <code>ShapeData</code>（单个异形面）</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>path</td><td><code>[number, number, number][]</code></td><td>—</td><td>XZ 平面轮廓点 <code>[x, y, z]</code>（<strong>y 被忽略</strong>），首尾自动闭合。至少 3 个点</td></tr>
+      <tr><td>height</td><td><code>number</code></td><td>—</td><td>挤出高度（沿 Y 轴）</td></tr>
+      <tr><td>radius</td><td><code>number | (number | undefined)[]</code></td><td>0</td><td>拐角圆角半径。数值 ⇒ 所有拐角统一；数组 ⇒ 按 <code>path</code> 顶点索引<strong>逐拐角指定</strong>，<code>undefined</code> 回退到全局值</td></tr>
+      <tr><td>radiusSegments</td><td><code>number</code></td><td>8</td><td>圆角分段数（越大越圆滑）</td></tr>
+      <tr><td>uvMode</td><td><code>'repeat' | 'stretch'</code></td><td>'repeat'</td><td>UV 映射方式：<code>'repeat'</code> = 按米平铺，<code>'stretch'</code> = 一张贴图铺满</td></tr>
+    </tbody>
+  </table>
+
+  <h3>圆角半径规则</h3>
+  <p class="desc"><code>radius</code> 支持两种形式：</p>
+  <ul>
+    <li><strong>标量</strong>（如 <code>0.3</code>）：所有拐角使用同一半径</li>
+    <li><strong>数组</strong>（如 <code>[0.5, undefined, 1, undefined]</code>）：按 <code>path</code> 顶点索引逐拐角指定。<code>undefined</code> 元素回退到标量值（即全局 radius = 0）。<strong>有单独设置用单独的，没有就用全局值。</strong></li>
+  </ul>
+
+  <h3>UV 映射</h3>
+  <p class="desc">异形面包含侧面和顶/底面，UV 分别处理：</p>
+  <ul>
+    <li><strong>侧面</strong>：<code>u = 沿轮廓弧长</code>、<code>v = 高度</code>。与 Wall / Path 的 uvMode 一致：<code>'repeat'</code> 按米平铺，<code>'stretch'</code> 归一化 [0,1]</li>
+    <li><strong>顶/底面</strong>：平面投影 UV，<code>u = x 范围</code>、<code>v = z 范围</code>。<code>'repeat'</code> 按米平铺，<code>'stretch'</code> 归一化 [0,1]</li>
+  </ul>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有异形面几何体；若材质由本组件创建则一并释放（外部传入的 <code>material</code> 不会被释放）。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Shape } from '@cyc/3d-components/core';
+
+// L 形异形台面，统一圆角
+const shape = new Shape({
+  shapes: [{
+    path: [[0,0,0], [4,0,0], [4,0,2], [2,0,2], [2,0,5], [0,0,5]],
+    height: 0.6,
+    radius: 0.3,
+    radiusSegments: 12,
+    uvMode: 'repeat',
+  }],
+});
+scene.add(shape);
+
+// 混合圆角：第 0、3 个拐角 0.5，其余用全局值 0
+const shape2 = new Shape({
+  shapes: [{
+    path: [[0,0,0], [3,0,0], [3,0,3], [0,0,3]],
+    height: 0.4,
+    radius: [0.5, undefined, undefined, 0.5],
+    radiusSegments: 12,
+  }],
+});
+scene.add(shape2);</code></pre>
+</div>
