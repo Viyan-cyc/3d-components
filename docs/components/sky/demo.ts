@@ -4,18 +4,13 @@ import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup
 
 // ---- Sky Demo ----
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
-  const { renderer, scene, camera, resize } = createScene(canvas, 0xf5f5f5);
-
-  // 移除默认的 GridHelper
-  scene.children
-    .filter((c) => c instanceof THREE.GridHelper)
-    .forEach((c) => scene.remove(c));
+  const { renderer, scene, camera, resize } = createScene(canvas);
 
   // 天空穹顶
   const sky = new Sky({
     size: 500,
     topColor: 0x109df4,
-    bottomColor: 0xf5f5f5,
+    bottomColor: 0xe8ecf1,
     offset: 0,
     exponent: 0.6,
   });
@@ -33,7 +28,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   // 控制面板
   const params = {
     topColor: '#109df4',
-    bottomColor: '#f5f5f5',
+    bottomColor: '#e8ecf1',
     offset: 0,
     exponent: 0.6,
   };

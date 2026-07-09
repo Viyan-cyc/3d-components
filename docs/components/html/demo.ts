@@ -80,7 +80,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   scene.add(box);
 
   const groundGeom = new THREE.PlaneGeometry(12, 12);
-  const groundMat = new THREE.MeshStandardMaterial({ color: 0xd9dee4, roughness: 0.8 });
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0xeef0f3, roughness: 1 });
   const ground = new THREE.Mesh(groundGeom, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.01;

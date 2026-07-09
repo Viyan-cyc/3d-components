@@ -1,0 +1,112 @@
+<div class="page">
+  <h2>MeshReflectorMaterial</h2>
+  <span class="tag">extends <code>THREE.MeshStandardMaterial</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">实时平面反射材质。基于 <code>MeshStandardMaterial</code>，通过虚拟镜像相机将场景渲染到 RenderTarget，再合成到表面。支持多通道模糊、深度感知模糊、法线贴图扰动和扭曲贴图。适用于镜面、地板反射、水面等效果。</p>
+
+  <div class="demo-card">
+    <canvas id="c-meshreflectormaterial"></canvas>
+    <div class="demo-ctrl" id="ctrl-meshreflectormaterial"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> MeshReflectorMaterial(options?: MeshReflectorMaterialOptions)</div>
+
+  <h4>Parameters — <code>MeshReflectorMaterialOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>resolution</td><td><code>number</code></td><td>256</td><td>反射 RenderTarget 分辨率，越高越清晰但更耗性能</td></tr>
+      <tr><td>blur</td><td><code>number | [number, number]</code></td><td>[0, 0]</td><td>模糊半径，单值或 [宽, 高] 元组，0 为禁用</td></tr>
+      <tr><td>mixBlur</td><td><code>number</code></td><td>0</td><td>模糊混合度 (0=仅清晰, 1=全模糊)</td></tr>
+      <tr><td>mixStrength</td><td><code>number</code></td><td>1</td><td>反射强度乘数</td></tr>
+      <tr><td>mixContrast</td><td><code>number</code></td><td>1</td><td>反射对比度 (1=不变, &gt;1=更高, &lt;1=更低)</td></tr>
+      <tr><td>mirror</td><td><code>number</code></td><td>0</td><td>镜面程度 (0=与基础色混合, 1=纯反射)</td></tr>
+      <tr><td>distortion</td><td><code>number</code></td><td>1</td><td>扭曲强度，需配合 distortionMap 使用</td></tr>
+      <tr><td>distortionMap</td><td><code>THREE.Texture</code></td><td>null</td><td>扭曲贴图，红通道作为 UV 偏移</td></tr>
+      <tr><td>minDepthThreshold</td><td><code>number</code></td><td>0.9</td><td>深度感知模糊最小阈值</td></tr>
+      <tr><td>maxDepthThreshold</td><td><code>number</code></td><td>1</td><td>深度感知模糊最大阈值</td></tr>
+      <tr><td>depthScale</td><td><code>number</code></td><td>0</td><td>深度缩放 (&gt;0 启用深度感知模糊)</td></tr>
+      <tr><td>depthToBlurRatioBias</td><td><code>number</code></td><td>0.25</td><td>深度与模糊比率偏置</td></tr>
+      <tr><td>reflectorOffset</td><td><code>number</code></td><td>0</td><td>反射面沿法线偏移，避免 z-fighting</td></tr>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0xffffff</td><td>基础颜色</td></tr>
+      <tr><td>metalness</td><td><code>number</code></td><td>0</td><td>金属度 0–1</td></tr>
+      <tr><td>roughness</td><td><code>number</code></td><td>0</td><td>粗糙度 0–1 (也影响模糊混合)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>核心方法</h3>
+  <div class="method">
+    <div class="sig">.updateBeforeRender(<strong>renderer</strong>: WebGLRenderer, <strong>scene</strong>: Scene, <strong>camera</strong>: PerspectiveCamera): <span class="kw">boolean</span></div>
+    <p>每帧在 <code>renderer.render()</code> 之前调用，更新反射纹理。渲染场景到虚拟镜像相机，应用斜裁剪平面，可选模糊。返回 <code>true</code> 表示反射已更新，<code>false</code> 表示反射面背对相机（无需更新）。</p>
+    <table class="pt">
+      <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>renderer</td><td><code>WebGLRenderer</code></td><td>WebGL 渲染器</td></tr>
+        <tr><td>scene</td><td><code>Scene</code></td><td>要反射的场景</td></tr>
+        <tr><td>camera</td><td><code>PerspectiveCamera</code></td><td>主相机（用于计算虚拟相机位置）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="method">
+    <div class="sig">.bindToMesh(<strong>mesh</strong>: THREE.Mesh): <span class="kw">this</span></div>
+    <p>将材质绑定到使用它的 Mesh 对象。必须在将材质赋给 Mesh 后调用，以便材质知道反射平面的位置。支持链式调用。</p>
+  </div>
+
+  <h3>链式设置方法</h3>
+  <div class="method">
+    <div class="sig">.setMirror(<strong>v</strong>: number): <span class="kw">this</span></div>
+    <p>设置镜面程度 (0=与基础色混合, 1=纯反射)。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setMixBlur(<strong>v</strong>: number): <span class="kw">this</span></div>
+    <p>设置模糊混合度 (0=仅清晰, 1=全模糊)。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setMixStrength(<strong>v</strong>: number): <span class="kw">this</span></div>
+    <p>设置反射强度乘数。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setMixContrast(<strong>v</strong>: number): <span class="kw">this</span></div>
+    <p>设置反射对比度。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setDistortion(<strong>v</strong>: number): <span class="kw">this</span></div>
+    <p>设置扭曲强度。</p>
+  </div>
+
+  <h3>资源释放</h3>
+  <div class="method">
+    <div class="sig">.dispose(): <span class="kw">void</span></div>
+    <p>释放所有 GPU 资源（RenderTarget、模糊通道等）。调用后材质不可再使用。</p>
+  </div>
+
+  <h3>代码示例</h3>
+  <pre><code class="language-ts">import * as THREE from 'three';
+import { MeshReflectorMaterial } from '@cyc/3d-components/material';
+
+// 创建反射地板
+const reflectorMat = new MeshReflectorMaterial({
+  mirror: 0.75,
+  blur: [300, 100],
+  mixBlur: 1,
+  mixStrength: 0.8,
+  resolution: 512,
+  color: 0x999999,
+});
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  reflectorMat,
+);
+floor.rotation.x = -Math.PI / 2;
+reflectorMat.bindToMesh(floor);
+scene.add(floor);
+
+// 渲染循环中更新反射
+function animate() {
+  requestAnimationFrame(animate);
+  reflectorMat.updateBeforeRender(renderer, scene, camera);
+  renderer.render(scene, camera);
+}</code></pre>
+</div>

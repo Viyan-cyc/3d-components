@@ -6,11 +6,6 @@ import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   const { renderer, scene, camera, resize } = createScene(canvas);
 
-  // createScene 默认添加了一个 GridHelper，与本组件的无限网格重复，移除它
-  scene.children
-    .filter((c) => c instanceof THREE.GridHelper)
-    .forEach((c) => scene.remove(c));
-
   camera.position.set(7, 5, 9);
   camera.lookAt(0, 0, 0);
 

@@ -1,19 +1,13 @@
 import * as THREE from 'three';
 import { Shape } from '../../../src/core/Shape';
-import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
+import { createScene, createGround, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
 
 // ---- Shape Demo ----
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   const { renderer, scene, camera, resize } = createScene(canvas);
 
   // Floor to catch shadows
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 40),
-    new THREE.MeshStandardMaterial({ color: 0xeef0f3, roughness: 1 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.01;
-  floor.receiveShadow = true;
+  const floor = createGround(40);
   scene.add(floor);
 
   camera.position.set(6, 5, 8);

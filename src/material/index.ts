@@ -14,6 +14,18 @@
  * mesh.material = mat;
  * mat.setColor(0xff6633).setShininess(0.5, 0.1);
  * ```
+ *
+ * @example
+ * ```ts
+ * import { MeshReflectorMaterial } from '@cyc/3d-components/material';
+ *
+ * const reflectorMat = new MeshReflectorMaterial({ mirror: 0.75, blur: [300, 100] });
+ * const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), reflectorMat);
+ * reflectorMat.bindToMesh(floor);
+ * ```
  */
 export { ShinyMaterial } from './ShinyMaterial';
 export type { ShinyMaterialOptions } from './ShinyMaterial';
+
+export { MeshReflectorMaterial } from './MeshReflectorMaterial';
+export type { MeshReflectorMaterialOptions } from './MeshReflectorMaterial';

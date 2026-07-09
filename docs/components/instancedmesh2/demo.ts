@@ -131,23 +131,20 @@ function concentricRings2D(
 // Demo
 // ============================================================
 export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => void {
-  const { renderer, scene, camera, resize } = createScene(canvas, 0xeef2f5);
+  const { renderer, scene, camera, resize } = createScene(canvas);
 
-  // Remove defaults, set up warm lighting
-  scene.children
-    .filter((c) => c instanceof THREE.GridHelper)
-    .forEach((c) => scene.remove(c));
+  // Remove defaults, set up outdoor lighting
   scene.children
     .filter((c) => c instanceof THREE.AmbientLight || c instanceof THREE.DirectionalLight)
     .forEach((c) => scene.remove(c));
 
-  const ambient = new THREE.AmbientLight(0xffeedd, 1.2);
+  const ambient = new THREE.AmbientLight(0xffffff, 1.0);
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.6);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.4);
   sun.position.set(8, 18, 6);
   sun.castShadow = false; // too expensive for 100k
   scene.add(sun);
-  const hemi = new THREE.HemisphereLight(0xa8c4e0, 0x8a7a5a, 0.4);
+  const hemi = new THREE.HemisphereLight(0xbcd5ea, 0x9a8f78, 0.5);
   scene.add(hemi);
 
   camera.near = 0.5;
@@ -163,7 +160,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   // ---- Ground plane (circular to match concentric layout) ----
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(600, 64),
-    new THREE.MeshStandardMaterial({ color: 0xb8a88a, roughness: 0.95 }),
+    new THREE.MeshStandardMaterial({ color: 0xcfc6b0, roughness: 0.95 }),
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
@@ -251,7 +248,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   orbit.target.set(0, 2, 0);
 
   // ---- LOD distance indicators (rings on ground) ----
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xd4c8a8, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x8a9ba8, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
   const distances = [25, 70, 160];
   const rings: THREE.Mesh[] = [];
   distances.forEach((d) => {

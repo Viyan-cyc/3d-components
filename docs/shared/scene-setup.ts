@@ -4,6 +4,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /**
  * Minimal Three.js scene setup shared across all demos.
  * Returns everything needed for a render loop.
+ *
+ * **Demo style guide (keep consistent across all demos):**
+ * - Background: default light grey `0xe8ecf1`; avoid dark backgrounds.
+ * - No `GridHelper` — use the library `Grid` component or a real ground plane.
+ * - Ground plane (when needed): use {@link createGround} for a unified look.
+ * - Lighting: a neutral ambient + directional key light (set up here).
  */
 export function createScene(canvas: HTMLCanvasElement, bgColor = 0xe8ecf1) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -27,10 +33,6 @@ export function createScene(canvas: HTMLCanvasElement, bgColor = 0xe8ecf1) {
   dir.castShadow = true;
   scene.add(dir);
 
-  // Ground grid — darker for light bg
-  const grid = new THREE.GridHelper(10, 20, 0xccd0d8, 0xdfe2e8);
-  scene.add(grid);
-
   // Handle resize
   function resize() {
     const parent = canvas.parentElement!;
@@ -45,6 +47,35 @@ export function createScene(canvas: HTMLCanvasElement, bgColor = 0xe8ecf1) {
 
   return { renderer, scene, camera, resize };
 }
+
+/**
+ * Create the standard demo ground plane — a large, light, matte floor
+ * that catches shadows. Shared across demos so the floor always looks
+ * the same. The caller owns disposal of the returned mesh's geometry
+ * and material.
+ *
+ * @param size - Side length of the (square) ground plane. @default 40
+ */
+export function createGround(size = 40): THREE.Mesh {
+  const ground = new THREE.Mesh(
+    size === 40
+      ? GROUND_GEOMETRY
+      : new THREE.PlaneGeometry(size, size),
+    GROUND_MATERIAL,
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.01;
+  ground.receiveShadow = true;
+  return ground;
+}
+
+// Shared geometry/material so every demo floor is identical.
+const GROUND_GEOMETRY = new THREE.PlaneGeometry(40, 40);
+const GROUND_MATERIAL = new THREE.MeshStandardMaterial({
+  color: 0xeef0f3,
+  roughness: 1,
+  metalness: 0,
+});
 
 /**
  * Start a standard render loop with auto-resize.

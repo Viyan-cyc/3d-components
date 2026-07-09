@@ -37,11 +37,6 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   plane.position.y = 0.01;
   scene.add(plane);
 
-  // Add a subtle wireframe grid on top for reference
-  const gridHelper = new THREE.GridHelper(8, 16, 0x999999, 0xcccccc);
-  gridHelper.position.y = 0.02;
-  scene.add(gridHelper);
-
   addSimpleOrbit(canvas, camera, () => new THREE.Vector3(0, 0, 0));
 
   // Controls
