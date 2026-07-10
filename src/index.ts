@@ -36,6 +36,7 @@ export * from './core';
 export * from './heat';
 export * from './material';
 export { Util } from './utils';
+export * from './graph';
 
 // Re-export types for convenience
 export type * from './types';

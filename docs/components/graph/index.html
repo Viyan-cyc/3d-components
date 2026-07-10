@@ -1,0 +1,76 @@
+<div class="page">
+  <h2>Graph3D</h2>
+  <span class="tag">extends <code>BaseGroup</code>（<code>THREE.Group</code>）</span>
+  <span class="tag">implements <code>IUpdatable</code> · <code>IDisposable</code></span>
+  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页为<strong>第一步</strong>交付：核心数据类型（Node/Edge/Graph + 标准 3D 坐标接口 <code>NodePos3D</code>）、数据适配层（校验/归一化/邻接表）、<code>Graph3D</code> 骨架，渲染球体节点 + 直线段边。后续步骤将接入多形态元素、交互拾取、以及完整的 3D 布局算法体系。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-graph"></canvas>
+    <div class="demo-ctrl" id="ctrl-graph"></div>
+  </div>
+  <p class="desc">上方 demo 默认渲染一组示例图（约 12 节点 / 18 边，初始在原点环形散布）。点「重新生成随机图」验证 <code>setData</code> 的重建与资源释放。</p>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Graph3D(options?: Graph3DOptions)</div>
+
+  <h4>Parameters — <code>Graph3DOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>data</td><td><code>GraphData</code></td><td>—</td><td>初始图数据。若提供，构造后立即 <code>setData()</code></td></tr>
+      <tr><td>nodeSize</td><td><code>number</code></td><td>0.3</td><td>节点默认尺寸（球体半径）。节点自身未指定 <code>size</code> 时使用</td></tr>
+      <tr><td>nodeMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>节点共享材质。不传则各节点自建默认 <code>MeshStandardMaterial</code></td></tr>
+      <tr><td>edgeMaterial</td><td><code>THREE.LineBasicMaterial</code></td><td>—</td><td>边共享材质。不传则各边自建默认材质</td></tr>
+      <tr><td>initialRadius</td><td><code>number</code></td><td>3</td><td>占位环形散布半径（仅当节点无显式坐标时使用）</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>'graph3d'</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+      <tr><td>scale</td><td><code>number</code></td><td>1</td><td>整体缩放</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Methods</h4>
+  <div class="method">
+    <div class="sig">.setData(data: GraphData): void</div>
+    <p>校验并归一化数据，释放旧元素后重新生成球体节点与直线段边。初始坐标取 <code>data.x/y/z</code>，未指定则在原点环形散布。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getNodes(): Node3D[] &nbsp;·&nbsp; .getNode(id): Node3D | undefined</div>
+    <p>访问节点元素实例（便于后续步骤追加交互）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getEdges(): Edge3D[] &nbsp;·&nbsp; .getData(): GraphData | null &nbsp;·&nbsp; .getIndex(): GraphIndex | null</div>
+    <p>访问边实例与规范化数据/索引（邻接表）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.update(delta: number): void &nbsp;·&nbsp; .dispose(): void</div>
+    <p><code>update</code> 每帧由渲染循环调用，转发给子元素；<code>dispose</code> 释放全部节点/边资源。</p>
+  </div>
+
+  <h3>数据类型</h3>
+  <pre><code class="language-ts">interface GraphData {
+  nodes: NodeData[];   // { id, x?, y?, z?, size?, type?, data? }
+  edges: EdgeData[];   // { source, target, id?, type?, data? }
+}
+
+// 所有布局算法的统一输出 —— 含完整 x/y/z
+interface NodePos3D { id: string | number; x: number; y: number; z: number; }</code></pre>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Graph3D } from '@cyc/3d-components/graph';
+
+const graph = new Graph3D({ nodeSize: 0.4 });
+graph.setData({
+  nodes: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }],
+  edges: [
+    { source: 'n1', target: 'n2' },
+    { source: 'n2', target: 'n3' },
+  ],
+});
+scene.add(graph);
+
+// 渲染循环中：
+graph.update(delta);</code></pre>
+</div>

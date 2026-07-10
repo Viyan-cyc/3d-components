@@ -19,6 +19,7 @@ export default defineConfig({
         heat: resolve(__dirname, 'src/heat/index.ts'),
         material: resolve(__dirname, 'src/material/index.ts'),
         utils: resolve(__dirname, 'src/utils/index.ts'),
+        graph: resolve(__dirname, 'src/graph/index.ts'),
       },
     },
     rollupOptions: {

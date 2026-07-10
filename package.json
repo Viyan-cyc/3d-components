@@ -57,6 +57,16 @@
         "default": "./dist/cjs/utils.cjs"
       }
     },
+    "./graph": {
+      "import": {
+        "types": "./dist/es/graph.d.ts",
+        "default": "./dist/es/graph.js"
+      },
+      "require": {
+        "types": "./dist/cjs/graph.d.ts",
+        "default": "./dist/cjs/graph.cjs"
+      }
+    },
     "./dist/*": "./dist/*"
   },
   "sideEffects": false,
@@ -92,7 +102,7 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "docs": "typedoc",
-    "docs:serve": "vite docs --open",
+    "docs:serve": "vite docs --open --port 7777",
     "prepublishOnly": "npm run build"
   }
 }
