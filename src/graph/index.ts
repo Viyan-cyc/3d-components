@@ -39,7 +39,7 @@
 
 // 主组件
 export { Graph3D } from './Graph3D';
-export type { Graph3DOptions } from './Graph3D';
+export type { Graph3DOptions, LayoutApplyOptions } from './Graph3D';
 
 // 数据类型
 export type {
@@ -58,7 +58,12 @@ export type { ValidationResult, GraphIndex } from './adapter';
 export { Node3D } from './elements/Node3D';
 export type { Node3DOptions } from './elements/Node3D';
 export { Edge3D } from './elements/Edge3D';
-export type { Edge3DOptions } from './elements/Edge3D';
+export type { Edge3DOptions, EdgeType } from './elements/Edge3D';
+
+// 交互
+export { PickController } from './interaction/PickController';
+export type { PickControllerOptions } from './interaction/PickController';
+export type { GraphEvent, GraphEventType, GraphEventHandler, GraphPickKind } from './interaction/types';
 
 // 布局（类型骨架）
 export * from './layouts';

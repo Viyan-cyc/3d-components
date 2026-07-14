@@ -78,7 +78,11 @@ export class Node3D extends BaseGroup {
   private geometry: THREE.SphereGeometry;
   /** 该节点独立持有的材质实例（由模板 clone 而来，状态变更互不影响）。 */
   readonly material: THREE.MeshStandardMaterial;
-  /** label 槽位（第二步以 `core/Html` 填充）。 */
+  /**
+   * label 槽位。第二步未填充（本次不实现 sprite/html 节点形态）；
+   * 后续步骤将以此挂载 `core/Html`（DOM 标签投影）或 `core/BitmapText`（SDF 文字）。
+   * 挂载后 `dispose()` 会预先释放之。
+   */
   label: THREE.Object3D | null = null;
 
   /**

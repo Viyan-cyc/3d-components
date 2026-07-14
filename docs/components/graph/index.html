@@ -2,14 +2,14 @@
   <h2>Graph3D</h2>
   <span class="tag">extends <code>BaseGroup</code>（<code>THREE.Group</code>）</span>
   <span class="tag">implements <code>IUpdatable</code> · <code>IDisposable</code></span>
-  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页为<strong>第一步</strong>交付：核心数据类型（Node/Edge/Graph + 标准 3D 坐标接口 <code>NodePos3D</code>）、数据适配层（校验/归一化/邻接表）、<code>Graph3D</code> 骨架，渲染球体节点 + 直线段边。后续步骤将接入多形态元素、交互拾取、以及完整的 3D 布局算法体系。</p>
+  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页为<strong>第五步</strong>交付（最终步）：在第三/四步布局基础上，新增<strong>统一声明式布局 API</strong>（<code>Graph3DOptions.layout</code> / <code>setLayout</code> / <code>getLayout</code> —— 布局被记忆，<code>setData</code> 后自动重应用，无需手动 <code>applyLayout</code>）与 <code>force</code> 的 <strong>Barnes-Hut 八叉树加速</strong>（<code>barnesHut:true</code>，斥力 <code>O(n²)→O(n log n)</code>，大图提速）。</p>
 
   <!-- Demo -->
   <div class="demo-card">
     <canvas id="c-graph"></canvas>
     <div class="demo-ctrl" id="ctrl-graph"></div>
   </div>
-  <p class="desc">上方 demo 默认渲染一组示例图（约 12 节点 / 18 边，初始在原点环形散布）。点「重新生成随机图」验证 <code>setData</code> 的重建与资源释放。</p>
+  <p class="desc">上方 demo 默认渲染一组示例图（约 12 节点）。在「布局」下拉切换任意布局 —— 经 <code>graph.setLayout(preset)</code> <strong>声明式</strong>切换并被记忆，节点经 gsap 过渡平滑飞抵目标坐标；之后点「重新生成」会<strong>自动重应用</strong>当前布局（无需再手动 apply，Step 5 核心）。力导向可勾「Barnes-Hut」开启八叉树加速，切到 <strong>大节点数（最高 2000）</strong>时「力导向计算耗时」条显示提速效果。切换「边形态」在直线/管道(带箭头)/混合间切换；悬停节点放大发光、边提亮；点击节点/边选中（节点常亮发光、边常亮+emissive）。切换「单选/多选」验证互斥与累加；选中节点<strong>只提亮邻接边</strong>（其余边不变）；<strong>点击空白/地面清除选中</strong>；OrbitControls 拖拽不会误触发点击。布局后 hover/select 仍正常。</p>
 
   <h3>Constructor</h3>
   <div class="sig"><span class="kw">new</span> Graph3D(options?: Graph3DOptions)</div>
@@ -20,9 +20,13 @@
     <tbody>
       <tr><td>data</td><td><code>GraphData</code></td><td>—</td><td>初始图数据。若提供，构造后立即 <code>setData()</code></td></tr>
       <tr><td>nodeSize</td><td><code>number</code></td><td>0.3</td><td>节点默认尺寸（球体半径）。节点自身未指定 <code>size</code> 时使用</td></tr>
-      <tr><td>nodeMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>节点共享材质。不传则各节点自建默认 <code>MeshStandardMaterial</code></td></tr>
-      <tr><td>edgeMaterial</td><td><code>THREE.LineBasicMaterial</code></td><td>—</td><td>边共享材质。不传则各边自建默认材质</td></tr>
+      <tr><td>nodeMaterial</td><td><code>THREE.MeshStandardMaterial</code></td><td>—</td><td>节点材质<strong>模板</strong>。每节点 clone 独立实例（改色/高亮互不影响）。不传则用内置默认</td></tr>
+      <tr><td>edgeMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>边材质<strong>模板</strong>（<code>line</code>→<code>LineBasicMaterial</code>，<code>path</code>→<code>MeshStandardMaterial</code>）。每边 clone 独立实例</td></tr>
+      <tr><td>edgeType</td><td><code>'line' | 'path'</code></td><td>'line'</td><td>边形态默认值。单边可用 <code>EdgeData.type</code> 覆盖。<code>'path'</code> 复用 <code>core/Path</code> 圆管</td></tr>
+      <tr><td>edgePathRadius</td><td><code>number</code></td><td>0.05</td><td><code>'path'</code> 形态管道半径</td></tr>
+      <tr><td>edgeArrow</td><td><code>boolean</code></td><td>false</td><td><code>'path'</code> 形态是否末端生成箭头（有向边）</td></tr>
       <tr><td>initialRadius</td><td><code>number</code></td><td>3</td><td>占位环形散布半径（仅当节点无显式坐标时使用）</td></tr>
+      <tr><td>layout</td><td><code>LayoutPreset</code></td><td>—</td><td><strong>声明式布局预设</strong>（Step 5）。<code>{ type, config }</code>，<code>type</code> ∈ <code>circular|force|hex|grid</code>。提供后 <code>setData</code> 自动应用并记忆；运行时用 <code>setLayout</code> 切换。与命令式 <code>applyLayout</code> 区别：被记忆、重建自动重应用</td></tr>
       <tr><td>name</td><td><code>string</code></td><td>'graph3d'</td><td><code>Object3D.name</code></td></tr>
       <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
       <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
@@ -41,13 +45,46 @@
     <p>访问节点元素实例（便于后续步骤追加交互）。</p>
   </div>
   <div class="method">
-    <div class="sig">.getEdges(): Edge3D[] &nbsp;·&nbsp; .getData(): GraphData | null &nbsp;·&nbsp; .getIndex(): GraphIndex | null</div>
-    <p>访问边实例与规范化数据/索引（邻接表）。</p>
+    <div class="sig">.getEdges(): Edge3D[] &nbsp;·&nbsp; .getEdge(id): Edge3D | undefined</div>
+    <p>访问边实例。<code>Edge3D</code> 支持 <code>type:'line'|'path'</code>、<code>arrow</code>，<code>getMaterial()</code> 返回该边独立 clone 的材质（可直接改色/透明度做反馈）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getData(): GraphData | null &nbsp;·&nbsp; .getIndex(): GraphIndex | null</div>
+    <p>访问规范化数据/索引（邻接表、<code>incidentEdges</code>）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.applyLayout(layout, config?, options?): void &nbsp;·&nbsp; .applyPositions(positions, options?): void</div>
+    <p>应用一次布局算法刷新全部节点坐标与边端点。<code>applyLayout</code> 接收布局函数（如 <code>Layouts.circular</code>/<code>Layouts.force</code>）+ 配置；<code>applyPositions</code> 跳过计算直接置位（外部坐标）。<code>options.animate</code> 启用 gsap 过渡动画（默认关），<code>duration</code>、<code>onComplete</code> 可选。力导向自动注入当前图边 —— <code>graph.applyLayout(Layouts.force)</code> 即可。一次性应用，不持久化（持久化 <code>setLayout</code> 留 Step 5）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setLayout(preset: LayoutPreset | null, options?): void &nbsp;·&nbsp; .getLayout(): LayoutPreset | null</div>
+    <p><strong>声明式布局 API</strong>（Step 5）：<code>setLayout</code> 切换并<strong>记忆</strong>预设，后续 <code>setData</code> 自动重应用（无需手动 applyLayout）；传 <code>null</code> 清除（退回占位散布）。<code>getLayout</code> 读取当前预设。与 <code>applyLayout</code> 区别：applyLayout 一次性不记忆；setLayout 持久化、重建自动编排。</p>
   </div>
   <div class="method">
     <div class="sig">.update(delta: number): void &nbsp;·&nbsp; .dispose(): void</div>
-    <p><code>update</code> 每帧由渲染循环调用，转发给子元素；<code>dispose</code> 释放全部节点/边资源。</p>
+    <p><code>update</code> 每帧由渲染循环调用，转发给子元素；<code>dispose</code> 释放全部节点/边资源（并终止进行中的布局过渡动画）。</p>
   </div>
+
+  <h3>布局 · Layouts（Step 3-5）</h3>
+  <div class="sig">Layouts.circular / Layouts.force / Layouts.hex / Layouts.grid &nbsp;—&nbsp; (nodes, config?) → NodePos3D[]</div>
+  <p class="desc">纯函数、零 Three.js 运行时依赖、可独立调用（不依赖 <code>Graph3D</code>）。统一签名 <code>(nodes, config) =&gt; NodePos3D[]</code>，输出含完整 x/y/z。命名空间风格 <code>Layouts.xxx(...)</code> 与命名导入 <code>import { hex } from ...</code> 等价。<strong>声明式</strong>使用见 <code>LayoutPreset</code>（Step 5），经 <code>setLayout</code>/<code>Graph3DOptions.layout</code> 接入。</p>
+  <table class="pt">
+    <thead><tr><th>布局</th><th>关键配置</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>circular</code></td><td><code>radius</code>(3) · <code>startAngle</code>/<code>endAngle</code> · <code>plane</code>('xz') · <code>rings</code>(1)+<code>radiusStep</code> · <code>groupBy</code> · <code>depthOffset</code>/<code>layerSpacing</code></td><td>2D 圆周按 <code>plane</code> 映射三维。<code>groupBy</code> 命中时<strong>每组一个深度层</strong>；否则 <code>rings&gt;1</code> 走同心多环；其余单圈单层</td></tr>
+      <tr><td><code>force</code></td><td><code>dimensions</code>(3) · <code>iterations</code>(300) · <code>linkDistance</code>(1)/<code>linkStrength</code>(0.3) · <code>chargeStrength</code>(30, 正=斥) · <code>centerStrength</code>(0.02) · <code>center</code> · <code>velocityDecay</code>(0.6) · <code>edges</code> · <code>barnesHut</code>(false)<sup>Step5</sup> · <code>theta</code>(0.9)<sup>Step5</sup></td><td>d3-force 思路三维力导向。<code>dimensions:2</code> 走 <code>plane</code> 映射；<code>edges</code> 经配置传入（applyLayout 自动注入）。恒返回有限坐标。<strong><code>barnesHut:true</code></strong>（仅 3D）启用八叉树近似 <code>O(n log n)</code> 加速大图；<code>theta</code> 越小越精确越慢</td></tr>
+      <tr><td><code>hex</code></td><td><code>radius</code>(1, 外接圆) · <code>orientation</code>('flat'|'pointy', 默认 'flat') · <code>layers</code>(1) · <code>groupBy</code> · <code>plane</code>('xz') · <code>depthOffset</code>/<code>layerSpacing</code></td><td>六边形蜂巢：轴向坐标 <code>(q,r)</code> 从中心逐环螺旋铺开（移植 RedBlobGames），按 <code>orientation</code> 换算后经 <code>plane</code> 映射三维。<code>layers&gt;1</code> 按 index 轮询多层堆叠；<code>groupBy</code> 命中时每组一层。本质 2D 布局</td></tr>
+      <tr><td><code>grid</code></td><td><code>cols</code>/<code>rows</code>/<code>levels</code>(1) · <code>spacingX</code>/<code>spacingY</code>/<code>spacingZ</code>(均 1)</td><td>行/列/层三维网格：<code>col→x</code>、<code>row→z</code>、<code>level→y</code>，居中于原点。缺省自动推算 <code>cols</code>/<code>rows</code> 铺满。<strong>本质 3D 布局</strong>（<code>plane</code>/<code>depthOffset</code>/<code>layerSpacing</code> 为 no-op）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>声明式布局 · LayoutPreset（Step 5）</h3>
+  <div class="sig">type LayoutPreset = { type: 'circular'|'force'|'hex'|'grid'; config?: ... }</div>
+  <p class="desc">判别联合：<code>type</code> 决定 <code>config</code> 具体类型，调用点即获类型安全。经 <code>Graph3DOptions.layout</code>（构造时）或 <code>setLayout</code>（运行时）接入 —— 布局被<strong>记忆</strong>，<code>setData</code> 后自动重应用。与命令式 <code>applyLayout</code>（一次性、不记忆）互补：声明式适合「布局随数据变化自动重排」场景，命令式适合「一次性手动驱动」场景。</p>
+
+  <h3>交互 · PickController</h3>
+  <div class="sig">new PickController({ domElement, graph, camera, onHover?, onSelect?, highlightOnHover?, highlightOnSelect?, neighborHighlight? })</div>
+  <p class="desc">监听 canvas pointer 事件，Raycaster 拾取 <code>Graph3D</code> 子树（<strong>节点优先于边</strong>回查 <code>userData.nodeId/edgeId</code>）。节点与边均可被选中：节点 hover 放大+发光、select 常亮；边 hover/select 提亮为强调色（<code>path</code> 形态加 emissive）。选中模式 <code>single</code>（互斥）/ <code>multiple</code>（纯累加 toggle）运行时可切换。选中节点时<strong>只提亮其邻接边</strong>（其余边不变）。点击空白/地面自动清空选中；另暴露 <code>clearSelection()</code>、<code>getSelectedNodes()</code>、<code>getSelectedEdges()</code>。分发 <code>GraphEvent</code>（<code>hover/unhover/click/select/unselect</code>）给 <code>onHover/onSelect</code> 回调。需在销毁时调用 <code>pick.dispose()</code>。</p>
 
   <h3>数据类型</h3>
   <pre><code class="language-ts">interface GraphData {
@@ -59,18 +96,52 @@
 interface NodePos3D { id: string | number; x: number; y: number; z: number; }</code></pre>
 
   <h3>示例</h3>
-  <pre><code class="language-ts">import { Graph3D } from '@cyc/3d-components/graph';
+  <pre><code class="language-ts">import { Graph3D, PickController, Layouts } from '@cyc/3d-components/graph';
 
-const graph = new Graph3D({ nodeSize: 0.4 });
+const graph = new Graph3D({ nodeSize: 0.4, edgeType: 'path', edgeArrow: true });
 graph.setData({
   nodes: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }],
   edges: [
-    { source: 'n1', target: 'n2' },
-    { source: 'n2', target: 'n3' },
+    { source: 'n1', target: 'n2', type: 'path' },
+    { source: 'n2', target: 'n3', type: 'line' },
   ],
 });
 scene.add(graph);
 
+// 声明式布局（Step 5）：构造时指定 → setData 自动应用并记忆
+const graph = new Graph3D({
+  nodeSize: 0.4, edgeType: 'path', edgeArrow: true,
+  layout: { type: 'force', config: { iterations: 300, barnesHut: true } }, // 大图加速
+});
+graph.setData({
+  nodes: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }],
+  edges: [
+    { source: 'n1', target: 'n2', type: 'path' },
+    { source: 'n2', target: 'n3', type: 'line' },
+  ],
+}); // ← 自动跑力导向，无需再 applyLayout
+scene.add(graph);
+
+// 运行时切换布局（被记忆，后续 setData 自动重应用）
+graph.setLayout({ type: 'hex', config: { radius: 1.3, layers: 3, layerSpacing: 2.4 } });
+graph.setLayout({ type: 'grid', config: { levels: 3, spacingY: 2.4 } });
+
+// 命令式一次性应用（不记忆，适合手动驱动）
+graph.applyLayout(Layouts.circular, { radius: 4, plane: 'xz' });
+
+// 布局函数也可独立调用（纯函数、零 Three.js 依赖）：
+// const positions = Layouts.force(nodes, { edges, dimensions: 3, barnesHut: true });
+// const honeycomb = Layouts.hex(nodes, { radius: 1.3, orientation: 'pointy' });
+// const grid3d    = Layouts.grid(nodes, { cols: 4, levels: 2 });
+
+// 交互拾取 + 内置反馈 + 事件回调
+const pick = new PickController({
+  domElement: renderer.domElement, graph, camera,
+  onHover: (e) => console.log('hover', e.kind, e.id),
+  onSelect: (e) => console.log(e.type, e.kind, e.id),
+});
+
 // 渲染循环中：
-graph.update(delta);</code></pre>
+graph.update(delta); pick.update(delta);
+// 销毁：pick.dispose(); graph.dispose();</code></pre>
 </div>
