@@ -363,18 +363,18 @@ pre code {
   overflow-y: auto;
   z-index: 10;
 }
-.demo-ctrl label {
+:is(.demo-ctrl, .demo-tabs) label {
   display: flex;
   flex-direction: column;
   gap: 3px;
   color: var(--text-secondary);
 }
-.demo-ctrl label span {
+:is(.demo-ctrl, .demo-tabs) label span {
   color: var(--text-primary);
   font-size: 12px;
 }
-.demo-ctrl label code { color: var(--color-primary); }
-.demo-ctrl input[type='range'] {
+:is(.demo-ctrl, .demo-tabs) label code { color: var(--color-primary); }
+:is(.demo-ctrl, .demo-tabs) input[type='range'] {
   width: 100%;
   height: 14px;
   -webkit-appearance: none;
@@ -382,12 +382,12 @@ pre code {
   background: transparent;
   cursor: pointer;
 }
-.demo-ctrl input[type='range']::-webkit-slider-runnable-track {
+:is(.demo-ctrl, .demo-tabs) input[type='range']::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
   background: var(--border-light);
 }
-.demo-ctrl input[type='range']::-webkit-slider-thumb {
+:is(.demo-ctrl, .demo-tabs) input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
@@ -398,12 +398,12 @@ pre code {
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
-.demo-ctrl input[type='range']::-moz-range-track {
+:is(.demo-ctrl, .demo-tabs) input[type='range']::-moz-range-track {
   height: 4px;
   border-radius: 999px;
   background: var(--border-light);
 }
-.demo-ctrl input[type='range']::-moz-range-thumb {
+:is(.demo-ctrl, .demo-tabs) input[type='range']::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -411,7 +411,7 @@ pre code {
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
-.demo-ctrl select {
+:is(.demo-ctrl, .demo-tabs) select {
   width: 100%;
   padding: 4px 8px;
   background: var(--bg-card);
@@ -421,8 +421,8 @@ pre code {
   font-size: 12px;
   outline: none;
 }
-.demo-ctrl select:focus { border-color: var(--color-primary); }
-.demo-ctrl button {
+:is(.demo-ctrl, .demo-tabs) select:focus { border-color: var(--color-primary); }
+:is(.demo-ctrl, .demo-tabs) button {
   width: 100%;
   padding: 6px 12px;
   background: var(--color-primary);
@@ -434,22 +434,22 @@ pre code {
   font-weight: 500;
   transition: background .2s;
 }
-.demo-ctrl button:hover { background: var(--color-primary-light); }
-.demo-ctrl .info {
+:is(.demo-ctrl, .demo-tabs) button:hover { background: var(--color-primary-light); }
+:is(.demo-ctrl, .demo-tabs) .info {
   margin-top: 2px;
   font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
-.demo-ctrl .info code { color: var(--color-primary); }
-.demo-ctrl label.check {
+:is(.demo-ctrl, .demo-tabs) .info code { color: var(--color-primary); }
+:is(.demo-ctrl, .demo-tabs) label.check {
   flex-direction: row;
   align-items: center;
   gap: 6px;
   cursor: pointer;
 }
-.demo-ctrl label.check input[type="checkbox"],
-.demo-ctrl label.check input[type="radio"] {
+:is(.demo-ctrl, .demo-tabs) label.check input[type="checkbox"],
+:is(.demo-ctrl, .demo-tabs) label.check input[type="radio"] {
   flex-shrink: 0;
   margin: 0;
   width: 14px;
@@ -457,7 +457,7 @@ pre code {
   accent-color: var(--color-primary);
   vertical-align: middle;
 }
-.demo-ctrl label.check input[type="color"] {
+:is(.demo-ctrl, .demo-tabs) label.check input[type="color"] {
   flex-shrink: 0;
   margin: 0;
   width: 22px;
@@ -467,11 +467,63 @@ pre code {
   border-radius: var(--radius);
   cursor: pointer;
 }
-/* Thin scrollbar for demo-ctrl */
-.demo-ctrl::-webkit-scrollbar { width: 4px; }
-.demo-ctrl::-webkit-scrollbar-track { background: transparent; }
-.demo-ctrl::-webkit-scrollbar-thumb { background: var(--border-base); border-radius: 999px; }
-.demo-ctrl::-webkit-scrollbar-thumb:hover { background: var(--text-placeholder); }
+/* Thin scrollbar for demo-ctrl / demo-tabs */
+:is(.demo-ctrl, .demo-tabs)::-webkit-scrollbar { width: 4px; }
+:is(.demo-ctrl, .demo-tabs)::-webkit-scrollbar-track { background: transparent; }
+:is(.demo-ctrl, .demo-tabs)::-webkit-scrollbar-thumb { background: var(--border-base); border-radius: 999px; }
+:is(.demo-ctrl, .demo-tabs)::-webkit-scrollbar-thumb:hover { background: var(--text-placeholder); }
+
+/* ==================== DEMO TABS（布局 Tab 浮层，Graph3D 专用）==================== */
+.demo-tabs {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  min-width: 168px;
+  max-width: 210px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  z-index: 10;
+}
+/* segmented Tab 条（.demo-tabs .seg 优先级高于 :is button，确保不被主按钮样式覆盖） */
+.demo-tabs .seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--border-lighter);
+  border-radius: var(--radius);
+}
+.demo-tabs .seg button {
+  flex: 1;
+  width: auto;
+  padding: 5px 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: calc(var(--radius) - 1px);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.demo-tabs .seg button:hover {
+  background: rgba(255,255,255,.7);
+  color: var(--text-primary);
+}
+.demo-tabs .seg button.active {
+  background: var(--color-primary);
+  color: #fff;
+}
+.demo-tabs .seg-panel { display: flex; flex-direction: column; gap: 6px; }
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 900px) {
