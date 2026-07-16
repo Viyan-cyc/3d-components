@@ -1,0 +1,108 @@
+<div class="page">
+  <h2>GizmoHelper</h2>
+  <span class="tag">implements <code>IUpdatable</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">视口导航 Gizmo（Viewport Gizmo）。参考 <a href="https://github.com/pmndrs/drei/blob/master/src/core/GizmoHelper.tsx" target="_blank">drei GizmoHelper</a> 的原生 Three.js 实现：在屏幕角落绘制一个独立小视口，用正交相机渲染一个三轴指示器（<code>GizmoViewport</code>），实时镜像主相机朝向；点击轴头即可把主相机平滑旋转到对应标准视角。GizmoHelper 自带虚拟场景与射线拾取，<strong>不要</strong> <code>scene.add(gizmo)</code>。</p>
+
+  <div class="demo-card">
+    <canvas id="c-gizmo"></canvas>
+    <div class="demo-ctrl" id="ctrl-gizmo"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> GizmoHelper(options: GizmoHelperOptions)</div>
+
+  <h4>Parameters — <code>GizmoHelperOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>camera</td><td><code>THREE.Camera</code></td><td>—</td><td>主场景相机（必填）：gizmo 镜像其朝向，点击轴时围绕目标点旋转它</td></tr>
+      <tr><td>renderer</td><td><code>THREE.WebGLRenderer</code></td><td>—</td><td>用于绘制叠层的渲染器（必填）</td></tr>
+      <tr><td>controls</td><td><code>GizmoControlsLike</code></td><td>—</td><td>相机控制器（OrbitControls 等），提供 <code>target</code> 与 <code>update</code>；省略时围绕原点旋转</td></tr>
+      <tr><td>content</td><td><code>GizmoContent</code></td><td>—</td><td>gizmo 内容（如 <code>GizmoViewport</code>），也可构造后用 <code>setContent</code> 设置</td></tr>
+      <tr><td>alignment</td><td><code>GizmoAlignment</code></td><td>'bottom-right'</td><td>九宫格对齐位置</td></tr>
+      <tr><td>margin</td><td><code>[number, number]</code></td><td>[16, 16]</td><td>相对屏幕边缘的留白 <code>[水平, 垂直]</code>（CSS 像素）</td></tr>
+      <tr><td>size</td><td><code>number</code></td><td>120</td><td>gizmo 叠层方形边长（CSS 像素）</td></tr>
+      <tr><td>disabled</td><td><code>boolean</code></td><td>false</td><td>是否整体禁用（不渲染、不响应点击、不做同步）</td></tr>
+      <tr><td>onTarget</td><td><code>() =&gt; Vector3</code></td><td>—</td><td>自定义轨道目标点提供函数，优先级高于 <code>controls.target</code></td></tr>
+      <tr><td>onUpdate</td><td><code>() =&gt; void</code></td><td>—</td><td>每个动画步的回调，替代 <code>controls.update</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.setContent(<strong>content</strong>: GizmoContent): <span class="kw">this</span></div>
+    <p>设置 gizmo 内容（替换现有内容）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>: number): void</div>
+    <p>每帧调用：把 gizmo 朝向同步到主相机、调用内容的逐帧回调，并推进相机动画（若有）。纯变换逻辑，不绘制。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.renderOverlay(): void</div>
+    <p>把 gizmo 绘制到屏幕角落叠层。<strong>必须在每帧主渲染 <code>renderer.render(scene, camera)</code> 之后调用</strong>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.tweenCamera(<strong>direction</strong>: Vector3): <span class="kw">this</span></div>
+    <p>平滑动画主相机，使其从 <code>direction</code> 方向看向目标点。通常由内容的 <code>onPick</code> 调用。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setAlignment(<strong>a</strong>: GizmoAlignment): <span class="kw">this</span></div>
+    <p>设置对齐位置。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setMargin(<strong>m</strong>: [number, number]): <span class="kw">this</span></div>
+    <p>设置屏幕边缘留白。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setSize(<strong>s</strong>: number): <span class="kw">this</span></div>
+    <p>设置叠层方形边长。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setDisabled(<strong>d</strong>: boolean): <span class="kw">this</span></div>
+    <p>启用 / 禁用整个 gizmo。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>移除监听、释放内容与虚拟场景中的几何体 / 材质 / 贴图。</p>
+  </div>
+
+  <h3>GizmoViewport</h3>
+  <p>三轴视口指示器（GizmoHelper 的默认内容），仿 <a href="https://github.com/Fennec-hub/ThreeOrbitControlsGizmo" target="_blank">ThreeOrbitControlsGizmo</a> 的 <strong>2D 扁平气泡</strong>样式。由 6 个彩色扁平圆形气泡（正轴亮、带暗色字母 X/Y/Z；负轴暗、较小）+ 从中心连出的细彩色线组成。每帧按各轴朝向切换<strong>正面=亮色 / 背面=暗色</strong>，鼠标悬停的气泡填白。气泡为始终面向相机的 <code>Sprite</code>。</p>
+  <div class="sig"><span class="kw">new</span> GizmoViewport(options?: GizmoViewportOptions)</div>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>onPick</td><td><code>(dir: Vector3) =&gt; void</code></td><td>—</td><td>点击轴头回调，参数为该轴方向，通常 <code>(dir) =&gt; gizmo.tweenCamera(dir)</code></td></tr>
+      <tr><td>colors</td><td><code>{ x, y, z }</code></td><td>见下</td><td>三轴颜色，每条为 <code>[正面亮色, 背面暗色]</code>。默认 x <code>#f73c3c/#942424</code>、y <code>#6ccb26/#417a17</code>、z <code>#178cf0/#0e5490</code></td></tr>
+      <tr><td>labels</td><td><code>[string, string, string]</code></td><td>['X','Y','Z']</td><td>正轴气泡标签文字（常显），空串隐藏</td></tr>
+      <tr><td>negativeLabels</td><td><code>[string, string, string]</code></td><td>['-X','-Y','-Z']</td><td>负轴气泡标签文字（仅悬停时显示）</td></tr>
+      <tr><td>labelColor</td><td><code>ColorRepresentation</code></td><td>'#222222'</td><td>标签文字常规色（正轴未悬停时）</td></tr>
+      <tr><td>hoverColor</td><td><code>ColorRepresentation</code></td><td>'#ffffff'</td><td>悬停时文字变白的颜色</td></tr>
+      <tr><td>negativeOpacity</td><td><code>number</code></td><td>0.35</td><td>负轴气泡填充透明度</td></tr>
+      <tr><td>backdropOpacity</td><td><code>number</code></td><td>0.13</td><td>整体悬停时白色圆底透明度（0 关闭）</td></tr>
+      <tr><td>size</td><td><code>number</code></td><td>1</td><td>气泡整体缩放</td></tr>
+      <tr><td>hideNegativeAxes</td><td><code>boolean</code></td><td>false</td><td>隐藏负方向轴头</td></tr>
+      <tr><td>hideAxisHeads</td><td><code>boolean</code></td><td>false</td><td>隐藏所有轴头（仅保留轴线）</td></tr>
+      <tr><td>disabled</td><td><code>boolean</code></td><td>false</td><td>禁用点击拾取</td></tr>
+    </tbody>
+  </table>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { GizmoHelper, GizmoViewport } from '@cyc/3d-components/helper';
+
+const gizmo = new GizmoHelper({ camera, renderer, controls });
+gizmo.setContent(new GizmoViewport({
+  onPick: (dir) => gizmo.tweenCamera(dir),
+}));
+
+// 渲染循环（renderOverlay 必须在主渲染之后）：
+function frame() {
+  const dt = clock.getDelta();
+  controls.update();
+  gizmo.update(dt);          // 同步 gizmo 朝向 + 动画相机
+  renderer.render(scene, camera);
+  gizmo.renderOverlay();     // 叠层绘制
+  requestAnimationFrame(frame);
+}</code></pre>
+</div>

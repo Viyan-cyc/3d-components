@@ -67,6 +67,16 @@
         "default": "./dist/cjs/graph.cjs"
       }
     },
+    "./helper": {
+      "import": {
+        "types": "./dist/es/helper.d.ts",
+        "default": "./dist/es/helper.js"
+      },
+      "require": {
+        "types": "./dist/cjs/helper.d.ts",
+        "default": "./dist/cjs/helper.cjs"
+      }
+    },
     "./dist/*": "./dist/*"
   },
   "sideEffects": false,
