@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { IUpdatable, IDisposable } from '../types';
+import type { IUpdatable, IDisposable } from '../../types';
 
 /**
  * Gizmo 在屏幕上的对齐位置（九宫格）。
