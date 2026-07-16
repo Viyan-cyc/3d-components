@@ -47,6 +47,14 @@ export interface Node3DOptions extends BaseGroupOptions {
    * 作模板。`dispose()` 释放各节点自己 clone 的实例（模板本身不被释放）。
    */
   material?: THREE.MeshStandardMaterial;
+  /**
+   * 节点几何体**工厂**。传入则用其返回值替代默认的 `SphereGeometry`，
+   * 可实现自定义节点形状（如六边形瓦片、立方体等）。工厂接收节点尺寸 `size`
+   *（球体半径量级，可忽略自行决定瓦片尺度），须返回**新建**的 `BufferGeometry`
+   *（节点会自行 `dispose()`）。不传则用球体。运行时可用
+   * {@link Node3D.setGeometryFactory} 切换。
+   */
+  geometryFactory?: (size: number) => THREE.BufferGeometry;
 }
 
 /**
@@ -74,8 +82,12 @@ export class Node3D extends BaseGroup {
   readonly nodeId: NodeId;
   /** 内部 mesh。 */
   private readonly mesh: THREE.Mesh;
-  /** 当前几何体引用（setSize 时会被替换，dispose 时释放当前实例）。 */
-  private geometry: THREE.SphereGeometry;
+  /** 当前几何体引用（setSize / setGeometryFactory 时会被替换，dispose 时释放当前实例）。 */
+  private geometry: THREE.BufferGeometry;
+  /** 节点解析后的尺寸（球体半径量级）；setGeometryFactory 重建时沿用。 */
+  private readonly size: number;
+  /** 节点几何工厂（可选）；缺省时 buildGeometry 回退 `SphereGeometry`。 */
+  private geometryFactory?: (size: number) => THREE.BufferGeometry;
   /** 该节点独立持有的材质实例（由模板 clone 而来，状态变更互不影响）。 */
   readonly material: THREE.MeshStandardMaterial;
   /**
@@ -101,7 +113,9 @@ export class Node3D extends BaseGroup {
     this.nodeId = options.data.id;
 
     const size = options.data.size ?? options.defaultSize ?? 0.3;
-    this.geometry = new THREE.SphereGeometry(size, 32, 32);
+    this.size = size;
+    this.geometryFactory = options.geometryFactory;
+    this.geometry = this.buildGeometry(size);
 
     // 每个节点 clone 一份独立材质实例 —— 交互时改色/高亮互不影响。
     // options.material 作为「模板（prototype）」提供，不直接共享。
@@ -151,13 +165,35 @@ export class Node3D extends BaseGroup {
   }
 
   /**
-   * 动态修改节点尺寸（重建球体几何）。用于交互反馈（如悬停放大）。
+   * 按当前工厂（或缺省球体）构建一份新几何体。供构造、setSize、setGeometryFactory 复用。
+   */
+  private buildGeometry(size: number): THREE.BufferGeometry {
+    return this.geometryFactory ? this.geometryFactory(size) : new THREE.SphereGeometry(size, 32, 32);
+  }
+
+  /**
+   * 动态修改节点尺寸（按工厂或缺省球体重建几何）。用于交互反馈（如悬停放大）。
    *
    * @param size - 新的半径。
    */
   setSize(size: number): void {
     this.geometry.dispose();
-    this.geometry = new THREE.SphereGeometry(size, 32, 32);
+    this.geometry = this.buildGeometry(size);
+    this.mesh.geometry = this.geometry;
+  }
+
+  /**
+   * 运行时切换节点几何工厂并就地重建几何（保持节点坐标/材质不变）。
+   *
+   * 传 `null`/`undefined` 回退默认球体。旧几何体会被释放。供 {@link Graph3D.setNodeGeometry}
+   * 批量切换节点形状（如布局 demo 中切到六边形瓦片）。
+   *
+   * @param factory - 新的几何工厂，或 `null` 回退球体。
+   */
+  setGeometryFactory(factory: ((size: number) => THREE.BufferGeometry) | null): void {
+    this.geometryFactory = factory ?? undefined;
+    this.geometry.dispose();
+    this.geometry = this.buildGeometry(this.size);
     this.mesh.geometry = this.geometry;
   }
 

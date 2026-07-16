@@ -2,14 +2,15 @@
   <h2>Graph3D</h2>
   <span class="tag">extends <code>BaseGroup</code>（<code>THREE.Group</code>）</span>
   <span class="tag">implements <code>IUpdatable</code> · <code>IDisposable</code></span>
-  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页为<strong>第五步</strong>交付（最终步）：在第三/四步布局基础上，新增<strong>统一声明式布局 API</strong>（<code>Graph3DOptions.layout</code> / <code>setLayout</code> / <code>getLayout</code> —— 布局被记忆，<code>setData</code> 后自动重应用，无需手动 <code>applyLayout</code>）与 <code>force</code> 的 <strong>Barnes-Hut 八叉树加速</strong>（<code>barnesHut:true</code>，斥力 <code>O(n²)→O(n log n)</code>，大图提速）。</p>
+  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页 demo 把 4 个布局算法（<code>circular / force / hex / grid</code>）各做成一个<strong> Tab</strong>，每个 Tab 配该布局专属的实时参数滑块 —— 切 Tab 即 <code>graph.setLayout(preset)</code> 声明式重排（被记忆，<code>setData</code> 后自动重应用）。<code>force</code> 支持 <strong>Barnes-Hut 八叉树加速</strong>（<code>barnesHut:true</code>，斥力 <code>O(n²)→O(n log n)</code>，大图提速）。</p>
 
   <!-- Demo -->
   <div class="demo-card">
     <canvas id="c-graph"></canvas>
+    <div class="demo-tabs" id="ctrl-graph-layout"></div>
     <div class="demo-ctrl" id="ctrl-graph"></div>
   </div>
-  <p class="desc">上方 demo 默认渲染一组示例图（约 12 节点）。在「布局」下拉切换任意布局 —— 经 <code>graph.setLayout(preset)</code> <strong>声明式</strong>切换并被记忆，节点经 gsap 过渡平滑飞抵目标坐标；之后点「重新生成」会<strong>自动重应用</strong>当前布局（无需再手动 apply，Step 5 核心）。力导向可勾「Barnes-Hut」开启八叉树加速，切到 <strong>大节点数（最高 2000）</strong>时「力导向计算耗时」条显示提速效果。切换「边形态」在直线/管道(带箭头)/混合间切换；悬停节点放大发光、边提亮；点击节点/边选中（节点常亮发光、边常亮+emissive）。切换「单选/多选」验证互斥与累加；选中节点<strong>只提亮邻接边</strong>（其余边不变）；<strong>点击空白/地面清除选中</strong>；OrbitControls 拖拽不会误触发点击。布局后 hover/select 仍正常。</p>
+  <p class="desc">上方 demo 默认渲染一组示例图（约 12 节点）。<strong>左侧面板</strong>把 4 个布局算法各做一个 Tab —— <code>环形 / 力导向 / 六边形 / 网格</code>，每个 Tab 配该布局<strong>专属的实时参数滑块</strong>（半径/斥力/层数/列数 等）。切 Tab 经 <code>graph.setLayout(preset)</code> <strong>声明式</strong>切换并被记忆，节点经 gsap 过渡平滑飞抵目标坐标（同一批节点在布局间「飞」）；拖滑块即时重排（力导向因昂贵在释放时重算）。<strong>右侧面板</strong>是全局控件：点「重新生成」会<strong>自动重应用</strong>当前 Tab 布局（无需手动 apply，Step 5 核心）；切换「边形态」在直线/管道(带箭头)/混合间切换；力导向 Tab 可勾「Barnes-Hut」开启八叉树加速，切到<strong>大节点数（最高 2000）</strong>时面板内「计算耗时」行显示提速效果。悬停节点放大发光、边提亮；点击节点/边选中（节点常亮发光、边常亮+emissive）。切换「单选/多选」验证互斥与累加；选中节点<strong>只提亮邻接边</strong>（其余边不变）；<strong>点击空白/地面清除选中</strong>；OrbitControls 拖拽不会误触发点击。</p>
 
   <h3>Constructor</h3>
   <div class="sig"><span class="kw">new</span> Graph3D(options?: Graph3DOptions)</div>
@@ -21,6 +22,7 @@
       <tr><td>data</td><td><code>GraphData</code></td><td>—</td><td>初始图数据。若提供，构造后立即 <code>setData()</code></td></tr>
       <tr><td>nodeSize</td><td><code>number</code></td><td>0.3</td><td>节点默认尺寸（球体半径）。节点自身未指定 <code>size</code> 时使用</td></tr>
       <tr><td>nodeMaterial</td><td><code>THREE.MeshStandardMaterial</code></td><td>—</td><td>节点材质<strong>模板</strong>。每节点 clone 独立实例（改色/高亮互不影响）。不传则用内置默认</td></tr>
+      <tr><td>nodeGeometry</td><td><code>(size: number) =&gt; BufferGeometry</code></td><td>—</td><td>节点几何<strong>工厂</strong>。传入则替代默认球体（如六边形瓦片）；<code>setData</code> 重建后仍应用（形状不丢）。运行时用 <code>setNodeGeometry</code> 切换</td></tr>
       <tr><td>edgeMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>边材质<strong>模板</strong>（<code>line</code>→<code>LineBasicMaterial</code>，<code>path</code>→<code>MeshStandardMaterial</code>）。每边 clone 独立实例</td></tr>
       <tr><td>edgeType</td><td><code>'line' | 'path'</code></td><td>'line'</td><td>边形态默认值。单边可用 <code>EdgeData.type</code> 覆盖。<code>'path'</code> 复用 <code>core/Path</code> 圆管</td></tr>
       <tr><td>edgePathRadius</td><td><code>number</code></td><td>0.05</td><td><code>'path'</code> 形态管道半径</td></tr>
@@ -59,6 +61,10 @@
   <div class="method">
     <div class="sig">.setLayout(preset: LayoutPreset | null, options?): void &nbsp;·&nbsp; .getLayout(): LayoutPreset | null</div>
     <p><strong>声明式布局 API</strong>（Step 5）：<code>setLayout</code> 切换并<strong>记忆</strong>预设，后续 <code>setData</code> 自动重应用（无需手动 applyLayout）；传 <code>null</code> 清除（退回占位散布）。<code>getLayout</code> 读取当前预设。与 <code>applyLayout</code> 区别：applyLayout 一次性不记忆；setLayout 持久化、重建自动编排。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setNodeGeometry(factory: ((size: number) =&gt; BufferGeometry) | null): void</div>
+    <p>运行时切换节点几何工厂，就地重建所有现存节点几何（坐标/材质不变）；传 <code>null</code> 回退球体。工厂被<strong>记忆</strong>，<code>setData</code> 重建后仍套用（「重新生成」后自定义形状不丢）。本页<strong>六边形 Tab</strong> 即用它把节点换成六边形瓦片以凸显蜂巢拼合。</p>
   </div>
   <div class="method">
     <div class="sig">.update(delta: number): void &nbsp;·&nbsp; .dispose(): void</div>

@@ -66,6 +66,13 @@ export interface Graph3DOptions extends BaseGroupOptions {
    */
   nodeMaterial?: THREE.MeshStandardMaterial;
   /**
+   * 节点几何体**工厂**（可选）。传入则每个节点用其返回值替代默认球体，
+   * 可实现自定义节点形状（如六边形瓦片）。工厂接收节点尺寸 `size`，须返回
+   * **新建**的 `BufferGeometry`（节点自行释放）。`setData` 重建后仍应用 ——
+   * 即「重新生成」数据后形状不丢。运行时用 {@link Graph3D.setNodeGeometry} 切换。
+   */
+  nodeGeometry?: (size: number) => THREE.BufferGeometry;
+  /**
    * 边材质**模板**（`LineBasicMaterial`）。每条边构造时 `clone()` 一份独立实例，
    * 故各边状态变更互不影响；不传则用内置默认值作模板。模板本身不被释放。
    */
@@ -164,6 +171,8 @@ export class Graph3D extends BaseGroup {
   private readonly nodeSize: number;
   /** 节点材质模板（各节点 clone 自它）。 */
   private readonly nodeMaterial?: THREE.MeshStandardMaterial;
+  /** 节点几何工厂（可选；各节点构造/重建时调用）。运行时 setNodeGeometry 可改。 */
+  private nodeGeometry?: (size: number) => THREE.BufferGeometry;
   /** 边材质模板（各边 clone 自它）。 */
   private readonly edgeMaterial?: THREE.LineBasicMaterial;
   /** 占位环形散布半径。 */
@@ -196,6 +205,7 @@ export class Graph3D extends BaseGroup {
 
     this.nodeSize = options.nodeSize ?? 0.3;
     this.nodeMaterial = options.nodeMaterial;
+    this.nodeGeometry = options.nodeGeometry;
     this.edgeMaterial = options.edgeMaterial;
     this.initialRadius = options.initialRadius ?? 3;
     this.edgeType = options.edgeType ?? 'line';
@@ -236,6 +246,7 @@ export class Graph3D extends BaseGroup {
         data: nodeData,
         defaultSize: this.nodeSize,
         material: this.nodeMaterial,
+        geometryFactory: this.nodeGeometry,
       });
       node.setPosition(positions.get(nodeData.id)!);
       this.nodes.set(nodeData.id, node);
@@ -437,6 +448,21 @@ export class Graph3D extends BaseGroup {
    */
   getLayout(): LayoutPreset | null {
     return this.layoutPreset;
+  }
+
+  /**
+   * 运行时切换节点几何工厂，并就地重建所有现存节点的几何（坐标/材质不变）。
+   *
+   * 传 `null` 回退默认球体。工厂会被**记忆**：后续 `setData` 重建的节点同样套用
+   * （故「重新生成」数据后自定义形状不丢）。旧几何体由各节点自行释放。
+   *
+   * @param factory - 几何工厂（接收节点尺寸），或 `null` 回退球体。
+   */
+  setNodeGeometry(factory: ((size: number) => THREE.BufferGeometry) | null): void {
+    this.nodeGeometry = factory ?? undefined;
+    for (const node of this.nodes.values()) {
+      node.setGeometryFactory(factory);
+    }
   }
 
   /**
