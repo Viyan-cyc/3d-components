@@ -1,0 +1,88 @@
+<div class="page">
+  <h2>PivotControls</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">implements <code>IUpdatable</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">统一变换操控 Gizmo（平移 / 旋转 / 缩放一体）。参考 <a href="https://github.com/pmndrs/drei/tree/master/src/web/pivotControls" target="_blank">drei PivotControls</a> 的原生 Three.js 实现：在一个 gizmo 上<strong>同时</strong>呈现三根轴箭头（单轴平移）、三个平面滑块（双轴平移）、三段旋转弧（绕轴旋转）和三个缩放球（单轴缩放）。把受控内容 <code>pivot.add(model)</code>，拖拽 gizmo 即变换该组；每帧调用 <code>pivot.update(dt)</code>。</p>
+
+  <div class="demo-card">
+    <canvas id="c-pivotcontrols"></canvas>
+    <div class="demo-ctrl" id="ctrl-pivotcontrols"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> PivotControls(options: PivotControlsOptions)</div>
+
+  <h4>Parameters — <code>PivotControlsOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>camera</td><td><code>THREE.Camera</code></td><td>—</td><td>观察相机（必填，<code>fixed</code> 模式与缩放计算依赖）</td></tr>
+      <tr><td>renderer</td><td><code>THREE.WebGLRenderer</code></td><td>—</td><td>渲染器（必填，指针监听挂在其 <code>domElement</code>）</td></tr>
+      <tr><td>controls</td><td><code>PivotControlsLike</code></td><td>—</td><td>相机控制器（OrbitControls 等）；拖拽期间临时禁用</td></tr>
+      <tr><td>scale</td><td><code>number</code></td><td>1</td><td>gizmo 整体缩放（<code>fixed</code> 时为像素）</td></tr>
+      <tr><td>lineWidth</td><td><code>number</code></td><td>4</td><td>可见线条宽度（像素）</td></tr>
+      <tr><td>fixed</td><td><code>boolean</code></td><td>false</td><td>true 时 gizmo 保持固定屏幕像素尺寸</td></tr>
+      <tr><td>offset</td><td><code>[n,n,n]</code></td><td>[0,0,0]</td><td>gizmo 相对原点的额外平移（与 anchor 叠加）</td></tr>
+      <tr><td>rotation</td><td><code>[n,n,n]</code></td><td>[0,0,0]</td><td>gizmo 起始旋转（Euler XYZ）</td></tr>
+      <tr><td>anchor</td><td><code>[n,n,n]</code></td><td>—</td><td>包围盒锚点，每轴 -1/0/+1，定位到内容角 / 边 / 中心</td></tr>
+      <tr><td>matrix</td><td><code>THREE.Matrix4</code></td><td>—</td><td>受控起始矩阵（每帧以该矩阵覆盖；拖拽不持久）</td></tr>
+      <tr><td>autoTransform</td><td><code>boolean</code></td><td>true</td><td>拖拽后是否自动应用局部变换到本组</td></tr>
+      <tr><td>activeAxes</td><td><code>[b,b,b]</code></td><td>[T,T,T]</td><td>各轴是否参与</td></tr>
+      <tr><td>disableAxes / disableSliders / disableRotations / disableScaling</td><td><code>boolean</code></td><td>false</td><td>关闭某类操控件</td></tr>
+      <tr><td>translationLimits / rotationLimits / scaleLimits</td><td><code>LimitsTuple</code></td><td>—</td><td>三轴区间限制 <code>[[min,max]×3]</code></td></tr>
+      <tr><td>axisColors</td><td><code>[Color×3]</code></td><td>#ff2060 / #20df80 / #2080ff</td><td>X / Y / Z 三轴颜色</td></tr>
+      <tr><td>hoveredColor</td><td><code>Color</code></td><td>#ffff40</td><td>悬停高亮色</td></tr>
+      <tr><td>opacity / depthTest / renderOrder / visible</td><td><code>number / boolean / number / boolean</code></td><td>1 / true / 500 / true</td><td>外观与渲染</td></tr>
+      <tr><td>annotations</td><td><code>boolean</code></td><td>false</td><td>拖拽时显示数值徽标</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>受控内容（等价于构造后 <code>pivot.add(...)</code>）</td></tr>
+      <tr><td>onDragStart / onDrag / onDragEnd</td><td><code>function</code></td><td>—</td><td>拖拽事件；<code>onDrag(local, deltaLocal, world, deltaWorld)</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>?: number): void</div>
+    <p>每帧调用：刷新世界矩阵、<code>fixed</code> 模式恒定像素缩放、FatLine 分辨率与注释定位。须在渲染前调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.recomputeAnchor(): void</div>
+    <p>重算 <code>anchor</code> 定位（动态 <code>add</code> 内容后调用一次）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setEnabled(<strong>e</strong>: boolean): <span class="kw">this</span></div>
+    <p>启用 / 禁用交互（gizmo 仍显示）。链式。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setVisible(<strong>v</strong>: boolean): <span class="kw">this</span></div>
+    <p>显示 / 隐藏 gizmo。链式。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>移除指针监听、释放操控件的几何 / 材质 / 注释（不释放你 <code>add</code> 的内容）。</p>
+  </div>
+
+  <h3>操控件</h3>
+  <p>四类操控件，覆盖完整变换。轴箭头与缩放球沿 +X/+Y/+Z；平面滑块与旋转弧作用于各坐标平面（法线轴着色）。</p>
+  <ul>
+    <li><strong>AxisArrow</strong> —— 拖一根轴箭头，沿该轴平移。</li>
+    <li><strong>PlaneSlider</strong> —— 拖一个平面方框，在该平面内自由平移。</li>
+    <li><strong>AxisRotator</strong> —— 拖一段弧，绕该面法线旋转（按住 Shift 吸附到 10°）。</li>
+    <li><strong>ScalingSphere</strong> —— 拖一个球，沿该轴缩放（按住 Shift 吸附到 0.1）。</li>
+  </ul>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { PivotControls } from '@cyc/3d-components/controls';
+
+const pivot = new PivotControls({ camera, renderer, controls: orbit });
+scene.add(pivot);
+pivot.add(model);
+
+function frame() {
+  const dt = clock.getDelta();
+  orbit.update();
+  pivot.update(dt);          // 每帧调用
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}</code></pre>
+</div>

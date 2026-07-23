@@ -67,6 +67,26 @@
         "default": "./dist/cjs/graph.cjs"
       }
     },
+    "./controls": {
+      "import": {
+        "types": "./dist/es/controls.d.ts",
+        "default": "./dist/es/controls.js"
+      },
+      "require": {
+        "types": "./dist/cjs/controls.d.ts",
+        "default": "./dist/cjs/controls.cjs"
+      }
+    },
+    "./interactive": {
+      "import": {
+        "types": "./dist/es/interactive.d.ts",
+        "default": "./dist/es/interactive.js"
+      },
+      "require": {
+        "types": "./dist/cjs/interactive.d.ts",
+        "default": "./dist/cjs/interactive.cjs"
+      }
+    },
     "./helper": {
       "import": {
         "types": "./dist/es/helper.d.ts",

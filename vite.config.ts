@@ -21,6 +21,8 @@ export default defineConfig({
         utils: resolve(__dirname, 'src/utils/index.ts'),
         helper: resolve(__dirname, 'src/helper/index.ts'),
         graph: resolve(__dirname, 'src/graph/index.ts'),
+        controls: resolve(__dirname, 'src/controls/index.ts'),
+        interactive: resolve(__dirname, 'src/interactive/index.ts'),
       },
     },
     rollupOptions: {

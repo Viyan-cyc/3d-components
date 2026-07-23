@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { Graph3D } from '../../../src/graph/Graph3D';
 import { PickController } from '../../../src/graph/interaction/PickController';
+import { GizmoHelper, GizmoViewport } from '../../../src/helper';
 import type { LayoutPreset, LayoutType } from '../../../src/graph/layouts/types';
-import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
+import { createScene, addSimpleOrbit } from '../../shared/scene-setup';
 import { randomGraph, type EdgeMode, type LayoutTab, type LayoutTabContext } from './layouts/shared';
 import { circularTab } from './layouts/circular';
 import { forceTab } from './layouts/force';
@@ -12,7 +13,7 @@ import { gridTab } from './layouts/grid';
 // ---- Graph3D Demo：每布局一个 Tab ----
 // 4 个布局算法（环形 / 力导向 / 六边形 / 网格）各自一个 Tab，配本布局专属实时参数滑块。
 // 架构：一个持久 Graph3D 跨所有 Tab 复用，切 Tab = graph.setLayout 重排（节点 gsap 飞动）；
-// 场景/渲染循环/Orbit/Pick 全 Tab 共用、不随 Tab 切换重建（单 WebGL context，最轻量）。
+// 场景/渲染循环/Orbit/Gizmo/Pick 全 Tab 共用、不随 Tab 切换重建（单 WebGL context，最轻量）。
 // 全局控件（节点数/边形态/选中/反馈/动画）在右浮层；布局 Tab + 参数在左浮层。
 
 const TABS: LayoutTab[] = [circularTab, forceTab, hexTab, gridTab];
@@ -58,6 +59,11 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): (() => v
 
   // 捕获 orbit 以便 dispose（修复既有泄漏：OrbitControls 的 DOM 监听原先从不释放）。
   const orbit = addSimpleOrbit(canvas, camera, () => new THREE.Vector3(0, 0, 0));
+
+  // GizmoHelper：右下角视口导航 gizmo，实时镜像主相机朝向，点击轴头平滑切到标准视角。
+  // 不加入主场景（自带虚拟场景）；renderOverlay 必须在主渲染之后调用（见下方自定义循环）。
+  const gizmo = new GizmoHelper({ camera, renderer, controls: orbit, alignment: 'top-center', size: 100 });
+  gizmo.setContent(new GizmoViewport({ onPick: (dir) => gizmo.tweenCamera(dir) }));
 
   // ---- 全局控制面板（右浮层）----
   ctrl.innerHTML = `
@@ -132,10 +138,26 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): (() => v
       setStatus(`${e.type} <code>${e.kind}</code> · <code>${e.id}</code> · ${selectionSummary()}`, true),
   });
 
-  const loop = startLoop(renderer, scene, camera, resize, (dt) => {
+  // 渲染循环（自定义而非 startLoop）：GizmoHelper.renderOverlay 必须在主场景渲染之后调用，
+  // startLoop 内部自行 render 且不暴露渲染后钩子，故这里手动驱动 resize/tick/render/overlay。
+  let last = performance.now();
+  let running = true;
+  function frame(): void {
+    if (!running) return;
+    const now = performance.now();
+    const dt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+
+    resize();
     graph.update(dt);
     pick.update(dt);
-  });
+    gizmo.update(dt); // 同步 gizmo 朝向 + 动画相机
+    renderer.render(scene, camera);
+    gizmo.renderOverlay(); // 必须在主渲染之后
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 
   // ---- 布局 Tab 上下文 ----
   const ctx: LayoutTabContext = {
@@ -243,7 +265,8 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): (() => v
       activeCleanup = null;
     }
     pick.dispose();
-    loop();
+    running = false; // 停止渲染循环
+    gizmo.dispose(); // 释放 gizmo 监听与虚拟场景资源
     orbit.dispose(); // 修复：释放 OrbitControls 的 DOM 监听
     graph.dispose();
     nodeMaterialTemplate.dispose();

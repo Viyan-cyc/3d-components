@@ -38,6 +38,8 @@ export * from './material';
 export * from './helper';
 export { Util } from './utils';
 export * from './graph';
+export * from './controls';
+export * from './interactive';
 
 // Re-export types for convenience
 export type * from './types';
