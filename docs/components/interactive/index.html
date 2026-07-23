@@ -1,0 +1,190 @@
+<div class="page">
+<style>
+  #im-log-wrap {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 340px;
+    max-height: 200px;
+    background: rgba(30, 30, 30, .92);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 10;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  #im-log-header {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #aaa;
+    background: rgba(255,255,255,.06);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #im-log-clear {
+    background: none;
+    border: 1px solid rgba(255,255,255,.2);
+    color: #aaa;
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  #im-log-clear:hover {
+    background: rgba(255,255,255,.1);
+    color: #fff;
+  }
+  #im-log {
+    margin: 0;
+    padding: 6px 10px;
+    max-height: 170px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #ccc;
+    background: transparent;
+    border: none;
+    white-space: pre;
+  }
+  #im-log::-webkit-scrollbar { width: 4px; }
+  #im-log::-webkit-scrollbar-track { background: transparent; }
+  #im-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 999px; }
+</style>
+  <h2>InteractiveManager</h2>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">基于 Raycaster 的集中式事件交互系统，忠实改编自 <a href="https://github.com/pmndrs/react-three-fiber/blob/master/packages/fiber/src/core/events.ts" target="_blank">react-three-fiber 的 <code>createEvents</code></a>。开发者只需注册 Object3D + 事件回调，无需关心 Raycaster、NDC 坐标转换、hover diffing 等底层原理。支持 <strong>click / doubleclick / pointerdown / pointerup / pointermove / pointerover / pointerout / pointerenter / pointerleave / wheel / contextmenu / pointermissed</strong> 全套事件，内置扁平列表传播、点击 vs 拖拽判别、指针捕获与相机控制器自动抑制。</p>
+
+  <h3>R3F 事件模型</h3>
+  <div class="info">
+    <p><strong>扁平传播（非 DOM 冒泡）</strong>：每次射线检测产生按 distance 排序的 <code>Intersection[]</code>，每个原始命中会向上展开到所有注册祖先。事件按此扁平列表顺序依次派发，<code>stopPropagation()</code> 中断后续迭代。</p>
+    <p><strong>Hover Diffing</strong>：通过 composite-id（<code>eventObject.uuid/faceIndex/instanceId</code>）追踪悬停状态。进入新对象时 <code>over</code>+<code>enter</code> 同时触发；离开时 <code>out</code>+<code>leave</code> 同时触发（由 <code>cancelPointer</code> 执行）。</p>
+    <p><strong>Click 验证</strong>：<code>onClick</code> 仅在 pointerDown 时命中的对象（<code>initialHits</code>）上触发。pointerMissed 在未命中的注册对象上触发。</p>
+  </div>
+
+  <div class="demo-card">
+    <canvas id="c-interactive"></canvas>
+    <div class="demo-ctrl" id="ctrl-interactive"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> InteractiveManager(options: InteractiveManagerOptions)</div>
+
+  <h4>Parameters — <code>InteractiveManagerOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>camera</td><td><code>THREE.Camera</code></td><td>—</td><td>用于射线投射的相机</td></tr>
+      <tr><td>domElement</td><td><code>HTMLElement</code></td><td>—</td><td>Canvas 元素，挂载 DOM 事件监听</td></tr>
+      <tr><td>scene</td><td><code>THREE.Object3D</code></td><td>—</td><td>场景根对象。提供时执行全场景射线检测；省略时仅对注册对象射线检测</td></tr>
+      <tr><td>controls</td><td><code>ControlsLike</code></td><td>—</td><td>相机控制器，点击到对象时自动禁用，pointerup 后恢复</td></tr>
+      <tr><td>clickThreshold</td><td><code>number</code></td><td>2</td><td>点击 vs 拖拽像素距离阈值</td></tr>
+      <tr><td>clickTimeThreshold</td><td><code>number</code></td><td>300</td><td>点击最大时间（ms）</td></tr>
+      <tr><td>doubleClickTimeThreshold</td><td><code>number</code></td><td>300</td><td>双击最大间隔（ms）</td></tr>
+      <tr><td>recursive</td><td><code>boolean</code></td><td>true</td><td>是否递归射线检测子对象（仅 <code>scene</code> 未提供时生效）</td></tr>
+      <tr><td>computeNDC</td><td><code>ComputeNDCFn</code></td><td>—</td><td>自定义 NDC 坐标转换</td></tr>
+      <tr><td>filterIntersections</td><td><code>FilterIntersectionsFn</code></td><td>—</td><td>自定义原始交点过滤/排序（展开到注册祖先之前）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.add(<strong>object</strong>: Object3D, <strong>handlers</strong>: EventHandlers): void</div>
+    <p>注册一个 Object3D 及其事件回调。若已注册则更新回调。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.remove(<strong>object</strong>: Object3D): void</div>
+    <p>取消注册，若当前悬停则触发 out/leave 后移除。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.update(<strong>delta?</strong>: number): void</div>
+    <p>强制刷新悬停状态（相机动画后调用）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setEnabled(<strong>enabled</strong>: boolean): void</div>
+    <p>启用 / 禁用事件派发。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>移除所有 DOM 监听器，清除所有内部状态。</p>
+  </div>
+
+  <h3>IntersectionEvent 关键属性</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>object</code></td><td><code>THREE.Object3D</code></td><td>射线实际命中的对象（可能是子 Mesh）</td></tr>
+      <tr><td><code>eventObject</code></td><td><code>THREE.Object3D</code></td><td>注册了处理函数的对象（可能是 object 的祖先）</td></tr>
+      <tr><td><code>intersections</code></td><td><code>Intersection[]</code></td><td>本次射线检测的所有交点（扁平排序列表）</td></tr>
+      <tr><td><code>delta</code></td><td><code>number</code></td><td>pointerDown 到当前位置的像素距离</td></tr>
+      <tr><td><code>stopPropagation</code></td><td><code>() =&gt; void</code></td><td>中断扁平列表后续事件派发</td></tr>
+      <tr><td><code>target</code> / <code>currentTarget</code></td><td>对象</td><td>指针捕获 API：<code>hasPointerCapture / setPointerCapture / releasePointerCapture</code></td></tr>
+      <tr><td><code>nativeEvent</code></td><td><code>PointerEvent | WheelEvent</code></td><td>原始 DOM 事件</td></tr>
+    </tbody>
+  </table>
+
+  <h3>EventHandlers</h3>
+  <table class="pt">
+    <thead><tr><th>事件</th><th>传播</th><th>说明</th><th>触发方式</th></tr></thead>
+    <tbody>
+      <tr><td><code>onClick</code></td><td>扁平列表</td><td>左键单击（down→up 距离≤阈值，且在 initialHits 中）</td><td>左键快速按下并抬起</td></tr>
+      <tr><td><code>onDoubleClick</code></td><td>扁平列表</td><td>左键双击（替代第二次 click 触发）</td><td>左键快速连按两次</td></tr>
+      <tr><td><code>onPointerDown</code></td><td>扁平列表</td><td>任意鼠标键按下</td><td>按下鼠标任意键</td></tr>
+      <tr><td><code>onPointerUp</code></td><td>扁平列表</td><td>任意鼠标键抬起</td><td>抬起鼠标任意键</td></tr>
+      <tr><td><code>onPointerMove</code></td><td>扁平列表</td><td>指针在已悬停对象上移动</td><td>光标在物体上移动</td></tr>
+      <tr><td><code>onPointerOver</code></td><td>扁平列表</td><td>指针进入对象（composite-id diffing，与 enter 同时触发）</td><td>光标从外部移入</td></tr>
+      <tr><td><code>onPointerOut</code></td><td>—</td><td>指针离开对象（与 leave 同时触发，由 cancelPointer 执行）</td><td>光标移出到外部</td></tr>
+      <tr><td><code>onPointerEnter</code></td><td>扁平列表</td><td>指针进入对象（与 over 同时触发）</td><td>光标首次进入</td></tr>
+      <tr><td><code>onPointerLeave</code></td><td>—</td><td>指针离开对象（与 out 同时触发，由 cancelPointer 执行）</td><td>光标完全离开</td></tr>
+      <tr><td><code>onWheel</code></td><td>扁平列表</td><td>鼠标滚轮</td><td>在物体上滚动滚轮</td></tr>
+      <tr><td><code>onContextMenu</code></td><td>扁平列表</td><td>右键菜单</td><td>右键点击物体</td></tr>
+      <tr><td><code>onPointerMissed</code></td><td>—</td><td>点击空白区域</td><td>点击无物体的空白区域</td></tr>
+    </tbody>
+  </table>
+
+  <h3>重叠区域交互行为</h3>
+  <div class="info">
+    <p>当两个独立的注册对象（非父子关系）在空间中部分重叠时：</p>
+    <ul>
+      <li><strong>A区（仅小球）</strong>：射线只命中小球 → 只触发小球的事件</li>
+      <li><strong>B区（重叠处）</strong>：射线同时命中两个对象 → 两个对象都在 intersections 列表中，事件按 distance 排序依次派发</li>
+      <li><strong>C区（仅大球）</strong>：射线只命中大球 → 只触发大球的事件</li>
+    </ul>
+    <p>进入/离开重叠区时，hover diffing 基于 composite-id 独立追踪每个对象，互不影响。</p>
+    <p>在重叠区，<code>stopPropagation()</code> 可以阻止距离更远的对象接收事件。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { InteractiveManager } from '@cyc/3d-components/interactive';
+
+const manager = new InteractiveManager({
+  camera,
+  domElement: renderer.domElement,
+  scene,
+  controls: orbitControls,
+});
+
+manager.add(myMesh, {
+  onClick: (e) => console.log('clicked!', e.eventObject),
+  onPointerOver: (e) => { e.eventObject.material.emissive.setHex(0x333333); },
+  onPointerOut: (e) => { e.eventObject.material.emissive.setHex(0x000000); },
+  onPointerMissed: (e) => console.log('missed!'),
+});
+
+// Pointer capture for drag
+manager.add(draggableMesh, {
+  onPointerDown: (e) => {
+    e.target.setPointerCapture(e.nativeEvent.pointerId);
+  },
+  onPointerMove: (e) => { /* drag logic */ },
+  onPointerUp: (e) => {
+    e.target.releasePointerCapture(e.nativeEvent.pointerId);
+  },
+});
+
+manager.dispose();</code></pre>
+</div>
