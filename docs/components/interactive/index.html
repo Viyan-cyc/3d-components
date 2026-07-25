@@ -128,34 +128,38 @@
   </table>
 
   <h3>EventHandlers</h3>
+  <p>R3F 的"冒泡"指事件通过 <code>handleIntersects</code> 扁平列表依次派发——射线命中子对象后，祖先展开使父对象也出现在列表中，从而收到事件。<code>stopPropagation()</code> 中断后续派发。</p>
   <table class="pt">
-    <thead><tr><th>事件</th><th>传播</th><th>说明</th><th>触发方式</th></tr></thead>
+    <thead><tr><th>事件</th><th>冒泡</th><th>说明</th><th>触发方式</th></tr></thead>
     <tbody>
-      <tr><td><code>onClick</code></td><td>扁平列表</td><td>左键单击（down→up 距离≤阈值，且在 initialHits 中）</td><td>左键快速按下并抬起</td></tr>
-      <tr><td><code>onDoubleClick</code></td><td>扁平列表</td><td>左键双击（替代第二次 click 触发）</td><td>左键快速连按两次</td></tr>
-      <tr><td><code>onPointerDown</code></td><td>扁平列表</td><td>任意鼠标键按下</td><td>按下鼠标任意键</td></tr>
-      <tr><td><code>onPointerUp</code></td><td>扁平列表</td><td>任意鼠标键抬起</td><td>抬起鼠标任意键</td></tr>
-      <tr><td><code>onPointerMove</code></td><td>扁平列表</td><td>指针在已悬停对象上移动</td><td>光标在物体上移动</td></tr>
-      <tr><td><code>onPointerOver</code></td><td>扁平列表</td><td>指针进入对象（composite-id diffing，与 enter 同时触发）</td><td>光标从外部移入</td></tr>
-      <tr><td><code>onPointerOut</code></td><td>—</td><td>指针离开对象（与 leave 同时触发，由 cancelPointer 执行）</td><td>光标移出到外部</td></tr>
-      <tr><td><code>onPointerEnter</code></td><td>扁平列表</td><td>指针进入对象（与 over 同时触发）</td><td>光标首次进入</td></tr>
-      <tr><td><code>onPointerLeave</code></td><td>—</td><td>指针离开对象（与 out 同时触发，由 cancelPointer 执行）</td><td>光标完全离开</td></tr>
-      <tr><td><code>onWheel</code></td><td>扁平列表</td><td>鼠标滚轮</td><td>在物体上滚动滚轮</td></tr>
-      <tr><td><code>onContextMenu</code></td><td>扁平列表</td><td>右键菜单</td><td>右键点击物体</td></tr>
-      <tr><td><code>onPointerMissed</code></td><td>—</td><td>点击空白区域</td><td>点击无物体的空白区域</td></tr>
+      <tr><td><code>onClick</code></td><td>✅</td><td>左键单击（down→up 距离≤阈值，且在 initialHits 中）</td><td>左键快速按下并抬起</td></tr>
+      <tr><td><code>onDoubleClick</code></td><td>✅</td><td>左键双击（替代第二次 click 触发）</td><td>左键快速连按两次</td></tr>
+      <tr><td><code>onPointerDown</code></td><td>✅</td><td>任意鼠标键按下</td><td>按下鼠标任意键</td></tr>
+      <tr><td><code>onPointerUp</code></td><td>✅</td><td>任意鼠标键抬起</td><td>抬起鼠标任意键</td></tr>
+      <tr><td><code>onPointerMove</code></td><td>✅</td><td>指针在已悬停对象上移动</td><td>光标在物体上移动</td></tr>
+      <tr><td><code>onPointerOver</code></td><td>✅</td><td>指针进入对象（与 enter 同时触发，在 move 的 handleIntersects 回调中）</td><td>光标从外部移入</td></tr>
+      <tr><td><code>onPointerEnter</code></td><td>✅</td><td>指针进入对象（与 over 同时触发，在 move 的 handleIntersects 回调中）</td><td>光标首次进入</td></tr>
+      <tr><td><code>onPointerOut</code></td><td>❌</td><td>指针离开对象（与 leave 同时触发，由 cancelPointer 直接 per-object 派发）</td><td>光标移出到外部</td></tr>
+      <tr><td><code>onPointerLeave</code></td><td>❌</td><td>指针离开对象（与 out 同时触发，由 cancelPointer 直接 per-object 派发）</td><td>光标完全离开</td></tr>
+      <tr><td><code>onWheel</code></td><td>✅</td><td>鼠标滚轮</td><td>在物体上滚动滚轮</td></tr>
+      <tr><td><code>onContextMenu</code></td><td>✅</td><td>右键菜单</td><td>右键点击物体</td></tr>
+      <tr><td><code>onPointerMissed</code></td><td>❌</td><td>点击空白区域（直接 per-object 派发）</td><td>点击无物体的空白区域</td></tr>
+      <tr><td><code>onPointerCancel</code></td><td>❌</td><td>指针取消（触发 cancelPointer 清除所有悬停）</td><td>触摸手势中断等</td></tr>
+      <tr><td><code>onLostPointerCapture</code></td><td>❌</td><td>指针捕获丢失（由 DOM 事件触发）</td><td>浏览器释放捕获</td></tr>
     </tbody>
   </table>
 
-  <h3>重叠区域交互行为</h3>
+  <h3>祖先展开与重叠区域交互</h3>
   <div class="info">
-    <p>当两个独立的注册对象（非父子关系）在空间中部分重叠时：</p>
+    <p>R3F 的"冒泡"本质是<strong>场景图祖先展开</strong>：射线命中子对象后，沿 <code>parent</code> 链向上走，每遇到一个注册对象就多产生一条 <code>Intersection</code>（同 distance）。两个同级对象之间不存在此路径——<strong>只有父子关系才能冒泡</strong>。</p>
+    <p>当小球是大球的子对象（<code>bigSphere.add(smallSphere)</code>），且部分嵌入大球时：</p>
     <ul>
-      <li><strong>A区（仅小球）</strong>：射线只命中小球 → 只触发小球的事件</li>
-      <li><strong>B区（重叠处）</strong>：射线同时命中两个对象 → 两个对象都在 intersections 列表中，事件按 distance 排序依次派发</li>
-      <li><strong>C区（仅大球）</strong>：射线只命中大球 → 只触发大球的事件</li>
+      <li><strong>A区（仅小球）</strong>：射线只命中 smallSphere → 祖先展开到 bigSphere → 两者都收到事件（小球先派发，大球后派发）</li>
+      <li><strong>B区（重叠处）</strong>：射线命中 bigSphere(d1) + smallSphere(d2) → bigSphere 直接命中 + smallSphere 命中后展开到大球 → 三条 Intersection 按距离依次派发</li>
+      <li><strong>C区（仅大球）</strong>：射线只命中 bigSphere → 只触发大球事件</li>
     </ul>
-    <p>进入/离开重叠区时，hover diffing 基于 composite-id 独立追踪每个对象，互不影响。</p>
-    <p>在重叠区，<code>stopPropagation()</code> 可以阻止距离更远的对象接收事件。</p>
+    <p>在 A/B 区，子对象调用 <code>stopPropagation()</code> 可阻止大球（祖先）收到该事件。</p>
+    <p>Hover diffing 基于 composite-id 独立追踪，进入/离开不同区域时各自触发 over/out + enter/leave。</p>
   </div>
 
   <h3>示例</h3>

@@ -68,9 +68,9 @@ export interface Intersection {
   point: THREE.Vector3;
   /** Face at intersection, if available. */
   face?: THREE.Face | null;
-  /** Face index, if available. */
-  faceIndex?: number;
-  /** Instance ID (for InstancedMesh), if available. */
+  /** Index into the geometry's index buffer (THREE.Intersection.index). Used in composite hover key. */
+  index?: number;
+  /** Instance ID (for InstancedMesh), if available. Used in composite hover key. */
   instanceId?: number | null;
   /** UV coordinates at intersection, if available. */
   uv?: THREE.Vector2;
@@ -96,9 +96,9 @@ export interface IntersectionEvent {
   point: THREE.Vector3;
   /** Face at intersection, if available. */
   face?: THREE.Face | null;
-  /** Face index, if available. */
-  faceIndex?: number;
-  /** Instance ID, if available. */
+  /** Index into the geometry's index buffer (THREE.Intersection.index). */
+  index?: number;
+  /** Instance ID (for InstancedMesh), if available. */
   instanceId?: number | null;
   /** UV coordinates at intersection, if available. */
   uv?: THREE.Vector2;
@@ -152,26 +152,33 @@ export interface IntersectionEvent {
  * ```
  */
 export interface EventHandlers {
+  /** ✅ 冒泡 — 左键单击（down→up 距离≤阈值，且在 initialHits 中） */
   onClick?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 左键双击（替代第二次 click 触发） */
   onDoubleClick?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 任意鼠标键按下 */
   onPointerDown?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 任意鼠标键抬起 */
   onPointerUp?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 指针在已悬停对象上移动 */
   onPointerMove?: (event: IntersectionEvent) => void;
-  /** Fired when pointer enters (synthetic, dispatched with enter during move). */
+  /** ✅ 冒泡 — 指针进入对象（与 enter 同时触发，在 move 的 handleIntersects 回调中派发） */
   onPointerOver?: (event: IntersectionEvent) => void;
-  /** Fired when pointer leaves (synthetic, dispatched with leave by cancelPointer). */
+  /** ❌ 不冒泡 — 指针离开对象（与 leave 同时触发，由 cancelPointer 直接 per-object 派发） */
   onPointerOut?: (event: IntersectionEvent) => void;
-  /** Fired when pointer enters (synthetic, dispatched with over during move). */
+  /** ✅ 冒泡 — 指针进入对象（与 over 同时触发，在 move 的 handleIntersects 回调中派发） */
   onPointerEnter?: (event: IntersectionEvent) => void;
-  /** Fired when pointer leaves (synthetic, dispatched with out by cancelPointer). */
+  /** ❌ 不冒泡 — 指针离开对象（与 out 同时触发，由 cancelPointer 直接 per-object 派发） */
   onPointerLeave?: (event: IntersectionEvent) => void;
-  /** Non-bubbling. Pointer event was cancelled. */
+  /** ❌ 不冒泡 — 指针取消（触发 cancelPointer 清除所有悬停） */
   onPointerCancel?: (event: IntersectionEvent) => void;
-  /** Non-bubbling. Pointer capture was lost. */
+  /** ❌ 不冒泡 — 指针捕获丢失（由 DOM 事件触发） */
   onLostPointerCapture?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 鼠标滚轮 */
   onWheel?: (event: IntersectionEvent) => void;
+  /** ✅ 冒泡 — 右键菜单 */
   onContextMenu?: (event: IntersectionEvent) => void;
-  /** Fires when a click occurs but this registered object was not hit. */
+  /** ❌ 不冒泡 — 点击空白区域（直接 per-object 派发） */
   onPointerMissed?: (event: IntersectionEvent) => void;
 }
 

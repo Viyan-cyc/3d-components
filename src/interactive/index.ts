@@ -11,7 +11,7 @@
  * - **Flat intersection list**: Each raw ray hit expands to one `Intersection`
  *   per registered ancestor. All events dispatch by iterating this flat list.
  * - **stopPropagation**: Breaks the flat iteration (NOT parent-chain bubbling).
- * - **Hover tracking**: Keyed by composite ID (`eventObject/faceIndex/instanceId`).
+ * - **Hover tracking**: Keyed by composite ID (`eventObject/index/instanceId`).
  *   `over`+`enter` fire together on new hover; `out`+`leave` fire together via cancelPointer.
  * - **Click validation**: Only fires on `initialHits` (objects hit during pointerDown).
  * - **Pointer capture**: `setPointerCapture`/`releasePointerCapture` on the event target.

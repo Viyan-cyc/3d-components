@@ -49,7 +49,7 @@ export function makeIntersectionId(intersection: Intersection): string {
   return (
     intersection.eventObject.uuid +
     '/' +
-    (intersection.faceIndex ?? '') +
+    (intersection.index ?? '') +
     (intersection.instanceId ?? '')
   );
 }

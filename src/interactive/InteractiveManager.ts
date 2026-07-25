@@ -34,7 +34,7 @@ import {
  *    iterating the flat intersection list. `stopPropagation()` breaks the
  *    loop — it does NOT walk the parent chain.
  *
- * 3. **Hover tracking**: Keyed by composite ID (`eventObject.uuid/faceIndex/instanceId`),
+ * 3. **Hover tracking**: Keyed by composite ID (`eventObject.uuid/index/instanceId`),
  *    not just Object3D. `over`+`enter` fire together on new hover;
  *    `out`+`leave` fire together via `cancelPointer`.
  *
@@ -296,9 +296,9 @@ export class InteractiveManager implements IDisposable {
         .sort((a, b) => a.distance - b.distance);
     }
 
-    // 4. Dedup by makeId-style key
+    // 4. Dedup by makeId-style key (using index + instanceId, matching R3F's makeId)
     rawHits = rawHits.filter((item) => {
-      const id = item.object.uuid + '/' + (item.faceIndex ?? '') + (item.instanceId ?? '');
+      const id = item.object.uuid + '/' + (item.index ?? '') + (item.instanceId ?? '');
       if (duplicates.has(id)) return false;
       duplicates.add(id);
       return true;
@@ -322,7 +322,7 @@ export class InteractiveManager implements IDisposable {
             distance: hit.distance,
             point: hit.point.clone(),
             face: hit.face,
-            faceIndex: hit.faceIndex ?? undefined,
+            index: hit.index ?? undefined,
             instanceId: hit.instanceId ?? undefined,
             uv: hit.uv ?? undefined,
           });
@@ -406,7 +406,7 @@ export class InteractiveManager implements IDisposable {
         distance: hit.distance,
         point: hit.point,
         face: hit.face,
-        faceIndex: hit.faceIndex,
+        index: hit.index,
         instanceId: hit.instanceId,
         uv: hit.uv,
         intersections,
@@ -467,7 +467,7 @@ export class InteractiveManager implements IDisposable {
       const stillHovered = intersections.find(
         (hit) =>
           hit.object === hoveredObj.object &&
-          (hit.faceIndex ?? '') === (hoveredObj.faceIndex ?? '') &&
+          (hit.index ?? '') === (hoveredObj.index ?? '') &&
           (hit.instanceId ?? '') === (hoveredObj.instanceId ?? ''),
       );
 
@@ -564,7 +564,7 @@ export class InteractiveManager implements IDisposable {
               distance: data.distance,
               point: data.point.clone(),
               face: data.face,
-              faceIndex: data.faceIndex,
+              index: data.index,
               instanceId: data.instanceId,
               uv: data.uv,
             },
@@ -768,7 +768,7 @@ export class InteractiveManager implements IDisposable {
       distance: hovered.distance,
       point: hovered.point,
       face: hovered.face,
-      faceIndex: hovered.faceIndex,
+      index: hovered.index,
       instanceId: hovered.instanceId,
       uv: hovered.uv,
       intersections,

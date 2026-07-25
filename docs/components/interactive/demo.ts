@@ -63,6 +63,12 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
         mat.emissive.setHex(0x000000);
         log(`⬇ onPointerOut  → ${objName(e.eventObject)}`);
       },
+      onPointerEnter: (e) => {
+        log(`⬆ onPointerEnter→ ${objName(e.eventObject)}`);
+      },
+      onPointerLeave: (e) => {
+        log(`⬇ onPointerLeave→ ${objName(e.eventObject)}`);
+      },
       onPointerDown: (e) => {
         log(`⏬ onPointerDown → ${objName(e.eventObject)}`);
       },
@@ -90,25 +96,38 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
     });
   }
 
-  // ─── Overlap demo: big sphere + small sphere ──────────────
-  // 小球只有一部分嵌入大球，形成三种交互区域：
-  //   A. 只在小球上（小球突出大球的部分）
-  //   B. 两者重合处（小球嵌入大球的部分）
-  //   C. 只在大球上（大球表面不在小球范围内的部分）
+  // ─── Overlap demo: big sphere + small sphere (parent-child) ──
+  // 小球是大球的子对象（bigSphere.add(smallSphere)），部分嵌入大球。
+  // 形成三种交互区域：
+  //   A. 只在小球上（小球突出大球的部分）——射线只命中 smallSphere
+  //   B. 两者重合处（小球嵌入大球的部分）——射线先命中 bigSphere 表面，再命中 smallSphere
+  //   C. 只在大球上（大球表面不在小球范围内的部分）——射线只命中 bigSphere
   //
-  // R3F 模型下，两个对象是**独立的**注册对象（非父子关系）。
-  // 射线检测的结果是按 distance 排序的扁平列表，每个原始 hit 会向
-  // 上展开到所有注册的祖先。但大球和小球互不为祖先，所以：
-  //   - 区域 A：只有小球的 intersection → 只触发小球事件
-  //   - 区域 B：射线先击中大球表面，再击中小球表面（或反之），
-  //             两个对象都会出现在 flat intersections 列表中，
-  //             事件按 distance 顺序依次派发（近的先）
-  //   - 区域 C：只有大球的 intersection → 只触发大球事件
+  // R3F 祖先展开（"冒泡"）规则：
+  //   每个原始 ray hit 沿 parent 链向上走，每遇到一个注册对象就多产生
+  //   一条 Intersection，同一个 hit 的 distance 相同。
   //
-  // over/out 的逻辑：基于 composite-id diffing。
-  //   - 进入重叠区时，如果之前只悬停了其中一个，另一个的 over+enter 会触发
-  //   - 离开重叠区时，离开的那个触发 out+leave
-  //   - 两者独立追踪，互不影响
+  //   - 区域 A：射线只命中 smallSphere → 展开到 bigSphere（parent）
+  //             intersections = [(smallSphere, d), (bigSphere, d)]
+  //             → 两者都收到事件，小球先派发，大球后派发（同 distance 按列表序）
+  //             → 这就是 R3F 的"冒泡"：子对象命中，父对象也收到
+  //
+  //   - 区域 B：射线命中 bigSphere(d1) + smallSphere(d2)
+  //             bigSphere 的 hit 展开只有 bigSphere 自身（无更上注册祖先）
+  //             smallSphere 的 hit 展开到 bigSphere（parent）
+  //             intersections = [(bigSphere,d1), (smallSphere,d2), (bigSphere,d2)]
+  //             → 三条 Intersection 按距离依次派发
+  //             → 注意 bigSphere 出现两次：一次是自身被直接命中(d1)，
+  //               一次是作为 smallSphere 的祖先展开(d2)
+  //
+  //   - 区域 C：射线只命中 bigSphere → 无 smallSphere 相关条目
+  //             intersections = [(bigSphere, d)]
+  //             → 只触发大球事件
+  //
+  // over/out 的逻辑：基于 composite-id diffing（eventObject/faceIndex/instanceId）
+  //   - 从 C→A：smallSphere 从无到有 → over+enter；bigSphere 持续在 → 无变化
+  //   - 从 A→C：smallSphere 消失 → out+leave；bigSphere 持续在 → 无变化
+  //   - stopPropagation()：子对象调用后，大球不再收到该事件
 
   const bigSphereMat = new THREE.MeshStandardMaterial({
     color: 0x9b59b6,
@@ -132,40 +151,59 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
     smallSphereMat,
   );
   smallSphereMesh.name = 'SmallSphere';
-  smallSphereMesh.position.set(0.7, 0.3, 0.6); // 偏移，部分在大球内，部分突出
-  // 注意：小球是 scene.add，不是 bigSphere.add！两者是同级，非父子
-  scene.add(smallSphereMesh);
+  smallSphereMesh.position.set(0, 1, 0); // 偏移，部分在大球内，部分突出
+  // 小球是大球的子对象 → 命中小球时，祖先展开会走到大球（R3F 冒泡）
+  bigSphereMesh.add(smallSphereMesh);
 
   let bubbleStopped = false;
+
+  // 冒泡来源标注：e.object 是射线实际命中的对象，e.eventObject 是注册了 handler 的对象
+  // 当 e.object !== e.eventObject 时，说明事件是从 e.object 冒泡上来的
+  // 注意：只有通过 handleIntersects 派发的事件才冒泡（over/enter/move/click/down/up/wheel/contextMenu）
+  // out/leave 由 cancelPointer 直接 per-object 派发，不冒泡，不应使用此标注
+  function bubbleTag(e: { object: THREE.Object3D; eventObject: THREE.Object3D }): string {
+    return e.object !== e.eventObject ? ` 🔼冒泡自${objName(e.object)}` : '';
+  }
 
   // Register small sphere
   manager.add(smallSphereMesh, {
     onPointerOver: (e) => {
       smallSphereMat.emissive.setHex(0x444444);
-      log(`⬆ onPointerOver → ${objName(e.eventObject)}`);
+      log(`⬆ onPointerOver → ${objName(e.eventObject)}${bubbleTag(e)}`);
+      if (bubbleStopped) {
+        e.stopPropagation();
+        log(`  └─ ${objName(e.eventObject)} stopPropagation() — 后续对象不再收到`);
+      }
     },
     onPointerOut: (e) => {
       smallSphereMat.emissive.setHex(0x000000);
       log(`⬇ onPointerOut  → ${objName(e.eventObject)}`);
     },
     onPointerEnter: (e) => {
-      log(`⬆ onPointerEnter→ ${objName(e.eventObject)}`);
+      log(`⬆ onPointerEnter→ ${objName(e.eventObject)}${bubbleTag(e)}`);
+      if (bubbleStopped) {
+        e.stopPropagation();
+        log(`  └─ ${objName(e.eventObject)} stopPropagation() — 后续对象不再收到`);
+      }
     },
     onPointerLeave: (e) => {
       log(`⬇ onPointerLeave→ ${objName(e.eventObject)}`);
     },
     onPointerMove: (e) => {
-      log(`↔ onPointerMove → ${objName(e.eventObject)}`);
+      log(`↔ onPointerMove → ${objName(e.eventObject)}${bubbleTag(e)}`);
+      if (bubbleStopped) {
+        e.stopPropagation();
+      }
     },
     onClick: (e) => {
-      log(`🖱 onClick       → ${objName(e.eventObject)}`);
+      log(`🖱 onClick       → ${objName(e.eventObject)}${bubbleTag(e)}`);
       if (bubbleStopped) {
         e.stopPropagation();
         log(`  └─ ${objName(e.eventObject)} stopPropagation() — 后续对象不再收到`);
       }
     },
     onContextMenu: (e) => {
-      log(`📋 onContextMenu → ${objName(e.eventObject)}`);
+      log(`📋 onContextMenu → ${objName(e.eventObject)}${bubbleTag(e)}`);
       if (bubbleStopped) {
         e.stopPropagation();
       }
@@ -176,28 +214,26 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   manager.add(bigSphereMesh, {
     onPointerOver: (e) => {
       bigSphereMat.emissive.setHex(0x222222);
-      log(`⬆ onPointerOver → ${objName(e.eventObject)}`);
+      log(`⬆ onPointerOver → ${objName(e.eventObject)}${bubbleTag(e)}`);
     },
     onPointerOut: (e) => {
       bigSphereMat.emissive.setHex(0x000000);
       log(`⬇ onPointerOut  → ${objName(e.eventObject)}`);
     },
     onPointerEnter: (e) => {
-      log(`⬆ onPointerEnter→ ${objName(e.eventObject)}`);
+      log(`⬆ onPointerEnter→ ${objName(e.eventObject)}${bubbleTag(e)}`);
     },
     onPointerLeave: (e) => {
       log(`⬇ onPointerLeave→ ${objName(e.eventObject)}`);
     },
     onPointerMove: (e) => {
-      log(`↔ onPointerMove → ${objName(e.eventObject)}`);
+      log(`↔ onPointerMove → ${objName(e.eventObject)}${bubbleTag(e)}`);
     },
     onClick: (e) => {
-      const bubbled = e.eventObject !== e.object;
-      log(`🖱 onClick       → ${objName(e.eventObject)}${bubbled ? ' 🔵 同一射线命中' : ''}`);
+      log(`🖱 onClick       → ${objName(e.eventObject)}${bubbleTag(e)}`);
     },
     onContextMenu: (e) => {
-      const bubbled = e.eventObject !== e.object;
-      log(`📋 onContextMenu → ${objName(e.eventObject)}${bubbled ? ' 🔵 同一射线命中' : ''}`);
+      log(`📋 onContextMenu → ${objName(e.eventObject)}${bubbleTag(e)}`);
     },
   });
 
@@ -223,16 +259,16 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
     <button id="im-dispose">Dispose</button>
     <div class="info" style="margin-top:6px;border-top:1px solid var(--border-lighter);padding-top:6px">
       <b>R3F 事件模型</b><br>
-      • 射线按 distance 排序，扁平列表依次派发<br>
+      • 每个原始 ray hit 沿 parent 链展开到注册祖先<br>
+      • 展开后按 distance 排序，扁平列表依次派发<br>
       • stopPropagation() 中断后续派发<br>
       • over+enter 同时触发；out+leave 同时触发<br>
       • click 仅在 pointerDown 命中的对象上触发<br>
-      <b>重叠演示</b><br>
-      • 大球/小球同级（非父子），各自独立注册<br>
-      • A区(仅小球)→只有小球事件<br>
-      • B区(重叠)→两者都收到，按距离排序<br>
+      <b>重叠演示（小球是大球子对象）</b><br>
+      • A区(仅小球)→小球+大球都收到(祖先展开)<br>
+      • B区(重叠)→大球直接命中+小球命中展开到大球<br>
       • C区(仅大球)→只有大球事件<br>
-      • 勾选阻止传播后，近处对象stopPropagation可阻止远处对象
+      • 勾选阻止传播后，小球stopPropagation可阻止大球收到
     </div>
   `;
 
