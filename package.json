@@ -77,6 +77,16 @@
         "default": "./dist/cjs/controls.cjs"
       }
     },
+    "./camera": {
+      "import": {
+        "types": "./dist/es/camera.d.ts",
+        "default": "./dist/es/camera.js"
+      },
+      "require": {
+        "types": "./dist/cjs/camera.d.ts",
+        "default": "./dist/cjs/camera.cjs"
+      }
+    },
     "./interactive": {
       "import": {
         "types": "./dist/es/interactive.d.ts",
@@ -95,6 +105,16 @@
       "require": {
         "types": "./dist/cjs/helper.d.ts",
         "default": "./dist/cjs/helper.cjs"
+      }
+    },
+    "./animation": {
+      "import": {
+        "types": "./dist/es/animation.d.ts",
+        "default": "./dist/es/animation.js"
+      },
+      "require": {
+        "types": "./dist/cjs/animation.d.ts",
+        "default": "./dist/cjs/animation.cjs"
       }
     },
     "./dist/*": "./dist/*"

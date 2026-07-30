@@ -39,7 +39,9 @@ export * from './helper';
 export { Util } from './utils';
 export * from './graph';
 export * from './controls';
+export * from './camera';
 export * from './interactive';
+export * from './animation';
 
 // Re-export types for convenience
 export type * from './types';

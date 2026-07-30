@@ -35,11 +35,13 @@
  * - **Color**: {@link hexToRgb}, {@link rgbToHex}, {@link hslToRgb}, {@link blendColors}
  * - **Geometry**: {@link createGrid}, {@link createCircle}, {@link createSphere},
  *   {@link createSpiral}
+ * - **Object**: {@link cloneDeep}
  */
 
 import * as colorUtils from './color';
 import * as mathUtils from './math';
 import * as geometryUtils from './geometry';
+import * as cloneDeepUtils from './cloneDeep';
 
 /**
  * Util namespace — all utility functions in one object.
@@ -59,12 +61,14 @@ export const Util = {
   ...mathUtils,
   ...colorUtils,
   ...geometryUtils,
+  ...cloneDeepUtils,
 } as const;
 
 // Re-export individual functions for tree-shaking
 export * from './math';
 export * from './color';
 export * from './geometry';
+export * from './cloneDeep';
 
 // Font / SDF utilities
 export { DynamicFont } from './dynamicFont';

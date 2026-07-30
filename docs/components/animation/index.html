@@ -1,0 +1,300 @@
+<div class="page">
+  <h2>Animation</h2>
+  <span class="tag">module</span>
+  <p class="desc">基于 GSAP 封装的通用动画库，完全隐藏 GSAP 概念。通过直观的链式 API 完成 Three.js 对象的动画编排与控制。</p>
+
+  <div class="demo-card">
+    <canvas id="c-animation"></canvas>
+    <div class="demo-ctrl" id="ctrl-animation"></div>
+  </div>
+
+  <h3>API</h3>
+  <div class="method">
+    <div class="sig"><span class="kw">animate</span>(target, config?): <span class="kw">AnimationController</span></div>
+    <p>创建动画控制器。支持链式 <code>.to()</code> 串行、<code>.parallel()</code> 并行编排。</p>
+  </div>
+  <div class="method">
+    <div class="sig"><span class="kw">registerEasing</span>(name, fn)</div>
+    <p>注册自定义缓动函数，注册后可通过名称在任何动画中使用。</p>
+  </div>
+  <div class="method">
+    <div class="sig"><span class="kw">setDefaultConfig</span>(config)</div>
+    <p>修改全局默认配置（duration、ease、repeat 等）。</p>
+  </div>
+
+  <h4>animate() 参数 — target</h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>target</code></td><td><code>Object3D | Object3D[]</code></td><td>动画目标对象。传入数组时所有目标同步执行，共享进度。</td></tr>
+    </tbody>
+  </table>
+
+  <h4>animate() 参数 — AnimationConfig</h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>to</code></td><td><code>PropertyTarget</code></td><td>—</td><td>目标属性值。省略 <code>from</code> 时从当前值动画到 <code>to</code>。</td></tr>
+      <tr><td><code>from</code></td><td><code>PropertyTarget</code></td><td>—</td><td>起始属性值。设置后动画从 <code>from</code> 过渡到 <code>to</code>（或当前值）。</td></tr>
+      <tr><td><code>duration</code></td><td><code>number</code></td><td><code>1</code></td><td>动画时长（秒）。</td></tr>
+      <tr><td><code>delay</code></td><td><code>number</code></td><td><code>0</code></td><td>延迟启动时间（秒）。</td></tr>
+      <tr><td><code>ease</code></td><td><code>string | (t) =&gt; number</code></td><td><code>'easeInOut'</code></td><td>缓动函数。内置名称如 <code>'linear'</code>、<code>'easeOut'</code>、<code>'easeOutCubic'</code> 等，或传入自定义 <code>(t) =&gt; number</code> 函数。</td></tr>
+      <tr><td><code>repeat</code></td><td><code>number</code></td><td><code>0</code></td><td>重复次数。0 = 播放一次，1 = 共两次，以此类推。</td></tr>
+      <tr><td><code>yoyo</code></td><td><code>boolean</code></td><td><code>false</code></td><td>是否往复播放（前进→后退→前进→…），需配合 <code>repeat</code> 使用。</td></tr>
+    </tbody>
+  </table>
+
+  <h4>PropertyTarget 属性目标</h4>
+  <table class="pt">
+    <thead><tr><th>键</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>position</code></td><td><code>{ x?, y?, z? }</code></td><td>位置目标（局部坐标），只写需要动画的轴。</td></tr>
+      <tr><td><code>rotation</code></td><td><code>{ x?, y?, z? }</code></td><td>旋转目标（欧拉角，弧度制）。</td></tr>
+      <tr><td><code>scale</code></td><td><code>{ x?, y?, z? }</code></td><td>缩放目标。</td></tr>
+      <tr><td><code>'material.color'</code></td><td><code>string</code></td><td>材质颜色，支持十六进制字符串如 <code>'#ff0000'</code>。</td></tr>
+      <tr><td><code>'material.opacity'</code></td><td><code>number</code></td><td>材质透明度 (0-1)。</td></tr>
+      <tr><td>其他点路径</td><td><code>unknown</code></td><td>任意嵌套属性路径，如 <code>'material.uniforms.uProgress.value'</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h4>生命周期回调</h4>
+  <table class="pt">
+    <thead><tr><th>回调</th><th>签名</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>onStart</code></td><td><code>() =&gt; void</code></td><td>动画开始播放时触发。</td></tr>
+      <tr><td><code>onUpdate</code></td><td><code>(progress: number) =&gt; void</code></td><td>每帧更新时触发，<code>progress</code> 为当前进度 (0-1)。</td></tr>
+      <tr><td><code>onPause</code></td><td><code>() =&gt; void</code></td><td>暂停时触发。</td></tr>
+      <tr><td><code>onComplete</code></td><td><code>() =&gt; void</code></td><td>动画播放完成时触发。</td></tr>
+      <tr><td><code>onStop</code></td><td><code>(progress: number) =&gt; void</code></td><td>被 <code>stop()</code> 停止时触发，入参为停止时的进度。</td></tr>
+      <tr><td><code>onSeek</code></td><td><code>(progress: number) =&gt; void</code></td><td>跳转进度时触发。</td></tr>
+    </tbody>
+  </table>
+
+  <h4>AnimationController 方法</h4>
+  <table class="pt">
+    <thead><tr><th>方法</th><th>返回值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>.to(props, config?)</code></td><td><code>this</code></td><td>添加串行动画步骤。第二个参数可覆盖 <code>duration</code>、<code>ease</code> 等配置。</td></tr>
+      <tr><td><code>.parallel(groups)</code></td><td><code>this</code></td><td>添加并行步骤组。<code>groups</code> 为回调数组，每个回调接收一个 <code>AnimationStepBuilder</code>。</td></tr>
+      <tr><td><code>.play()</code></td><td><code>this</code></td><td>开始播放。首次调用会构建内部 Timeline。</td></tr>
+      <tr><td><code>.pause()</code></td><td><code>this</code></td><td>暂停当前动画。</td></tr>
+      <tr><td><code>.resume()</code></td><td><code>this</code></td><td>从暂停处继续播放。</td></tr>
+      <tr><td><code>.stop()</code></td><td><code>this</code></td><td>停止播放并回到起始位置。</td></tr>
+      <tr><td><code>.restart()</code></td><td><code>this</code></td><td>重置到初始状态重新播放。</td></tr>
+      <tr><td><code>.seek(progress)</code></td><td><code>this</code></td><td>跳转到指定进度 (0-1)，不改变播放/暂停状态。</td></tr>
+      <tr><td><code>.getProgress()</code></td><td><code>number</code></td><td>获取当前播放进度 (0-1)。</td></tr>
+      <tr><td><code>.getState()</code></td><td><code>AnimationState</code></td><td>获取播放状态：<code>'idle'</code> | <code>'playing'</code> | <code>'paused'</code> | <code>'stopped'</code> | <code>'completed'</code> | <code>'destroyed'</code></td></tr>
+      <tr><td><code>.getDuration()</code></td><td><code>number</code></td><td>获取动画总时长（秒）。</td></tr>
+      <tr><td><code>.destroy()</code></td><td><code>void</code></td><td>销毁动画实例，释放所有内部资源。销毁后调用任何方法会抛出错误。</td></tr>
+    </tbody>
+  </table>
+
+  <h4>内置缓动预设</h4>
+  <table class="pt">
+    <thead><tr><th>分类</th><th>名称</th></tr></thead>
+    <tbody>
+      <tr><td>通用</td><td><code>linear</code> · <code>easeIn</code> · <code>easeOut</code> · <code>easeInOut</code></td></tr>
+      <tr><td>二次方 (Quad)</td><td><code>easeInQuad</code> · <code>easeOutQuad</code> · <code>easeInOutQuad</code></td></tr>
+      <tr><td>三次方 (Cubic)</td><td><code>easeInCubic</code> · <code>easeOutCubic</code> · <code>easeInOutCubic</code></td></tr>
+      <tr><td>四次方 (Quart)</td><td><code>easeInQuart</code> · <code>easeOutQuart</code> · <code>easeInOutQuart</code></td></tr>
+      <tr><td>五次方 (Quint)</td><td><code>easeInQuint</code> · <code>easeOutQuint</code> · <code>easeInOutQuint</code></td></tr>
+      <tr><td>正弦 (Sine)</td><td><code>easeInSine</code> · <code>easeOutSine</code> · <code>easeInOutSine</code></td></tr>
+      <tr><td>指数 (Expo)</td><td><code>easeInExpo</code> · <code>easeOutExpo</code> · <code>easeInOutExpo</code></td></tr>
+      <tr><td>圆形 (Circ)</td><td><code>easeInCirc</code> · <code>easeOutCirc</code> · <code>easeInOutCirc</code></td></tr>
+      <tr><td>过冲 (Back)</td><td><code>easeInBack</code> · <code>easeOutBack</code> · <code>easeInOutBack</code></td></tr>
+      <tr><td>弹性 (Elastic)</td><td><code>easeInElastic</code> · <code>easeOutElastic</code> · <code>easeInOutElastic</code></td></tr>
+      <tr><td>弹跳 (Bounce)</td><td><code>easeInBounce</code> · <code>easeOutBounce</code> · <code>easeInOutBounce</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>示例</h3>
+
+  <h4>1. 基础单步动画</h4>
+  <p>传入 <code>to</code> 指定目标属性值，配合 <code>duration</code> 和 <code>ease</code> 完成单步动画。</p>
+  <pre><code class="language-ts">import { animate } from '@cyc/3d-components/animation';
+
+animate(mesh, {
+  to: { position: { x: 2 }, 'material.color': '#ff8800' },
+  duration: 1,
+  ease: 'easeOut',
+  onComplete: () => console.log('完成'),
+}).play();</code></pre>
+
+  <h4>2. 串行编排（链式 .to）</h4>
+  <p>多次调用 <code>.to()</code>，步骤按顺序执行——前一步完成后执行下一步。</p>
+  <pre><code class="language-ts">animate(mesh)
+  .to({ position: { x: 2 } }, { duration: 0.5, ease: 'easeOut' })
+  .to({ rotation: { y: Math.PI * 2 } }, { duration: 0.6, ease: 'easeInOut' })
+  .to({ 'material.color': '#ff4488' }, { duration: 0.4, ease: 'easeIn' })
+  .play();</code></pre>
+
+  <h4>3. 并行编排（.parallel）</h4>
+  <p><code>.parallel()</code> 中的所有子步骤同时开始播放。</p>
+  <pre><code class="language-ts">animate(mesh)
+  .parallel([
+    (g) => g.to({ position: { y: 2 } }, { duration: 0.8, ease: 'easeOut' }),
+    (g) => g.to({ rotation: { y: Math.PI } }, { duration: 0.8, ease: 'easeInOut' }),
+    (g) => g.to({ 'material.color': '#ffff00' }, { duration: 0.8, ease: 'linear' }),
+  ])
+  .play();</code></pre>
+
+  <h4>4. 混合编排（串行 + 并行）</h4>
+  <p>先移动，到达后同时旋转+变色，最后缩放——串行和并行自由组合。</p>
+  <pre><code class="language-ts">animate(mesh)
+  .to({ position: { x: 2 } }, { duration: 0.5, ease: 'easeOut' })
+  .parallel([
+    (g) => g.to({ rotation: { y: Math.PI } }, { duration: 0.5, ease: 'easeInOut' }),
+    (g) => g.to({ 'material.color': '#ff0044' }, { duration: 0.5, ease: 'linear' }),
+  ])
+  .to({ scale: { x: 1.5, y: 1.5, z: 1.5 } }, { duration: 0.3, ease: 'easeOutBack' })
+  .play();</code></pre>
+
+  <h4>5. 并行中嵌套串行</h4>
+  <p><code>.parallel()</code> 的每个回调是一个独立的并行轨道，轨道内部可以用 <code>.to()</code> 链式调用来编排串行步骤。两条轨道<strong>同时开始</strong>，但各自内部按串行执行：</p>
+  <ul>
+    <li><strong>轨道 A（位置）</strong>：先向右移动 (0→0.5s)，到达后再向上移动 (0.5→1.0s)</li>
+    <li><strong>轨道 B（旋转）</strong>：绕 Y 轴旋转一圈 (0→0.8s)</li>
+  </ul>
+  <p>两条轨道同时启动，总时长取最长的轨道 = 1.0s。</p>
+  <pre><code class="language-ts">animate(mesh)
+  .parallel([
+    // 轨道 A：先右移，再上移（串行）
+    (g) => g
+      .to({ position: { x: 2 } }, { duration: 0.5, ease: 'easeOut' })
+      .to({ position: { y: 2 } }, { duration: 0.5, ease: 'easeOut' }),
+    // 轨道 B：旋转一圈
+    (g) => g
+      .to({ rotation: { y: Math.PI * 2 } }, { duration: 0.8, ease: 'easeInOut' }),
+  ])
+  .play();</code></pre>
+
+  <h4>6. from 动画</h4>
+  <p>指定 <code>from</code> 起始值，动画从该值过渡到 <code>to</code> 目标值（或当前值）。</p>
+  <pre><code class="language-ts">animate(mesh, {
+  from: { position: { x: -5, y: 5 } },
+  to: { position: { x: 0, y: 0.5 } },
+  duration: 1,
+  ease: 'easeOutCubic',
+}).play();</code></pre>
+
+  <h4>7. repeat + yoyo</h4>
+  <p><code>repeat</code> 控制重复次数，<code>yoyo</code> 启用往复播放（前进→后退→前进→…）。</p>
+  <pre><code class="language-ts">animate(mesh, {
+  to: { position: { y: 2 } },
+  duration: 0.6,
+  ease: 'easeInOut',
+  repeat: 3,   // 重复3次（总共播放4次）
+  yoyo: true,  // 每次往复
+  onComplete: () => console.log('所有重复完成'),
+}).play();</code></pre>
+
+  <h4>8. 多目标同时动画</h4>
+  <p>传入对象数组，所有目标同步执行同一动画，共享进度。适合<strong>所有目标做相同动画</strong>的场景。</p>
+  <pre><code class="language-ts">animate([mesh1, mesh2, mesh3], {
+  to: { position: { y: 2 } },
+  duration: 0.8,
+  ease: 'easeOutBack',
+}).play();</code></pre>
+
+  <h4>9. 多目标 + 纯 onUpdate</h4>
+  <p>传入对象数组配合 <code>onUpdate</code>，在回调中遍历每个目标实现自定义动画逻辑（如波浪、错开等效果）。</p>
+  <pre><code class="language-ts">animate([mesh1, mesh2, mesh3], {
+  duration: 1.5,
+  ease: 'easeInOut',
+  onUpdate: (progress) => {
+    [mesh1, mesh2, mesh3].forEach((mesh, i) => {
+      const offset = i * 0.15;              // 逐个错开
+      const p = Math.max(0, Math.min(1, (progress - offset) / (1 - offset)));
+      mesh.position.y = Math.sin(p * Math.PI) * 2;  // 波浪上升
+      mesh.rotation.y = p * Math.PI * 2;             // 旋转
+    });
+  },
+}).play();</code></pre>
+
+  <h4>多目标 vs parallel —— 如何选择？</h4>
+  <table class="pt">
+    <thead><tr><th>场景</th><th>用哪个</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>所有目标做<strong>同样</strong>的属性动画</td>
+        <td><code>animate([m1,m2], { to })</code></td>
+        <td>简洁，一行搞定</td>
+      </tr>
+      <tr>
+        <td>所有目标<strong>统一驱动</strong>但逻辑可遍历区分</td>
+        <td><code>animate([...], { onUpdate })</code></td>
+        <td>回调中用 index / 属性区分，如波浪错开效果</td>
+      </tr>
+      <tr>
+        <td>每个目标有<strong>完全不同</strong>的动画或回调</td>
+        <td><code>.parallel([...])</code></td>
+        <td>每条轨道独立配置，各自有独立的 onUpdate/onStart/onComplete</td>
+      </tr>
+    </tbody>
+  </table>
+  <pre><code class="language-ts">// ❌ 错误：多目标数组不支持各自的 onUpdate
+animate([mesh1, mesh2], {
+  onUpdate: (progress) => {
+    // mesh1 和 mesh2 共享同一个回调，无法分别配置
+  },
+});
+
+// ✅ 正确：各自不同的动画 → 用 parallel
+animate(mesh)
+  .parallel([
+    (g) => g.to({ position: { x: 2 } }, {
+      duration: 0.5,
+      onUpdate: (p) => console.log('移动进度', p),
+    }),
+    (g) => g.to({ 'material.color': '#ff0000' }, {
+      duration: 0.3,
+      onUpdate: (p) => console.log('变色进度', p),
+    }),
+  ])
+  .play();</code></pre>
+
+  <h4>10. 手动控制（play / pause / seek / stop / restart）</h4>
+  <p>通过命令式 API 完整控制动画播放生命周期。</p>
+  <pre><code class="language-ts">const anim = animate(mesh, {
+  to: { position: { x: 2 }, rotation: { y: Math.PI } },
+  duration: 3,
+  ease: 'easeInOut',
+});
+
+anim.play();           // 开始播放
+anim.pause();          // 暂停
+anim.seek(0.5);        // 跳转到 50%
+anim.resume();         // 继续播放
+anim.getProgress();    // → 0.5
+anim.getState();       // → 'playing'
+anim.stop();           // 停止并回到起始位置
+anim.restart();        // 重新播放</code></pre>
+
+  <h4>11. 自定义缓动</h4>
+  <p>通过 <code>registerEasing</code> 注册自定义缓动函数，之后用名称引用。</p>
+  <pre><code class="language-ts">import { animate, registerEasing } from '@cyc/3d-components/animation';
+
+registerEasing('customElastic', (t) => {
+  if (t === 0 || t === 1) return t;
+  return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI / 3)) + 1;
+});
+
+animate(mesh, {
+  to: { position: { x: 2 } },
+  duration: 1.5,
+  ease: 'customElastic',
+}).play();</code></pre>
+
+  <h4>12. 纯 onUpdate 模式</h4>
+  <p>不指定 <code>to</code>/<code>from</code>，仅通过 <code>onUpdate(progress)</code> 回调驱动自定义逻辑。</p>
+  <pre><code class="language-ts">animate(mesh, {
+  duration: 2,
+  ease: 'easeInOut',
+  onUpdate: (progress) => {
+    const s = 1 + Math.sin(progress * Math.PI) * 0.8;
+    mesh.scale.set(s, s, s);
+    mesh.rotation.y = progress * Math.PI * 2;
+  },
+}).play();</code></pre>
+
+</div>

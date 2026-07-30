@@ -109,6 +109,9 @@ async function showPage(name: string) {
   // Syntax highlight code blocks on the newly active page
   host.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el as HTMLElement));
 
+  // Notify listeners that page content is ready (e.g. fn-scroll anchor)
+  host.dispatchEvent(new Event('page-loaded'));
+
   // Lazy-init demo
   if (hasDemo(name)) {
     try {
@@ -135,6 +138,29 @@ document.querySelectorAll('.nav-page').forEach((a) => {
   a.addEventListener('click', (e) => {
     e.preventDefault();
     navigateTo((a as HTMLElement).dataset.page!);
+  });
+});
+
+// Bind sidebar fn clicks → navigate to utils page & scroll to anchor
+document.querySelectorAll('.nav-fn').forEach((fn) => {
+  fn.addEventListener('click', () => {
+    const fnName = (fn as HTMLElement).dataset.search;
+    if (!fnName) return;
+    const anchor = `fn-${fnName}`;
+    // If already on utils page, just scroll
+    if (activePage === 'utils') {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // Navigate to utils first, then scroll after page loads
+      navigateTo('utils');
+      const scrollAfterLoad = () => {
+        const el = document.getElementById(anchor);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        host.removeEventListener('page-loaded', scrollAfterLoad);
+      };
+      host.addEventListener('page-loaded', scrollAfterLoad);
+    }
   });
 });
 

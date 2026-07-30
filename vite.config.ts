@@ -22,7 +22,9 @@ export default defineConfig({
         helper: resolve(__dirname, 'src/helper/index.ts'),
         graph: resolve(__dirname, 'src/graph/index.ts'),
         controls: resolve(__dirname, 'src/controls/index.ts'),
+        camera: resolve(__dirname, 'src/camera/index.ts'),
         interactive: resolve(__dirname, 'src/interactive/index.ts'),
+        animation: resolve(__dirname, 'src/animation/index.ts'),
       },
     },
     rollupOptions: {

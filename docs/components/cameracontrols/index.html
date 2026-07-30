@@ -1,0 +1,347 @@
+<div class="page">
+  <h2>CameraControls</h2>
+  <span class="tag">implements <code>IUpdatable</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">轨道式相机控制器，移植自 <a href="https://github.com/yomotsu/camera-controls" target="_blank">camera-controls</a> v3.1.2，改写为符合本工程规范的 TypeScript 实现。支持 <code>PerspectiveCamera</code> 和 <code>OrthographicCamera</code>，提供轨道旋转、dolly/zoom、truck/pan、边界约束、碰撞检测、可配置的鼠标/触控输入映射。所有带 <code>enableTransition</code> 参数的方法返回 <code>Promise&lt;void&gt;</code>，可 <code>await</code> 等待过渡完成。</p>
+
+  <div class="demo-card">
+    <canvas id="c-cameracontrols"></canvas>
+    <div class="demo-ctrl" id="ctrl-cameracontrols"></div>
+    <div id="cc-readout"
+      style="position:absolute;bottom:10px;left:10px;padding:8px 12px;min-width:280px;
+             background:rgba(30,30,30,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);
+             border-radius:8px;font-family:'Cascadia Code','Fira Code','Consolas',monospace;
+             font-size:11px;line-height:1.6;color:#ccc;z-index:10;pointer-events:none;white-space:pre">
+    </div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> CameraControls(options: CameraControlsOptions)</div>
+
+  <h4>Parameters — <code>CameraControlsOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>camera</td><td><code>PerspectiveCamera | OrthographicCamera</code></td><td>—</td><td>被控制的相机（必填）</td></tr>
+      <tr><td>domElement</td><td><code>HTMLElement</code></td><td>—</td><td>挂载指针事件的 DOM 元素（通常 <code>renderer.domElement</code>）</td></tr>
+      <tr><td>minPolarAngle</td><td><code>number</code></td><td>0</td><td>最小极角（弧度）</td></tr>
+      <tr><td>maxPolarAngle</td><td><code>number</code></td><td>Math.PI</td><td>最大极角（弧度）</td></tr>
+      <tr><td>minAzimuthAngle</td><td><code>number</code></td><td>-Infinity</td><td>最小方位角（弧度）</td></tr>
+      <tr><td>maxAzimuthAngle</td><td><code>number</code></td><td>Infinity</td><td>最大方位角（弧度）</td></tr>
+      <tr><td>minDistance</td><td><code>number</code></td><td>Number.EPSILON</td><td>最小推拉距离</td></tr>
+      <tr><td>maxDistance</td><td><code>number</code></td><td>Infinity</td><td>最大推拉距离</td></tr>
+      <tr><td>infinityDolly</td><td><code>boolean</code></td><td>false</td><td>到达距离极限时推动目标而非停止</td></tr>
+      <tr><td>minZoom</td><td><code>number</code></td><td>0.01</td><td>最小缩放因子（正交相机）</td></tr>
+      <tr><td>maxZoom</td><td><code>number</code></td><td>Infinity</td><td>最大缩放因子（正交相机）</td></tr>
+      <tr><td>smoothTime</td><td><code>number</code></td><td>0.25</td><td>编程式过渡的平滑时间（秒）</td></tr>
+      <tr><td>draggingSmoothTime</td><td><code>number</code></td><td>0.125</td><td>拖拽时的平滑时间（秒）</td></tr>
+      <tr><td>maxSpeed</td><td><code>number</code></td><td>Infinity</td><td>最大过渡速度</td></tr>
+      <tr><td>azimuthRotateSpeed</td><td><code>number</code></td><td>1.0</td><td>水平旋转速度倍率</td></tr>
+      <tr><td>polarRotateSpeed</td><td><code>number</code></td><td>1.0</td><td>垂直旋转速度倍率</td></tr>
+      <tr><td>dollySpeed</td><td><code>number</code></td><td>1.0</td><td>滚轮推拉速度倍率</td></tr>
+      <tr><td>dollyDragInverted</td><td><code>boolean</code></td><td>false</td><td>拖拽推拉方向反转</td></tr>
+      <tr><td>truckSpeed</td><td><code>number</code></td><td>2.0</td><td>平移速度倍率</td></tr>
+      <tr><td>dollyToCursor</td><td><code>boolean</code></td><td>false</td><td>推拉朝向鼠标光标</td></tr>
+      <tr><td>dragToOffset</td><td><code>boolean</code></td><td>false</td><td>拖拽偏移焦距而非平移</td></tr>
+      <tr><td>boundaryFriction</td><td><code>number</code></td><td>0</td><td>边界摩擦系数（0 = 硬限，1 = 无摩擦）</td></tr>
+      <tr><td>restThreshold</td><td><code>number</code></td><td>0.01</td><td>判定相机静止的阈值</td></tr>
+      <tr><td>boundaryEnclosesCamera</td><td><code>boolean</code></td><td>false</td><td>将相机位置（而非仅目标）限制在边界内</td></tr>
+      <tr><td>mouseButtons</td><td><code>MouseButtons</code></td><td>见下</td><td>鼠标按键映射</td></tr>
+      <tr><td>touches</td><td><code>Touches</code></td><td>见下</td><td>触控手势映射</td></tr>
+      <tr><td>boundary</td><td><code>THREE.Box3</code></td><td>—</td><td>边界框</td></tr>
+      <tr><td>viewport</td><td><code>{x,y,width,height}</code></td><td>—</td><td>视口裁剪区域</td></tr>
+      <tr><td>colliderMeshes</td><td><code>THREE.Object3D[]</code></td><td>—</td><td>碰撞检测网格</td></tr>
+      <tr><td>onUpdate / onWake / onRest / onSleep / onTransitionStart</td><td><code>() =&gt; void</code></td><td>—</td><td>事件回调快捷方式</td></tr>
+      <tr><td>onControlStart / onControl / onControlEnd</td><td><code>() =&gt; void</code></td><td>—</td><td>控制事件回调</td></tr>
+    </tbody>
+  </table>
+
+  <h4>默认鼠标映射（透视相机）</h4>
+  <table class="pt">
+    <thead><tr><th>按键</th><th>行为</th></tr></thead>
+    <tbody>
+      <tr><td>左键拖拽</td><td><code>ACTION.ROTATE</code> 轨道旋转</td></tr>
+      <tr><td>中键拖拽</td><td><code>ACTION.DOLLY</code> 推拉</td></tr>
+      <tr><td>右键拖拽</td><td><code>ACTION.TRUCK</code> 平移</td></tr>
+      <tr><td>滚轮</td><td><code>ACTION.DOLLY</code> 推拉（透视） / <code>ACTION.ZOOM</code> 缩放（正交）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods — 旋转</h3>
+  <div class="method">
+    <div class="sig">.rotate(<strong>azimuthAngle</strong>, <strong>polarAngle</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>按增量旋转（弧度）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.rotateTo(<strong>azimuthAngle</strong>, <strong>polarAngle</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>旋转到绝对角度（弧度）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.rotateAzimuthTo(<strong>angle</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>旋转到绝对方位角。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.rotatePolarTo(<strong>angle</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>旋转到绝对极角。</p>
+  </div>
+
+  <h3>Methods — 推拉 / 缩放</h3>
+  <div class="method">
+    <div class="sig">.dolly(<strong>distance</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>推拉距离增量（透视相机）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dollyTo(<strong>distance</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>推拉到绝对距离。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dollyInFixed(<strong>distance</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>推拉但移动目标而非改变距离。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.zoom(<strong>zoomStep</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>缩放增量（正交相机）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.zoomTo(<strong>zoom</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>缩放到绝对值。</p>
+  </div>
+
+  <h3>Methods — 移动</h3>
+  <div class="method">
+    <div class="sig">.truck(<strong>x</strong>, <strong>y</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>平行于屏幕平移。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.forward(<strong>distance</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>沿视线方向前后移动目标。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.elevate(<strong>height</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>上下移动目标。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.moveTo(<strong>x</strong>, <strong>y</strong>, <strong>z</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>移动轨道中心到指定位置。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.lookInDirectionOf(<strong>x</strong>, <strong>y</strong>, <strong>z</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>朝指定方向看。</p>
+  </div>
+
+  <h3>Methods — 视角设置</h3>
+  <div class="method">
+    <div class="sig">.setLookAt(<strong>px,py,pz</strong>, <strong>tx,ty,tz</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>同时设置相机位置和目标。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.lerpLookAt(<strong>…12 个坐标</strong>, <strong>t</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>在两个视角之间插值。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setPosition(<strong>x, y, z</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>设置相机位置（目标不变）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setTarget(<strong>x, y, z</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>设置目标（位置不变）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setFocalOffset(<strong>x, y, z</strong>, enableTransition?): Promise&lt;void&gt;</div>
+    <p>设置屏幕平行偏移。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setOrbitPoint(<strong>x, y, z</strong>): void</div>
+    <p>设置轨道点但不移动相机。不可在动画中使用。</p>
+  </div>
+
+  <h3>Methods — 适配</h3>
+  <div class="method">
+    <div class="sig">.fitToBox(<strong>box3OrObject</strong>, enableTransition, options?): Promise&lt;void[]&gt;</div>
+    <p>将视口适配到包围盒或对象。支持 <code>cover</code> 和四向 <code>padding</code>。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.fitToSphere(<strong>sphereOrMesh</strong>, enableTransition): Promise&lt;void[]&gt;</div>
+    <p>将视口适配到包围球。</p>
+  </div>
+
+  <h3>Methods — 边界 / 视口</h3>
+  <div class="method">
+    <div class="sig">.setBoundary(<strong>box3?</strong>): void</div>
+    <p>设置边界框（<code>undefined</code> 清除）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setViewport(<strong>viewportOrX</strong>, y?, width?, height?): void</div>
+    <p>设置或清除视口裁剪区域。</p>
+  </div>
+
+  <h3>Methods — 状态查询</h3>
+  <div class="method">
+    <div class="sig">.getTarget(<strong>out</strong>, receiveEndValue?): Vector3</div>
+    <p>获取轨道目标位置。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getPosition(<strong>out</strong>, receiveEndValue?): Vector3</div>
+    <p>获取相机位置。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getSpherical(<strong>out</strong>, receiveEndValue?): Spherical</div>
+    <p>获取球坐标。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getFocalOffset(<strong>out</strong>, receiveEndValue?): Vector3</div>
+    <p>获取焦距偏移。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getDistanceToFitBox(<strong>w, h, d</strong>, cover?): number</div>
+    <p>计算适配包围盒所需距离。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.getDistanceToFitSphere(<strong>radius</strong>): number</div>
+    <p>计算适配球体所需距离。</p>
+  </div>
+
+  <h3>Methods — 生命周期</h3>
+  <div class="method">
+    <div class="sig">.update(<strong>delta</strong>: number): boolean</div>
+    <p>每帧调用，返回相机是否仍在运动。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.saveState(): void</div>
+    <p>保存当前状态（供 reset 使用）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.reset(enableTransition?): Promise&lt;void[]&gt;</div>
+    <p>重置到保存的状态。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.stop(): void</div>
+    <p>立即停止所有过渡。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.normalizeRotations(): this</div>
+    <p>将方位角规范化到 [-π, π]，链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.updateCameraUp(): void</div>
+    <p>修改 <code>camera.up</code> 后调用，同步内部四元数。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.applyCameraUp(): void</div>
+    <p>应用当前 camera.up 并重新初始化轨道系统。</p>
+  </div>
+
+  <h3>Methods — 连接 / 释放</h3>
+  <div class="method">
+    <div class="sig">.connect(<strong>domElement</strong>): void</div>
+    <p>挂载指针事件。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.disconnect(): void</div>
+    <p>卸载指针事件。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放所有资源，移除所有监听。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.cancel(): void</div>
+    <p>强制取消用户拖拽。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.lockPointer() / .unlockPointer()</div>
+    <p>锁定/解锁指针（实验性功能）。</p>
+  </div>
+
+  <h3>Methods — 序列化</h3>
+  <div class="method">
+    <div class="sig">.toJSON(): string</div>
+    <p>导出控制器状态为 JSON 字符串。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.fromJSON(<strong>json</strong>, enableTransition?): void</div>
+    <p>从 JSON 恢复控制器状态。</p>
+  </div>
+
+  <h3>Events</h3>
+  <table class="pt">
+    <thead><tr><th>事件</th><th>触发时机</th></tr></thead>
+    <tbody>
+      <tr><td><code>'controlstart'</code></td><td>用户开始拖拽</td></tr>
+      <tr><td><code>'control'</code></td><td>用户正在拖拽（每帧）</td></tr>
+      <tr><td><code>'controlend'</code></td><td>用户停止拖拽</td></tr>
+      <tr><td><code>'transitionstart'</code></td><td>任何过渡开始</td></tr>
+      <tr><td><code>'update'</code></td><td>相机位置更新（每帧）</td></tr>
+      <tr><td><code>'wake'</code></td><td>相机开始运动</td></tr>
+      <tr><td><code>'rest'</code></td><td>运动幅度低于 <code>restThreshold</code></td></tr>
+      <tr><td><code>'sleep'</code></td><td>相机停止运动</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Getters / Setters</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>读/写</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>camera</td><td><code>PerspectiveCamera | OrthographicCamera</code></td><td>读/写</td><td>被控相机</td></tr>
+      <tr><td>enabled</td><td><code>boolean</code></td><td>读/写</td><td>是否响应输入</td></tr>
+      <tr><td>active</td><td><code>boolean</code></td><td>只读</td><td>是否正在更新</td></tr>
+      <tr><td>currentAction</td><td><code>ACTION</code></td><td>只读</td><td>当前交互动作</td></tr>
+      <tr><td>distance</td><td><code>number</code></td><td>读/写</td><td>推拉距离</td></tr>
+      <tr><td>azimuthAngle</td><td><code>number</code></td><td>读/写</td><td>方位角（弧度）</td></tr>
+      <tr><td>polarAngle</td><td><code>number</code></td><td>读/写</td><td>极角（弧度）</td></tr>
+      <tr><td>interactiveArea</td><td><code>DOMRect | {x,y,w,h}</code></td><td>只写</td><td>可交互区域</td></tr>
+    </tbody>
+  </table>
+
+  <h3>ACTION 枚举（位掩码）</h3>
+  <table class="pt">
+    <thead><tr><th>名称</th><th>值</th><th>类别</th></tr></thead>
+    <tbody>
+      <tr><td>NONE</td><td>0</td><td>—</td></tr>
+      <tr><td>ROTATE</td><td>1</td><td>鼠标</td></tr>
+      <tr><td>TRUCK</td><td>2</td><td>鼠标</td></tr>
+      <tr><td>SCREEN_PAN</td><td>4</td><td>鼠标</td></tr>
+      <tr><td>OFFSET</td><td>8</td><td>鼠标</td></tr>
+      <tr><td>DOLLY</td><td>16</td><td>鼠标</td></tr>
+      <tr><td>ZOOM</td><td>32</td><td>鼠标</td></tr>
+      <tr><td>TOUCH_ROTATE</td><td>64</td><td>触控</td></tr>
+      <tr><td>TOUCH_TRUCK</td><td>128</td><td>触控</td></tr>
+      <tr><td>TOUCH_SCREEN_PAN</td><td>256</td><td>触控</td></tr>
+      <tr><td>TOUCH_OFFSET</td><td>512</td><td>触控</td></tr>
+      <tr><td>TOUCH_DOLLY</td><td>1024</td><td>触控</td></tr>
+      <tr><td>TOUCH_ZOOM</td><td>2048</td><td>触控</td></tr>
+      <tr><td>TOUCH_DOLLY_TRUCK</td><td>4096</td><td>组合</td></tr>
+      <tr><td>TOUCH_DOLLY_SCREEN_PAN</td><td>8192</td><td>组合</td></tr>
+      <tr><td>TOUCH_DOLLY_OFFSET</td><td>16384</td><td>组合</td></tr>
+      <tr><td>TOUCH_DOLLY_ROTATE</td><td>32768</td><td>组合</td></tr>
+      <tr><td>TOUCH_ZOOM_TRUCK</td><td>65536</td><td>组合</td></tr>
+      <tr><td>TOUCH_ZOOM_OFFSET</td><td>131072</td><td>组合</td></tr>
+      <tr><td>TOUCH_ZOOM_SCREEN_PAN</td><td>262144</td><td>组合</td></tr>
+      <tr><td>TOUCH_ZOOM_ROTATE</td><td>524288</td><td>组合</td></tr>
+    </tbody>
+  </table>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { CameraControls } from '@cyc/3d-components/camera';
+
+const controls = new CameraControls({
+  camera,
+  domElement: renderer.domElement,
+  smoothTime: 0.3,
+});
+
+// 编程式旋转
+await controls.rotateTo(Math.PI / 4, Math.PI / 3, true);
+
+// 适配到对象
+await controls.fitToBox(myMesh, true);
+
+// 每帧更新
+const clock = new THREE.Clock();
+function frame() {
+  const dt = clock.getDelta();
+  controls.update(dt);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}</code></pre>
+</div>
