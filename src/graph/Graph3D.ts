@@ -26,7 +26,7 @@
  */
 
 import * as THREE from 'three';
-import gsap from 'gsap';
+import { animate, type AnimationController } from '../animation';
 import type { GroupComponentOptions, IUpdatable, IDisposable } from '../types';
 import { prepare, type GraphIndex } from './adapter';
 import { Edge3D } from './elements/Edge3D';
@@ -124,7 +124,7 @@ export interface Graph3DOptions extends GroupComponentOptions {
  */
 export interface LayoutApplyOptions {
   /**
-   * 是否启用 gsap 过渡动画。关闭则瞬移到目标坐标。
+   * 是否启用过渡动画。关闭则瞬移到目标坐标。
    * @default false
    */
   animate?: boolean;
@@ -186,8 +186,8 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
   private readonly edgePathRadius: number;
   /** 'path' 形态是否带箭头。 */
   private readonly edgeArrow: boolean;
-  /** 当前布局过渡动画的进度代理 `{ t: 0→1 }`；无动画时为 null。 */
-  private layoutProxy: { t: number } | null = null;
+  /** 当前布局过渡动画的控制器；无动画时为 null。 */
+  private layoutAnim: AnimationController | null = null;
   /**
    * 当前声明的布局预设（Step 5）。`setData` 后自动重应用；`setLayout` 写入。
    * `null` 表示未声明布局（用占位环形散布）。
@@ -318,7 +318,7 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
   }
 
   /**
-   * 应用一次布局算法，刷新全部节点坐标与边端点（可选 gsap 过渡动画）。
+   * 应用一次布局算法，刷新全部节点坐标与边端点（可选过渡动画）。
    *
    * **一次性应用**（非持久化）：不记忆布局配置；`setData` 重建后需重新调用。
    * 声明式持久化见 Step 5 的 {@link Graph3D.setLayout} / {@link Graph3DOptions.layout} ——
@@ -388,7 +388,7 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
       return;
     }
 
-    // 动画：gsap 代理 t:0→1，逐帧 lerp 起止位 + 同步 line 边（path 边节流到完成帧）。
+    // 动画：animate 纯 onUpdate 模式，逐帧 lerp 起止位 + 同步 line 边（path 边节流到完成帧）。
     this.killLayoutTween();
     const startMap = new Map<NodeId, THREE.Vector3>();
     const targetMap = new Map<NodeId, THREE.Vector3>();
@@ -398,29 +398,32 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
       if (t) targetMap.set(node.nodeId, new THREE.Vector3(t.x, t.y, t.z));
     }
     const scratch = new THREE.Vector3();
-    this.layoutProxy = { t: 0 };
-    const proxy = this.layoutProxy;
     const duration = options?.duration ?? 0.6;
-    gsap.to(proxy, {
-      t: 1,
+    // 用一个临时 Object3D 作为 animate 目标（animate 需要 Object3D），
+    // 利用纯 onUpdate 模式：progress 从 0→1，不驱动任何实际属性。
+    const proxyObj = new THREE.Object3D();
+    proxyObj.name = '__layoutAnimProxy';
+    const anim = animate(proxyObj, {
       duration,
-      ease: 'power2.inOut',
-      onUpdate: () => {
+      ease: 'easeInOutQuad',
+      onUpdate: (progress: number) => {
         for (const node of this.nodes.values()) {
           const src = startMap.get(node.nodeId);
           const tgt = targetMap.get(node.nodeId);
           if (!src || !tgt) continue;
-          scratch.lerpVectors(src, tgt, proxy.t);
+          scratch.lerpVectors(src, tgt, progress);
           node.setPosition(scratch);
         }
         this.syncEdges(false);
       },
       onComplete: () => {
         this.syncEdges(true);
-        if (this.layoutProxy === proxy) this.layoutProxy = null;
+        if (this.layoutAnim === anim) this.layoutAnim = null;
         options?.onComplete?.();
       },
     });
+    this.layoutAnim = anim;
+    anim.play();
   }
 
   /**
@@ -615,9 +618,9 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    * 避免动画 `onUpdate` 操作已释放的节点/边几何导致运行时错误。
    */
   private killLayoutTween(): void {
-    if (this.layoutProxy) {
-      gsap.killTweensOf(this.layoutProxy);
-      this.layoutProxy = null;
+    if (this.layoutAnim) {
+      this.layoutAnim.destroy();
+      this.layoutAnim = null;
     }
   }
 }

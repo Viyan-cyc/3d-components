@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import gsap from 'gsap';
+import { animate, type AnimationController } from '../animation';
 import type { ComponentOptions, IDisposable } from '../types';
 
 /** 网格所在平面。`'xz'` 为水平地面（默认），`'xy'` 为面向 +Z 的立面（如 2D 坐标墙）。 */
@@ -243,6 +243,8 @@ const _vm = new THREE.Matrix4();
  */
 export class Grid extends THREE.Mesh implements IDisposable {
   private _plane: GridPlane;
+  /** flipProgress 过渡动画控制器，用于在 setPlane 时 kill 旧动画。 */
+  private _flipAnim: AnimationController | null = null;
 
   /**
    * @param options - 配置对象，所有属性均为可选。
@@ -338,19 +340,24 @@ export class Grid extends THREE.Mesh implements IDisposable {
    * - `'xy'`：垂直立面（flipProgress = 1）
    *
    * @param plane - 目标平面。
-   * @param animate - 是否用 GSAP 平滑过渡（约 0.6s 缓动）。 @default true
+   * @param useAnimate - 是否用平滑过渡（约 0.6s 缓动）。 @default true
    * @returns this，支持链式调用。
    */
-  setPlane(plane: GridPlane, animate = true): this {
+  setPlane(plane: GridPlane, useAnimate = true): this {
     this._plane = plane;
     const target = plane === 'xy' ? 1 : 0;
-    const u = this.mat.uniforms.flipProgress;
-    if (animate) {
-      gsap.killTweensOf(u);
-      gsap.to(u, { value: target, duration: 0.6, ease: 'power2.inOut' });
+    // 终止进行中的 flipProgress 过渡
+    this._flipAnim?.destroy();
+    this._flipAnim = null;
+    if (useAnimate) {
+      this._flipAnim = animate(this, {
+        to: { 'material.uniforms.flipProgress.value': target },
+        duration: 0.6,
+        ease: 'easeInOutQuad',
+        onComplete: () => { this._flipAnim = null; },
+      }).play();
     } else {
-      gsap.killTweensOf(u);
-      u.value = target;
+      this.mat.uniforms.flipProgress.value = target;
     }
     return this;
   }
@@ -449,7 +456,8 @@ export class Grid extends THREE.Mesh implements IDisposable {
    * 释放网格占用的 GPU 资源（geometry 与 material），并终止进行中的 GSAP 补间。
    */
   dispose(): void {
-    gsap.killTweensOf(this.mat.uniforms.flipProgress);
+    this._flipAnim?.destroy();
+    this._flipAnim = null;
     this.geometry?.dispose();
     this.mat.dispose();
   }

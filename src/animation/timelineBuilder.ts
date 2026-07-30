@@ -7,7 +7,7 @@
  * @module animation/timelineBuilder
  */
 
-import { gsap } from 'gsap';
+import gsap from 'gsap';
 import * as THREE from 'three';
 import type { AnimationStep, SerialStep, InternalAnimationConfig } from './types';
 import { resolveEase } from './easing';

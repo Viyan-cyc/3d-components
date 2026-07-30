@@ -7,7 +7,7 @@
  * @module animation/easing
  */
 
-import { gsap } from 'gsap';
+import gsap from 'gsap';
 import type { EasingInput } from './types';
 
 // ─── 数学工具 ───────────────────────────────────────────
