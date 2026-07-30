@@ -75,8 +75,7 @@ function edt(
 /**
  * DistanceTransform — converts alpha-channel bitmap into SDF.
  *
- * Uses the Felzenszwalb & Huttenlocher linear-time EDT algorithm
- * (ported from Mapbox tiny-sdf / t3d.js).
+ * Uses the Felzenszwalb & Huttenlocher linear-time EDT algorithm.
  *
  * @example
  * ```ts

@@ -2,14 +2,14 @@
   <h2>Path</h2>
   <span class="tag">extends <code>THREE.Group</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">路径绘制组件。把一组 3D 顶点先经「直线段 + 二次贝塞尔圆角」构造曲线，再经 Frenet 标架采样，最后扫掠成<strong>管道（tube）</strong>或<strong>扁平带（plane）</strong>两种几何体。算法移植自 t3d.js 的 <code>CurvePath3</code> / <code>TubeBuilder</code> / <code>RouteBuilder</code>。适合管线、电路走线、路网导航带、3D 路径动画轨道等场景。</p>
+  <p class="desc">路径绘制组件。把一组 3D 顶点先经「直线段 + 二次贝塞尔圆角」构造曲线，再经 Frenet 标架采样，最后扫掠成<strong>管道（tube）</strong>或<strong>扁平带（plane）</strong>两种几何体。适合管线、电路走线、路网导航带、3D 路径动画轨道等场景。</p>
 
   <!-- Demo -->
   <div class="demo-card">
     <canvas id="c-path"></canvas>
     <div class="demo-ctrl" id="ctrl-path"></div>
   </div>
-  <p class="desc">上方 demo 的路径数据采用 <strong>2D Hilbert 曲线</strong>（移植自 t3d.js <code>CurveUtils.hilbert2D</code>），参考 <a href="https://github.com/uinosoft/t3d.js/blob/dev/examples/geometry_builder_lines.html" target="_blank">t3d geometry_builder_lines</a> 示例。</p>
+  <p class="desc">上方 demo 的路径数据采用 <strong>2D Hilbert 曲线</strong>。</p>
 
   <h3>Constructor</h3>
   <div class="sig"><span class="kw">new</span> Path(options: PathOptions)</div>

@@ -3,10 +3,9 @@
  *
  * # interactive
  *
- * Centralized raycaster-based interaction system, faithfully adapted from
- * react-three-fiber's `createEvents` event model.
+ * Centralized raycaster-based interaction system.
  *
- * ## Architecture (R3F-faithful)
+ * ## Architecture
  *
  * - **Flat intersection list**: Each raw ray hit expands to one `Intersection`
  *   per registered ancestor. All events dispatch by iterating this flat list.

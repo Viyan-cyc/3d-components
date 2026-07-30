@@ -10,7 +10,7 @@ import type { Intersection, EventHandlers } from './types';
 export interface RegistrationEntry {
   object: THREE.Object3D;
   handlers: EventHandlers;
-  /** Number of event handlers registered (for eventCount check like R3F). */
+  /** Number of event handlers registered. */
   eventCount: number;
 }
 
@@ -36,7 +36,7 @@ export function computeNDC(
 // ─── makeIntersectionId ───────────────────────────────────────
 
 /**
- * Create a unique ID for an intersection, mirroring R3F's `makeId`.
+ * Create a unique ID for an intersection.
  *
  * This is the composite key used for hover tracking. Two intersections
  * are considered the same "hover target" if they share the same
@@ -59,7 +59,7 @@ export function makeIntersectionId(intersection: Intersection): string {
 /**
  * Check if a registration entry has any pointer-move/over/out/leave
  * handlers. Used to filter objects for move-event raycasting
- * (R3F's `filterPointerEvents`).
+ * (filter pointer events).
  */
 export function hasPointerHandlers(entry: RegistrationEntry): boolean {
   const h = entry.handlers;

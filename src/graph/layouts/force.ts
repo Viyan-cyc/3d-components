@@ -3,7 +3,7 @@
  *
  * 3D 力导向布局 —— 纯函数，零 Three.js 运行时依赖。
  *
- * 移植自 **d3-force** 思路（库仑斥力 + 弹簧吸引 + 中心引力 + alpha 冷却 + 速度阻尼），
+ * 库仑斥力 + 弹簧吸引 + 中心引力 + alpha 冷却 + 速度阻尼，
  * 同步迭代 `iterations` 步后返回静止态坐标。因统一签名 `(nodes, config) => NodePos3D[]`
  * 不收边，连接结构经 {@link ForceLayoutConfig.edges} 传入（`Graph3D.applyLayout` 自动注入）。
  *
@@ -28,7 +28,7 @@ const EPS_D2 = 1e-4;
 const CLAMP = 1e4;
 /** 触发「迭代减半 + 警告」的节点数阈值。 */
 const NODE_WARN = 600;
-/** alpha 冷却下限（与 d3-force 默认一致）。 */
+/** alpha 冷却下限。 */
 const ALPHA_MIN = 0.001;
 
 /**

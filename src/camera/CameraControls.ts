@@ -3,8 +3,7 @@
  *
  * Orbit-style camera controller with smooth transitions.
  *
- * Ported from [camera-controls](https://github.com/yomotsu/camera-controls) v3.1.2
- * by yomotsu, rewritten to match `@cyc/3d-components` conventions
+ * Rewritten to match `@cyc/3d-components` conventions
  * (options-object constructor, `import * as THREE`, typed events, JSDoc, etc.).
  */
 

@@ -2,7 +2,7 @@
   <h2>Outlines</h2>
   <span class="tag">extends <code>THREE.Group</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">描边（轮廓）组件。取父级 <code>Mesh</code> 的几何体，按折痕角度分裂法线后生成一个<strong>背面渲染</strong>的描边网格，在顶点着色器里沿法线把几何外扩 <code>thickness</code>，再叠回父级之下，形成轮廓描边效果。算法移植自 pmndrs/drei 的 <a href="https://github.com/pmndrs/drei/blob/master/src/core/Outlines.tsx" target="_blank"><code>Outlines</code></a>，但实现为原生 Three.js 类，不依赖 React/R3F。支持普通 <code>Mesh</code>、<code>SkinnedMesh</code>（绑定骨架）、<code>InstancedMesh</code>（复用实例矩阵）。</p>
+  <p class="desc">描边（轮廓）组件。取父级 <code>Mesh</code> 的几何体，按折痕角度分裂法线后生成一个<strong>背面渲染</strong>的描边网格，在顶点着色器里沿法线把几何外扩 <code>thickness</code>，再叠回父级之下，形成轮廓描边效果。支持普通 <code>Mesh</code>、<code>SkinnedMesh</code>（绑定骨架）、<code>InstancedMesh</code>（复用实例矩阵）。</p>
 
   <!-- Demo -->
   <div class="demo-card">

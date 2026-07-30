@@ -4,14 +4,14 @@
  * # graph
  *
  * 基于**图数据结构**（节点 Node + 边 Edge）的 3D 可视化组件，
- * 设计理念参考 AntV G6，渲染引擎基于 Three.js，支持三维空间下的布局与交互。
+ * 渲染引擎基于 Three.js，支持三维空间下的布局与交互。
  *
  * ## 分层
  * - **Data 层**：{@link NodeData} / {@link EdgeData} / {@link GraphData} / {@link NodePos3D}。
  * - **Adapter 层**：`validate` / `normalize` / `buildIndex` / `prepare`。
  * - **Layout 层**：`layouts/` 纯函数（第一步仅类型骨架）。
  * - **Element 层**：{@link Node3D}（球体节点）/ {@link Edge3D}（直线边）。
- * - **Graph 层**：{@link Graph3D} 主组件（`extends BaseGroup`）。
+ * - **Graph 层**：{@link Graph3D} 主组件（`extends THREE.Group`）。
  *
  * ## 快速开始
  * ```ts

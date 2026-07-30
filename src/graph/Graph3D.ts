@@ -3,10 +3,10 @@
  *
  * Graph3D —— 3D 图可视化主组件。
  *
- * 继承 {@link BaseGroup}（`THREE.Group` + `IUpdatable` + `IDisposable`），
+ * 继承 `THREE.Group`（`IUpdatable` + `IDisposable`），
  * 编排 Data / Layout / Element / Interaction 四层（第一步仅含 Data + Element 骨架）。
  *
- * 设计理念参考 AntV G6：图数据结构（Node/Edge）+ 元素 + 布局 + 交互分层解耦，
+ * 图数据结构（Node/Edge）+ 元素 + 布局 + 交互分层解耦，
  * 渲染引擎基于 Three.js。
  *
  * **第一步能力：**
@@ -27,8 +27,7 @@
 
 import * as THREE from 'three';
 import gsap from 'gsap';
-import { BaseGroup } from '../core/BaseGroup';
-import type { BaseGroupOptions } from '../core/BaseGroup';
+import type { GroupComponentOptions, IUpdatable, IDisposable } from '../types';
 import { prepare, type GraphIndex } from './adapter';
 import { Edge3D } from './elements/Edge3D';
 import { Node3D } from './elements/Node3D';
@@ -49,7 +48,7 @@ import type { GraphData, NodeData, NodeId, NodePos3D } from './types';
  * scene.add(graph);
  * ```
  */
-export interface Graph3DOptions extends BaseGroupOptions {
+export interface Graph3DOptions extends GroupComponentOptions {
   /**
    * 初始图数据。若提供，构造后立即 {@link Graph3D.setData}。
    */
@@ -62,7 +61,6 @@ export interface Graph3DOptions extends BaseGroupOptions {
   /**
    * 节点材质**模板**。每个节点构造时 `clone()` 一份独立实例，故各节点状态变更
    * （改色/高亮等）互不影响；不传则用内置默认 `MeshStandardMaterial` 作模板。
-   * 第三步起推荐传入 `ShinyMaterial` 作模板。模板本身不被 `dispose()` 释放。
    */
   nodeMaterial?: THREE.MeshStandardMaterial;
   /**
@@ -114,6 +112,11 @@ export interface Graph3DOptions extends BaseGroupOptions {
    * ```
    */
   layout?: LayoutPreset;
+  /**
+   * 整体缩放。
+   * @default 1
+   */
+  scale?: number;
 }
 
 /**
@@ -151,9 +154,9 @@ export interface LayoutApplyOptions {
  * scene.add(graph);
  * ```
  *
- * @extends BaseGroup
+ * @extends THREE.Group
  */
-export class Graph3D extends BaseGroup {
+export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 节点元素列表（id → Node3D）。 */
   private readonly nodes = new Map<NodeId, Node3D>();
   /** 边元素列表。 */
@@ -195,13 +198,12 @@ export class Graph3D extends BaseGroup {
    * @param options - 配置对象，见 {@link Graph3DOptions}。
    */
   constructor(options: Graph3DOptions = {}) {
-    super({
-      name: options.name ?? 'graph3d',
-      visible: options.visible,
-      userData: options.userData,
-      children: options.children,
-      scale: options.scale,
-    });
+    super();
+    if (options.name ?? 'graph3d') this.name = options.name ?? 'graph3d';
+    if (options.visible !== undefined) this.visible = options.visible;
+    if (options.userData) this.userData = { ...options.userData };
+    if (options.scale !== undefined) this.scale.setScalar(options.scale);
+    if (options.children) { for (const c of options.children) this.add(c); }
 
     this.nodeSize = options.nodeSize ?? 0.3;
     this.nodeMaterial = options.nodeMaterial;
@@ -549,14 +551,20 @@ export class Graph3D extends BaseGroup {
 
   /**
    * 释放全部节点/边元素资源，并清空内部索引。
-   * 覆盖 {@link BaseGroup.dispose}，先释放子元素再走父类清理。
    */
   dispose(): void {
     this.killLayoutTween();
     this.clearElements();
     this.graphData = null;
     this.graphIndex = null;
-    super.dispose();
+    this.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material?.dispose();
+      }
+    });
+    this.clear();
   }
 
   /**

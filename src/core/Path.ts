@@ -70,7 +70,7 @@ export interface PathOptions extends GroupComponentOptions {
   material?: THREE.Material;
 }
 
-// ===================== frames (移植自 t3d CurvePath3.computeFrames) =====================
+// ===================== frames =====================
 
 interface Frames {
   points: THREE.Vector3[];
@@ -95,8 +95,7 @@ function scaleAlong(v: THREE.Vector3, direction: THREE.Vector3, scale: number): 
 }
 
 /**
- * 用「直线段 + 二次贝塞尔圆角」构造一条 three.js CurvePath。
- * 移植自 t3d `CurvePath.setBeveledCurves`（bevelRadius=0 或点数≤2 时退化为纯折线）。
+ * 用「直线段 + 二次贝塞尔圆角」构造一条 three.js CurvePath（bevelRadius=0 或点数≤2 时退化为纯折线）。
  */
 function setBeveledCurves(
   curvePath: THREE.CurvePath<THREE.Vector3>,
@@ -161,7 +160,7 @@ function setBeveledCurves(
   if (close) (curvePath.curves[0] as THREE.LineCurve3).v1.copy(p0);
 }
 
-/** 用纯直线段构造折线 CurvePath。移植自 t3d `CurvePath.setPolylines`。 */
+/** 用纯直线段构造折线 CurvePath。 */
 function setPolylines(curvePath: THREE.CurvePath<THREE.Vector3>, points: THREE.Vector3[], close: boolean): void {
   if (points.length < 2) return;
   const lastIndex = points.length - 1;
@@ -176,7 +175,6 @@ function setPolylines(curvePath: THREE.CurvePath<THREE.Vector3>, points: THREE.V
 /**
  * 沿 CurvePath 采样并计算 Frenet 标架（tangent / normal / binormal / bisector），
  * 以及每个采样点的 widthScale（拐角椭圆拉伸系数）与 sharp（是否锐角拐角）。
- * 移植自 t3d `CurvePath3.computeFrames`。
  */
 function computeFrames(
   curvePath: THREE.CurvePath<THREE.Vector3>,
@@ -345,7 +343,7 @@ function computeFrames(
   return { points, tangents, normals, binormals, bisectors, lengths, widthScales, sharps, tangentTypes };
 }
 
-// ===================== TubeBuilder (移植自 t3d TubeBuilder.getGeometryData) =====================
+// ===================== TubeBuilder =====================
 
 interface TubeOptions {
   radius: number;
@@ -358,7 +356,6 @@ interface TubeOptions {
 
 /**
  * 用标架扫掠出圆形管道几何体。锐角拐角处沿 bisector 把截面做椭圆拉伸（避免撕裂）。
- * 移植自 t3d `TubeBuilder.getGeometryData`。
  */
 function buildTubeGeometry(frames: Frames, opts: TubeOptions): THREE.BufferGeometry {
   const radius = opts.radius;
@@ -462,7 +459,7 @@ function buildTubeGeometry(frames: Frames, opts: TubeOptions): THREE.BufferGeome
   return toGeometry(positions, normals, uvs, indices);
 }
 
-// ===================== RouteBuilder (移植自 t3d RouteBuilder.getGeometryData) =====================
+// ===================== RouteBuilder =====================
 
 interface PlaneOptions {
   width: number;
@@ -474,7 +471,6 @@ interface PlaneOptions {
 
 /**
  * 用标架扫掠出扁平带状面几何体。锐角拐角处插入几何修补避免撕裂，可选末端箭头。
- * 移植自 t3d `RouteBuilder.getGeometryData`。
  */
 function buildPlaneGeometry(frames: Frames, opts: PlaneOptions): THREE.BufferGeometry {
   const width = opts.width;
@@ -713,7 +709,7 @@ function buildPathGeometry(data: PathData): THREE.BufferGeometry | null {
  *
  * 把一组 3D 顶点先经 `setBeveledCurves`（直线段 + 二次贝塞尔圆角）构造成曲线，
  * 再经 `computeFrames`（Frenet 标架）采样，最后扫掠成**管道**或**扁平带**两种几何体。
- * 算法整体移植自 t3d.js 的 `CurvePath3` / `TubeBuilder` / `RouteBuilder`，翻译成 three.js 语言。
+ * 算法翻译成 three.js 语言。
  *
  * **特性:**
  * - 继承 `THREE.Group`，可直接加入任意 Three.js 场景

@@ -10,37 +10,31 @@ npm install @cyc/3d-components</code></pre>
   <p>支持<strong>整包引入</strong>和<strong>按需引入</strong>（tree-shaking），兼容 ESM / CJS：</p>
 
   <h4>整包 (ESM)</h4>
-  <pre><code class="language-ts">import { BaseGroup, HeatMesh, ShinyMaterial, Util } from '@cyc/3d-components';</code></pre>
+  <pre><code class="language-ts">import { HeatMap, Util } from '@cyc/3d-components';</code></pre>
 
   <h4>按需引入（推荐）</h4>
-  <pre><code class="language-ts">import { BaseGroup } from '@cyc/3d-components/core';
-import { HeatMesh } from '@cyc/3d-components/heat';
-import { ShinyMaterial } from '@cyc/3d-components/material';
+  <pre><code class="language-ts">import { Grid } from '@cyc/3d-components/core';
+import { HeatMap } from '@cyc/3d-components/heat';
+import { MeshReflectorMaterial } from '@cyc/3d-components/material';
 import { Util } from '@cyc/3d-components/utils';</code></pre>
 
   <h4>CommonJS</h4>
-  <pre><code class="language-ts">const { BaseGroup } = require('@cyc/3d-components/core');
-const { Util } = require('@cyc/3d-components/utils');</code></pre>
+  <pre><code class="language-ts">const { Util } = require('@cyc/3d-components/utils');</code></pre>
 
   <h3>快速示例</h3>
   <pre><code class="language-ts">import * as THREE from 'three';
-import { BaseGroup } from '@cyc/3d-components/core';
-import { ShinyMaterial } from '@cyc/3d-components/material';
+import { Grid } from '@cyc/3d-components/core';
 
-const widget = new BaseGroup({ name: 'widget', scale: 1.5 });
-widget.add(new THREE.Mesh(
-  new THREE.SphereGeometry(0.5, 32, 32),
-  new ShinyMaterial({ color: 0x3366ff, metalness: 0.3 })
-));
-scene.add(widget);</code></pre>
+const grid = new Grid({ primaryScale: 5, secondaryScale: 1 });
+scene.add(grid);</code></pre>
 
   <h3>模块一览</h3>
   <table class="pt">
     <thead><tr><th>子路径</th><th>说明</th><th>主要导出</th></tr></thead>
     <tbody>
-      <tr><td><code>/core</code></td><td>通用组件</td><td><code>BaseGroup</code> (extends THREE.Group)</td></tr>
-      <tr><td><code>/heat</code></td><td>热力组件</td><td><code>HeatMesh</code> (extends THREE.Mesh)</td></tr>
-      <tr><td><code>/material</code></td><td>材质组件</td><td><code>ShinyMaterial</code> (extends THREE.MeshStandardMaterial)</td></tr>
+      <tr><td><code>/core</code></td><td>通用组件</td><td><code>Grid</code> · <code>Path</code> · <code>Html</code> 等</td></tr>
+      <tr><td><code>/heat</code></td><td>热力组件</td><td><code>HeatMap</code> (canvas heatmap texture)</td></tr>
+      <tr><td><code>/material</code></td><td>材质组件</td><td><code>MeshReflectorMaterial</code> (extends THREE.MeshStandardMaterial)</td></tr>
       <tr><td><code>/utils</code></td><td>工具类</td><td><code>Util</code> 命名空间 (math/color/geometry)</td></tr>
     </tbody>
   </table>

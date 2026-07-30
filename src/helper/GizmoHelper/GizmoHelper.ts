@@ -98,14 +98,13 @@ export interface GizmoHelperOptions {
 }
 
 // ===================== internals =====================
-// 旋转速率：弧度 / 秒（与 drei 一致，2π 即每秒一圈）。
+// 旋转速率：弧度 / 秒（2π 即每秒一圈）。
 const TURN_RATE = 2 * Math.PI;
 
 /**
  * GizmoHelper —— 视口导航 Gizmo（Viewport Gizmo）容器。
  *
- * 参考 [drei GizmoHelper](https://github.com/pmndrs/drei/blob/master/src/core/GizmoHelper.tsx)
- * 的原生 Three.js 实现。在屏幕角落绘制一个独立的小视口，用一个正交相机渲染
+ * 原生 Three.js 实现。在屏幕角落绘制一个独立的小视口，用一个正交相机渲染
  * 一个 gizmo（默认 {@link GizmoViewport} 三轴指示器）。该 gizmo 实时镜像主相机朝向，
  * 点击其上的轴头即可把主相机平滑旋转到对应的标准视角。
  *

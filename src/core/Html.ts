@@ -16,8 +16,7 @@
  *   similar to CSS3DRenderer but integrated into the normal render
  *   loop without a separate renderer.
  *
- * Based on the React Three Fiber drei `Html` component, rewritten
- * for vanilla Three.js without React dependencies.
+ * Vanilla Three.js implementation, no React dependencies.
  *
  * @module core/Html
  */

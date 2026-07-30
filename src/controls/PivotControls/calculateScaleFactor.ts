@@ -37,7 +37,6 @@ const getPoint3 = (point2: THREE.Vector3, camera: THREE.Camera, size: ViewportSi
 /**
  * 计算世界空间缩放因子 —— 让一个 `radiusPx` 像素半径在 `point3` 处看起来恒定。
  *
- * 移植自 [drei calculateScaleFactor](https://github.com/pmndrs/drei/blob/master/src/core/calculateScaleFactor.ts)，
  * 用于 PivotControls 的 `fixed` 模式（gizmo 在屏幕上保持固定像素尺寸）。
  *
  * @param point3 - 需要保持恒定像素尺寸的世界空间参考点。

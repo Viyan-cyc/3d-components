@@ -81,7 +81,7 @@ export class AxisRotator extends PivotHandle {
 		const r = fixed ? 0.65 : scale * 0.65;
 		const tube = fixed ? (lineWidth / scale) * 1.6 : scale / 14;
 
-		// 注释：弧的角点（与 drei 一致）
+		// 注释：弧的角点
 		this.createAnnotation([r, r, 0]);
 
 		// 不可见命中环（管径放大以便拾取）

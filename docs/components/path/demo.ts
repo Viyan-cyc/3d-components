@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { Path } from '../../../src/core/Path';
 import { createScene, startLoop, addSimpleOrbit } from '../../shared/scene-setup';
 
-// 路径数据：2D Hilbert 曲线，移植自 t3d.js geometry_builder_lines 示例的 CurveUtils.hilbert2D。
-// 参考：https://github.com/uinosoft/t3d.js/blob/dev/examples/geometry_builder_lines.html
+// 路径数据：2D Hilbert 曲线。
 
 type Pt = [number, number, number];
 
-/** 2D Hilbert 曲线（点落在 y = cy 的 XZ 平面上）。移植自 t3d CurveUtils.hilbert2D。 */
+/** 2D Hilbert 曲线（点落在 y = cy 的 XZ 平面上）。 */
 function hilbert2D(cx: number, cy: number, cz: number, size: number, iter: number,
   v0: number, v1: number, v2: number, v3: number): Pt[] {
   const half = size / 2;
@@ -44,7 +43,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
     rebuild();
   });
 
-  // 演示路径数据：2D Hilbert 曲线（XZ 平面），参考 t3d geometry_builder_lines 示例。
+  // 演示路径数据：2D Hilbert 曲线（XZ 平面）。
   const basePoints = hilbert2D(0, 0, 0, 4, 1, 0, 1, 2, 3);
 
   const params = {

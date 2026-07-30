@@ -12,7 +12,7 @@ const _projV = /* @__PURE__ */ new THREE.Vector3();
  * - 颜色高亮：悬停时切换为 `hoveredColor`，否则为 `axisColors[axis]`。
  * - 可拾取物注册：把命中 mesh 打上 `userData.pivotHandle` 反查标记。
  * - 注释（annotation）：拖拽时显示数值的 DOM 徽标（`annotations` 开启时），
- *   黑底白字（与 drei 一致）。由基类每帧把 `objGroup` 本地锚点投影到屏幕定位，
+ *   黑底白字。由基类每帧把 `objGroup` 本地锚点投影到屏幕定位，
  *   不依赖 {@link Html} 组件（其会清空行内样式，无法保留徽标样式）。
  *
  * 子类负责 `_build()`（几何 + 命中 mesh）、`_applyColor()`、以及拖拽语义方法。
@@ -132,7 +132,7 @@ export abstract class PivotHandle extends THREE.Group {
 	}
 
 	/**
-	 * 创建注释徽标（黑底白字，与 drei 一致），锚点为 `objGroup` 本地坐标。
+	 * 创建注释徽标（黑底白字），锚点为 `objGroup` 本地坐标。
 	 * 仅 `annotations` 开启时创建。
 	 */
 	protected createAnnotation(anchorLocal: [number, number, number]): void {

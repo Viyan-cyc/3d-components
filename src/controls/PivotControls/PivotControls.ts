@@ -30,8 +30,7 @@ export interface PivotControlsLike {
 /**
  * PivotControls 构造选项。
  *
- * 移植自 [drei PivotControls](https://github.com/pmndrs/drei/blob/master/src/web/pivotControls/PivotControls.tsx)，
- * 改写为原生 Three.js 的 `THREE.Group` 子类（无 React）。把组件 `scene.add(pivot)` 后，
+ * 原生 Three.js 的 `THREE.Group` 子类（无 React）。把组件 `scene.add(pivot)` 后，
  * 把要被操控的内容 `pivot.add(content)`，并在每帧渲染循环里调用 `pivot.update(delta)`。
  */
 export interface PivotControlsOptions extends ComponentOptions {
@@ -113,8 +112,7 @@ export interface PivotControlsOptions extends ComponentOptions {
 /**
  * PivotControls —— 统一变换操控 Gizmo（平移 / 旋转 / 缩放一体）。
  *
- * 参考 [drei PivotControls](https://github.com/pmndrs/drei/blob/master/src/web/pivotControls/PivotControls.tsx)
- * 的原生 Three.js 实现。与 {@link https://threejs.org/docs/#examples/en/controls/TransformControls | TransformControls}
+ * 原生 Three.js 实现。与 {@link https://threejs.org/docs/#examples/en/controls/TransformControls | TransformControls}
  * 「一次只显示一种模式」不同，PivotControls 在一个 gizmo 上**同时**呈现：
  * - 三根**轴箭头**（AxisArrow，单轴平移）
  * - 三个**平面滑块**（PlaneSlider，双轴平移）

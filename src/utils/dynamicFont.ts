@@ -6,7 +6,7 @@
  * `CanvasRenderingContext2D.fillText`, then converted to SDF via
  * {@link DistanceTransform}, and packed into a single atlas texture.
  *
- * Ported from t3d.js DynamicFont and translated to Three.js conventions.
+ * Translated to Three.js conventions.
  *
  * @module utils/dynamic-font
  */
@@ -400,7 +400,7 @@ export class DynamicFont {
 
 		const charInfo = _fontAtlas.getChar(char)!;
 
-		// 'j' scaler to avoid zero-width artifacts (ported from t3d.js)
+		// 'j' scaler to avoid zero-width artifacts
 		const scaler = char === 'j' ? 0.00001 : 1;
 
 		_font.chars.push({

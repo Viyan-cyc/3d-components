@@ -3,8 +3,7 @@
  *
  * **相机控制器 (Camera Controls)**
  *
- * 轨道式相机控制器，移植自 [camera-controls](https://github.com/yomotsu/camera-controls) v3.1.2，
- * 改写为符合 @cyc/3d-components 工程规范的 TypeScript 实现。
+ * 轨道式相机控制器，TypeScript 实现。
  *
  * 支持 `PerspectiveCamera` 和 `OrthographicCamera`，提供轨道旋转、dolly/zoom、truck/pan、
  * 边界约束、碰撞检测、可配置的鼠标/触控输入映射。

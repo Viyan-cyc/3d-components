@@ -2,7 +2,7 @@
   <h2>Wireframe</h2>
   <span class="tag">extends <code>THREE.Group</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">线框化组件。基于<strong>重心坐标（barycentric）</strong>在每个三角形内计算到三条边的最小距离，用 <code>fwidth</code> 抗锯齿画出线条；支持虚线、收窄、正反面不同色、半透明填充。算法移植自 pmndrs/drei 的 <a href="https://github.com/pmndrs/drei/blob/master/src/materials/WireframeMaterial.tsx" target="_blank"><code>WireframeMaterial</code></a>，实现为原生 Three.js 类，不依赖 React/R3F。</p>
+  <p class="desc">线框化组件。基于<strong>重心坐标（barycentric）</strong>在每个三角形内计算到三条边的最小距离，用 <code>fwidth</code> 抗锯齿画出线条；支持虚线、收窄、正反面不同色、半透明填充。</p>
 
   <p class="desc">提供两种模式：<strong>独立线框</strong>（默认，<code>overrideMaterial = false</code>）在父级网格下挂一个子 <code>Mesh</code>，用独立 <code>ShaderMaterial</code> 渲染线框 + 填充，父级原材质不变；<strong>材质覆盖</strong>（<code>overrideMaterial = true</code>）通过 <code>onBeforeCompile</code> 把线框注入父级材质，与原 PBR 光照混合渲染，适合「带光照的线框模型」。</p>
 

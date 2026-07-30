@@ -3,7 +3,7 @@
  *
  * 节点视觉载体 —— 第一步实现：球体 Mesh。
  *
- * 继承 {@link BaseGroup}（即 `THREE.Group` + `IUpdatable` + `IDisposable`），
+ * 继承 `THREE.Group`（`IUpdatable` + `IDisposable`），
  * 内部包裹一个 `THREE.Mesh`（`SphereGeometry`）。预留 `label` 槽位（第二步以 `core/Html` 填充）。
  *
  * `userData.nodeId` 存储节点 id，供后续交互层（`PickController`）的 Raycaster
@@ -14,8 +14,7 @@
  */
 
 import * as THREE from 'three';
-import { BaseGroup } from '../../core/BaseGroup';
-import type { BaseGroupOptions } from '../../core/BaseGroup';
+import type { GroupComponentOptions, IUpdatable, IDisposable } from '../../types';
 import type { NodeData, NodeId } from '../types';
 
 // 复用临时对象，避免每帧分配。
@@ -33,7 +32,7 @@ const _box = /* @__PURE__ */ new THREE.Box3();
  * };
  * ```
  */
-export interface Node3DOptions extends BaseGroupOptions {
+export interface Node3DOptions extends GroupComponentOptions {
   /** **必填**。该节点对应的输入数据（至少需含 `id`）。 */
   data: NodeData;
   /**
@@ -55,6 +54,10 @@ export interface Node3DOptions extends BaseGroupOptions {
    * {@link Node3D.setGeometryFactory} 切换。
    */
   geometryFactory?: (size: number) => THREE.BufferGeometry;
+  /**
+   * 整体缩放。 @default 1
+   */
+  scale?: number;
 }
 
 /**
@@ -73,9 +76,9 @@ export interface Node3DOptions extends BaseGroupOptions {
  * node.setPosition({ id: 'n1', x: 2, y: 0, z: 0 });
  * ```
  *
- * @extends BaseGroup
+ * @extends THREE.Group
  */
-export class Node3D extends BaseGroup {
+export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 该节点对应的输入数据（只读视图）。 */
   readonly data: NodeData;
   /** 该节点 id（便捷访问，等价于 `this.data.id`）。 */
@@ -101,13 +104,12 @@ export class Node3D extends BaseGroup {
    * @param options - 配置对象，见 {@link Node3DOptions}。
    */
   constructor(options: Node3DOptions) {
-    super({
-      name: options.name ?? `node-${options.data.id}`,
-      visible: options.visible,
-      userData: { ...options.userData, nodeId: options.data.id },
-      children: options.children,
-      scale: options.scale,
-    });
+    super();
+    this.name = options.name ?? `node-${options.data.id}`;
+    if (options.visible !== undefined) this.visible = options.visible;
+    this.userData = { ...options.userData, nodeId: options.data.id };
+    if (options.scale !== undefined) this.scale.setScalar(options.scale);
+    if (options.children) { for (const c of options.children) this.add(c); }
 
     this.data = options.data;
     this.nodeId = options.data.id;
@@ -210,11 +212,13 @@ export class Node3D extends BaseGroup {
   /**
    * 释放节点持有的几何体与材质（均为本节点 clone 出的独立实例，始终释放）。
    *
-   * 先手动释放 geometry/material 与 label，再 `this.clear()` 移除子级，
-   * 最后调 `super.dispose()`。提前 clear 可避免 {@link BaseGroup.dispose} 的遍历
-   * 重复释放内部 mesh 的 geometry/material。
+   * 先手动释放 geometry/material 与 label，再 `this.clear()` 移除子级。
    * 预先释放 `label`（若已挂载，第二步以 `core/Html` 实现）。
    */
+  update(_delta: number): void {
+    // no-op — override in subclasses if needed
+  }
+
   dispose(): void {
     if (this.label) {
       const l = this.label as unknown as { dispose?: () => void };
@@ -224,7 +228,6 @@ export class Node3D extends BaseGroup {
     }
     this.geometry.dispose();
     this.material.dispose();
-    this.clear(); // 移除内部 mesh 等子级，避免 super.dispose 遍历重复释放
-    super.dispose();
+    this.clear(); // 移除内部 mesh 等子级
   }
 }

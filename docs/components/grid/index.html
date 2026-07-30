@@ -2,7 +2,7 @@
   <h2>Grid</h2>
   <span class="tag">extends <code>THREE.Mesh</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">无限参考网格。基于屏幕空间四边形 + 着色器实现（移植自 t3d.js <code>InfiniteGridShader</code>），把整屏四边形反投影成世界射线、与网格平面求交来绘制<strong>无边界</strong>网格——无论相机如何移动或拉远，网格始终铺满屏幕。写入 <code>gl_FragDepth</code>，能被场景中的物体正确遮挡。自带主 / 次双层网格、坐标轴高亮（X 红、Z/Y 蓝）与距离淡出。</p>
+  <p class="desc">无限网格。基于屏幕空间四边形 + 着色器实现，把整屏四边形反投影成世界射线、与网格平面求交来绘制<strong>无边界</strong>网格——无论相机如何移动或拉远，网格始终铺满屏幕。写入 <code>gl_FragDepth</code>，能被场景中的物体正确遮挡。自带主 / 次双层网格、坐标轴高亮（X 红、Z/Y 蓝）与距离淡出。</p>
 
   <div class="demo-card">
     <canvas id="c-grid"></canvas>

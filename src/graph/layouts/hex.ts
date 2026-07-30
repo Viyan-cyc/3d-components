@@ -13,7 +13,7 @@
  * 2. **多层堆叠**（`groupBy` 缺省且 `layers > 1`）：按 index 轮询分入 `layers` 层。
  * 3. **单层蜂巢**（其余）：全部节点铺成一张蜂巢。
  *
- * 算法移植自 RedBlobGames《Hexagonal Grids》：
+ * 算法：
  * - ring/spiral：`cube_ring` 的轴向版（起点 = 中心 + radius·dir[4]，绕 6 边各走 radius 步）；
  * - hex-to-pixel：pointy/flat 两套换算公式。
  *

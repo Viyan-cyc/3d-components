@@ -2,7 +2,7 @@
   <h2>GizmoHelper</h2>
   <span class="tag">implements <code>IUpdatable</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">视口导航 Gizmo（Viewport Gizmo）。参考 <a href="https://github.com/pmndrs/drei/blob/master/src/core/GizmoHelper.tsx" target="_blank">drei GizmoHelper</a> 的原生 Three.js 实现：在屏幕角落绘制一个独立小视口，用正交相机渲染一个三轴指示器（<code>GizmoViewport</code>），实时镜像主相机朝向；点击轴头即可把主相机平滑旋转到对应标准视角。GizmoHelper 自带虚拟场景与射线拾取，<strong>不要</strong> <code>scene.add(gizmo)</code>。</p>
+  <p class="desc">视口导航 Gizmo（Viewport Gizmo）。原生 Three.js 实现：在屏幕角落绘制一个独立小视口，用正交相机渲染一个三轴指示器（<code>GizmoViewport</code>），实时镜像主相机朝向；点击轴头即可把主相机平滑旋转到对应标准视角。GizmoHelper 自带虚拟场景与射线拾取，<strong>不要</strong> <code>scene.add(gizmo)</code>。</p>
 
   <div class="demo-card">
     <canvas id="c-gizmo"></canvas>
@@ -68,7 +68,7 @@
   </div>
 
   <h3>GizmoViewport</h3>
-  <p>三轴视口指示器（GizmoHelper 的默认内容），仿 <a href="https://github.com/Fennec-hub/ThreeOrbitControlsGizmo" target="_blank">ThreeOrbitControlsGizmo</a> 的 <strong>2D 扁平气泡</strong>样式。由 6 个彩色扁平圆形气泡（正轴亮、带暗色字母 X/Y/Z；负轴暗、较小）+ 从中心连出的细彩色线组成。每帧按各轴朝向切换<strong>正面=亮色 / 背面=暗色</strong>，鼠标悬停的气泡填白。气泡为始终面向相机的 <code>Sprite</code>。</p>
+  <p>三轴视口指示器（GizmoHelper 的默认内容），采用 <strong>2D 扁平气泡</strong>样式。由 6 个彩色扁平圆形气泡（正轴亮、带暗色字母 X/Y/Z；负轴暗、较小）+ 从中心连出的细彩色线组成。每帧按各轴朝向切换<strong>正面=亮色 / 背面=暗色</strong>，鼠标悬停的气泡填白。气泡为始终面向相机的 <code>Sprite</code>。</p>
   <div class="sig"><span class="kw">new</span> GizmoViewport(options?: GizmoViewportOptions)</div>
   <table class="pt">
     <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>

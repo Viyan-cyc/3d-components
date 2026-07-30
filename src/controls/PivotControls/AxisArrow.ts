@@ -9,7 +9,7 @@ const vec2 = /* @__PURE__ */ new THREE.Vector3();
 /**
  * 计算射线在给定方向上的「拖拽偏移量」。
  *
- * 移植自 drei AxisArrow 的 `calculateOffset`：求射线与过 `clickPoint`、法线为 `normal`
+ * `calculateOffset`：求射线与过 `clickPoint`、法线为 `normal`
  * 的平面交点沿 `normal` 方向的有符号距离。
  */
 const calculateOffset = (
@@ -68,11 +68,11 @@ export class AxisArrow extends PivotHandle {
 		const coneLength = fixed ? 0.2 : scale / 5;
 		this.cylinderLength = fixed ? 1 - coneLength : scale - coneLength;
 
-		// 注释徽标（轴根部下方，与 drei 一致）
+		// 注释徽标（轴根部下方）
 		this.createAnnotation([0, -coneLength, 0]);
 
 		// 不可见命中盒（覆盖轴身 + 锥头全长）
-		// drei 的 Line 组件自带屏幕空间线宽拾取，但 FatLine 禁用了 raycast，
+		// FatLine 禁用了 raycast，
 		// 所以命中 mesh 需要足够粗才能被点到。截面尺寸需覆盖从各种相机角度
 		// 射入的射线（对角线入射时偏移可达 scale*0.3，留余量取 scale*0.5）。
 		const hitSize = Math.max(coneWidth * 2.8, scale * 0.5);
@@ -125,7 +125,7 @@ export class AxisArrow extends PivotHandle {
 	onPointerDown(sample: PointerSample): void {
 		// 旋转矩阵必须排除 matrixL（objGroup 带有轴朝向旋转 matrixL），
 		// 用 this.matrixWorld（== gizmoGroup.matrixWorld，不含 matrixL）
-		// 对齐 drei 的 objRef.matrixWorld（外层 group，无 matrix 属性）。
+		// 外层 group，无 matrix 属性。
 		rotMatrix.extractRotation(this.matrixWorld);
 		const clickPoint = sample.point.clone();
 		const origin = new THREE.Vector3().setFromMatrixPosition(this.matrixWorld);

@@ -49,7 +49,7 @@ export interface OutlinesOptions extends GroupComponentOptions {
  * - `screenspace = false`：在裁剪空间沿投影法线偏移 `thickness / size * w * 2`，
  *   近处粗、远处细（默认行为，体积感更自然）。
  *
- * 兼容 morph / skinning / instancing，与 drei Outlines 实现一致。
+ * 兼容 morph / skinning / instancing。
  */
 const vertexShader = /* glsl */ `
   #include <common>
@@ -108,7 +108,6 @@ const fragmentShader = /* glsl */ `
 
 /**
  * 创建描边材质（背面渲染、自定义着色器）。
- * 复刻 drei `Outlines` 的 `OutlinesMaterial` 行为，但不依赖 R3F `shaderMaterial`。
  */
 function createOutlinesMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -128,8 +127,7 @@ function createOutlinesMaterial(): THREE.ShaderMaterial {
 /**
  * Outlines — 描边组件。
  *
- * 参考自 [pmndrs/drei 的 `Outlines`](https://github.com/pmndrs/drei/blob/master/src/core/Outlines.tsx)，
- * 但实现为原生 Three.js 类（继承 `THREE.Group`），不依赖 React/R3F。
+ * 原生 Three.js 实现（继承 `THREE.Group`）。
  *
  * 工作原理：取父级 `Mesh` 的几何体，按折痕角度分裂法线后生成一个**背面渲染**的描边网格，
  * 在顶点着色器里沿法线把几何外扩 `thickness`，再叠回父级之下，形成轮廓描边效果。

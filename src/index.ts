@@ -21,12 +21,12 @@
  * ## Quick Start
  * ```ts
  * // Full import
- * import { BaseGroup, HeatMesh, ShinyMaterial, Util } from '@cyc/3d-components';
+ * import { HeatMap, Util } from '@cyc/3d-components';
  *
  * // On-demand import (tree-shaking friendly)
- * import { BaseGroup } from '@cyc/3d-components/core';
- * import { HeatMesh } from '@cyc/3d-components/heat';
- * import { ShinyMaterial } from '@cyc/3d-components/material';
+ * import { Grid } from '@cyc/3d-components/core';
+ * import { HeatMap } from '@cyc/3d-components/heat';
+ * import { MeshReflectorMaterial } from '@cyc/3d-components/material';
  * import { Util } from '@cyc/3d-components/utils';
  * ```
  */

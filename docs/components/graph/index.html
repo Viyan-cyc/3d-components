@@ -1,8 +1,8 @@
 <div class="page">
   <h2>Graph3D</h2>
-  <span class="tag">extends <code>BaseGroup</code>（<code>THREE.Group</code>）</span>
+  <span class="tag">extends <code>THREE.Group</code></span>
   <span class="tag">implements <code>IUpdatable</code> · <code>IDisposable</code></span>
-  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，设计理念参考 AntV G6，渲染引擎基于 Three.js。本页 demo 把 4 个布局算法（<code>circular / force / hex / grid</code>）各做成一个<strong> Tab</strong>，每个 Tab 配该布局专属的实时参数滑块 —— 切 Tab 即 <code>graph.setLayout(preset)</code> 声明式重排（被记忆，<code>setData</code> 后自动重应用）。<code>force</code> 支持 <strong>Barnes-Hut 八叉树加速</strong>（<code>barnesHut:true</code>，斥力 <code>O(n²)→O(n log n)</code>，大图提速）。</p>
+  <p class="desc">基于<strong>图数据结构</strong>（节点 Node + 边 Edge）的 3D 可视化组件，渲染引擎基于 Three.js。本页 demo 把 4 个布局算法（<code>circular / force / hex / grid</code>）各做成一个<strong> Tab</strong>，每个 Tab 配该布局专属的实时参数滑块 —— 切 Tab 即 <code>graph.setLayout(preset)</code> 声明式重排（被记忆，<code>setData</code> 后自动重应用）。<code>force</code> 支持 <strong>Barnes-Hut 八叉树加速</strong>（<code>barnesHut:true</code>，斥力 <code>O(n²)→O(n log n)</code>，大图提速）。</p>
 
   <!-- Demo -->
   <div class="demo-card">
@@ -78,8 +78,8 @@
     <thead><tr><th>布局</th><th>关键配置</th><th>说明</th></tr></thead>
     <tbody>
       <tr><td><code>circular</code></td><td><code>radius</code>(3) · <code>startAngle</code>/<code>endAngle</code> · <code>plane</code>('xz') · <code>rings</code>(1)+<code>radiusStep</code> · <code>groupBy</code> · <code>depthOffset</code>/<code>layerSpacing</code></td><td>2D 圆周按 <code>plane</code> 映射三维。<code>groupBy</code> 命中时<strong>每组一个深度层</strong>；否则 <code>rings&gt;1</code> 走同心多环；其余单圈单层</td></tr>
-      <tr><td><code>force</code></td><td><code>dimensions</code>(3) · <code>iterations</code>(300) · <code>linkDistance</code>(1)/<code>linkStrength</code>(0.3) · <code>chargeStrength</code>(30, 正=斥) · <code>centerStrength</code>(0.02) · <code>center</code> · <code>velocityDecay</code>(0.6) · <code>edges</code> · <code>barnesHut</code>(false)<sup>Step5</sup> · <code>theta</code>(0.9)<sup>Step5</sup></td><td>d3-force 思路三维力导向。<code>dimensions:2</code> 走 <code>plane</code> 映射；<code>edges</code> 经配置传入（applyLayout 自动注入）。恒返回有限坐标。<strong><code>barnesHut:true</code></strong>（仅 3D）启用八叉树近似 <code>O(n log n)</code> 加速大图；<code>theta</code> 越小越精确越慢</td></tr>
-      <tr><td><code>hex</code></td><td><code>radius</code>(1, 外接圆) · <code>orientation</code>('flat'|'pointy', 默认 'flat') · <code>layers</code>(1) · <code>groupBy</code> · <code>plane</code>('xz') · <code>depthOffset</code>/<code>layerSpacing</code></td><td>六边形蜂巢：轴向坐标 <code>(q,r)</code> 从中心逐环螺旋铺开（移植 RedBlobGames），按 <code>orientation</code> 换算后经 <code>plane</code> 映射三维。<code>layers&gt;1</code> 按 index 轮询多层堆叠；<code>groupBy</code> 命中时每组一层。本质 2D 布局</td></tr>
+      <tr><td><code>force</code></td><td><code>dimensions</code>(3) · <code>iterations</code>(300) · <code>linkDistance</code>(1)/<code>linkStrength</code>(0.3) · <code>chargeStrength</code>(30, 正=斥) · <code>centerStrength</code>(0.02) · <code>center</code> · <code>velocityDecay</code>(0.6) · <code>edges</code> · <code>barnesHut</code>(false)<sup>Step5</sup> · <code>theta</code>(0.9)<sup>Step5</sup></td><td>三维力导向。<code>dimensions:2</code> 走 <code>plane</code> 映射；<code>edges</code> 经配置传入（applyLayout 自动注入）。恒返回有限坐标。<strong><code>barnesHut:true</code></strong>（仅 3D）启用八叉树近似 <code>O(n log n)</code> 加速大图；<code>theta</code> 越小越精确越慢</td></tr>
+      <tr><td><code>hex</code></td><td><code>radius</code>(1, 外接圆) · <code>orientation</code>('flat'|'pointy', 默认 'flat') · <code>layers</code>(1) · <code>groupBy</code> · <code>plane</code>('xz') · <code>depthOffset</code>/<code>layerSpacing</code></td><td>六边形蜂巢：轴向坐标 <code>(q,r)</code> 从中心逐环螺旋铺开，按 <code>orientation</code> 换算后经 <code>plane</code> 映射三维。<code>layers&gt;1</code> 按 index 轮询多层堆叠；<code>groupBy</code> 命中时每组一层。本质 2D 布局</td></tr>
       <tr><td><code>grid</code></td><td><code>cols</code>/<code>rows</code>/<code>levels</code>(1) · <code>spacingX</code>/<code>spacingY</code>/<code>spacingZ</code>(均 1)</td><td>行/列/层三维网格：<code>col→x</code>、<code>row→z</code>、<code>level→y</code>，居中于原点。缺省自动推算 <code>cols</code>/<code>rows</code> 铺满。<strong>本质 3D 布局</strong>（<code>plane</code>/<code>depthOffset</code>/<code>layerSpacing</code> 为 no-op）</td></tr>
     </tbody>
   </table>

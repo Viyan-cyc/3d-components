@@ -20,10 +20,9 @@ import {
 } from './utils';
 
 /**
- * Centralized raycaster-based interaction system, faithfully adapted from
- * react-three-fiber's event model (`createEvents`).
+ * Centralized raycaster-based interaction system.
  *
- * ## Architecture (R3F-faithful)
+ * ## Architecture
  *
  * 1. **Intersection expansion**: Each raw Three.js hit is expanded into
  *    multiple `Intersection` entries — one per registered ancestor. A hit
@@ -89,12 +88,12 @@ export class InteractiveManager implements IDisposable {
 
   // ─── Hover state ───────────────────────────────────────────
 
-  /** composite-id → { intersection, stopped } (R3F's internal.hovered) */
+  /** composite-id → { intersection, stopped }  */
   private readonly _hovered = new Map<string, { intersection: Intersection; stopped: boolean }>();
 
   // ─── Pointer capture ───────────────────────────────────────
 
-  /** pointerId → Map<Object3D, PointerCaptureTarget> (R3F's capturedMap) */
+  /** pointerId → Map<Object3D, PointerCaptureTarget>  */
   private readonly _capturedMap = new Map<number, Map<THREE.Object3D, PointerCaptureTarget>>();
 
   // ─── Click validation ──────────────────────────────────────
@@ -258,13 +257,13 @@ export class InteractiveManager implements IDisposable {
     this._lastPointerMoveEvent = null;
   }
 
-  // ─── Intersection Pipeline (R3F's intersect) ───────────────
+  // ─── Intersection Pipeline ───────────────
 
   /**
    * Perform raycast → dedup → filter → expand to registered ancestors
    * → inject captures.
    *
-   * This mirrors R3F's `intersect()` function.
+   * 
    */
   private _intersect(
     event: PointerEvent | WheelEvent,
@@ -282,7 +281,7 @@ export class InteractiveManager implements IDisposable {
     // 2. Determine which objects to raycast
     const eventObjects = filter ? filter(this._interaction) : this._interaction;
 
-    // 3. Raycast each object individually (R3F does this per-object, not scene-wide)
+    // 3. Raycast each object individually 
     const duplicates = new Set<string>();
     let rawHits: THREE.Intersection[];
 
@@ -290,13 +289,13 @@ export class InteractiveManager implements IDisposable {
       // Scene mode: one raycast, then filter to registered objects
       rawHits = this._raycaster.intersectObject(this._scene, true);
     } else {
-      // Per-object raycast (R3F pattern)
+      // Per-object raycast 
       rawHits = eventObjects
         .flatMap((obj) => this._raycaster.intersectObject(obj, this._recursive))
         .sort((a, b) => a.distance - b.distance);
     }
 
-    // 4. Dedup by makeId-style key (using index + instanceId, matching R3F's makeId)
+    // 4. Dedup by makeId-style key (using index + instanceId, )
     rawHits = rawHits.filter((item) => {
       const id = item.object.uuid + '/' + (item.index ?? '') + (item.instanceId ?? '');
       if (duplicates.has(id)) return false;
@@ -309,7 +308,7 @@ export class InteractiveManager implements IDisposable {
       rawHits = this._filterIntersections(rawHits);
     }
 
-    // 6. Expand: bubble up to find registered ancestors (R3F's ancestor walk)
+    // 6. Expand: bubble up to find registered ancestors 
     const intersections: Intersection[] = [];
     for (const hit of rawHits) {
       let eventObject: THREE.Object3D | null = hit.object;
@@ -331,7 +330,7 @@ export class InteractiveManager implements IDisposable {
       }
     }
 
-    // 7. Inject pointer captures (R3F's capturedMap injection)
+    // 7. Inject pointer captures 
     if ('pointerId' in event) {
       const capturedForPointer = this._capturedMap.get((event as PointerEvent).pointerId);
       if (capturedForPointer) {
@@ -348,13 +347,13 @@ export class InteractiveManager implements IDisposable {
     return intersections;
   }
 
-  // ─── handleIntersects (R3F's handleIntersects) ─────────────
+  // ─── handleIntersects ─────────────
 
   /**
    * Walk the flat intersection list, calling the callback for each.
    * `stopPropagation()` sets `localState.stopped = true` and breaks the loop.
    *
-   * This mirrors R3F's `handleIntersects()`.
+   * 
    */
   private _handleIntersects(
     intersections: Intersection[],
@@ -418,7 +417,7 @@ export class InteractiveManager implements IDisposable {
         pointer,
         nativeEvent: event as PointerEvent,
         stopPropagation: () => {
-          // R3F: only allow stopPropagation if pointer is not captured,
+          // Only allow stopPropagation if pointer is not captured,
           // or if this eventObject is capturing the pointer
           const capturesForPointer =
             'pointerId' in event && this._capturedMap.get((event as PointerEvent).pointerId);
@@ -427,7 +426,7 @@ export class InteractiveManager implements IDisposable {
             capturesForPointer.has(hit.eventObject)
           ) {
             raycastEvent.stopped = localState.stopped = true;
-            // R3F: if this object is currently hovered, flush higher-up objects
+            // If this object is currently hovered, flush higher-up objects
             if (
               this._hovered.size &&
               Array.from(this._hovered.values()).find(
@@ -445,20 +444,20 @@ export class InteractiveManager implements IDisposable {
 
       callback(raycastEvent);
 
-      // R3F: if propagation was stopped, break the loop
+      // If propagation was stopped, break the loop
       if (localState.stopped === true) break;
     }
 
     return intersections;
   }
 
-  // ─── cancelPointer (R3F's cancelPointer) ───────────────────
+  // ─── cancelPointer ───────────────────
 
   /**
    * Fire `onPointerOut` + `onPointerLeave` on all hovered objects
    * that are NOT in the provided intersection list.
    *
-   * This mirrors R3F's `cancelPointer()`.
+   * 
    */
   private _cancelPointer(intersections: Intersection[]): void {
     for (const [id, hoverEntry] of this._hovered) {
@@ -483,11 +482,11 @@ export class InteractiveManager implements IDisposable {
     }
   }
 
-  // ─── pointerMissed (R3F's pointerMissed) ───────────────────
+  // ─── pointerMissed ───────────────────
 
   /**
    * Fire `onPointerMissed` on the specified objects.
-   * Mirrors R3F's `pointerMissed()`.
+   * 
    */
   private _pointerMissed(event: PointerEvent, objects: THREE.Object3D[]): void {
     for (const obj of objects) {
@@ -529,7 +528,7 @@ export class InteractiveManager implements IDisposable {
     if (!this._enabled) return;
     this._lastPointerMoveEvent = e;
 
-    // R3F: filter to only objects with pointer move/over/out/leave handlers
+    // Filter to only objects with pointer move/over/out/leave handlers
     const filterFn = (objects: THREE.Object3D[]): THREE.Object3D[] =>
       objects.filter((obj) => {
         const entry = this._registry.get(obj);
@@ -538,7 +537,7 @@ export class InteractiveManager implements IDisposable {
 
     const hits = this._intersect(e, filterFn);
 
-    // R3F: cancelPointer BEFORE dispatching new over/enter
+    // cancelPointer before dispatching new over/enter
     this._cancelPointer(hits);
 
     this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
@@ -588,7 +587,7 @@ export class InteractiveManager implements IDisposable {
 
     const hits = this._intersect(e);
 
-    // R3F: save initial click coordinates and hit list
+    // Save initial click coordinates and hit list
     this._initialClick = [e.offsetX, e.offsetY];
     this._initialHits = hits.map((hit) => hit.eventObject);
 
@@ -617,7 +616,7 @@ export class InteractiveManager implements IDisposable {
 
     const isLeftButton = e.button === 0;
 
-    // R3F: calculate delta from initial click
+    // Calculate delta from initial click
     const dx = e.offsetX - this._initialClick[0];
     const dy = e.offsetY - this._initialClick[1];
     const delta = Math.round(Math.hypot(dx, dy));
@@ -632,9 +631,9 @@ export class InteractiveManager implements IDisposable {
       // Fire pointerup
       handlers.onPointerUp?.(data);
 
-      // Click validation (left button only, same as R3F)
+      // Click validation 
       if (isLeftButton && delta <= this._clickThreshold) {
-        // R3F: only fire click on objects that were in initialHits
+        // Only fire click on objects that were in initialHits
         if (this._initialHits.includes(data.eventObject)) {
           const now = Date.now();
           const lastTime = this._lastClickTimes.get(data.eventObject) ?? 0;
@@ -649,7 +648,7 @@ export class InteractiveManager implements IDisposable {
       }
     });
 
-    // R3F: pointerMissed on non-initial-hit objects during click
+    // pointerMissed on non-initial-hit objects during click
     if (isLeftButton && delta <= this._clickThreshold) {
       if (hits.length === 0) {
         this._pointerMissed(e, this._interaction);
@@ -662,7 +661,7 @@ export class InteractiveManager implements IDisposable {
       }
     }
 
-    // R3F-style capture cleanup: just delete the capturedMap entry
+    // Capture cleanup: just delete the capturedMap entry
     // (onLostPointerCapture is handled by DOM event)
     if ('pointerId' in e) {
       const pointerId = (e as PointerEvent).pointerId;
@@ -708,7 +707,7 @@ export class InteractiveManager implements IDisposable {
       if (!entry || !entry.eventCount) return;
       const handlers = entry.handlers;
 
-      // R3F: only fire contextMenu on initialHits
+      // Only fire contextMenu on initialHits
       if (this._initialHits.includes(data.eventObject)) {
         // Fire pointerMissed on non-initial-hit objects
         this._pointerMissed(
@@ -723,7 +722,7 @@ export class InteractiveManager implements IDisposable {
   // ─── Internal Helpers ──────────────────────────────────────
 
   /**
-   * Release a single pointer capture entry (R3F's releaseInternalPointerCapture).
+   * Release a single pointer capture entry 
    */
   private _releaseInternalPointerCapture(
     obj: THREE.Object3D,
@@ -741,7 +740,7 @@ export class InteractiveManager implements IDisposable {
   }
 
   /**
-   * Count non-undefined handlers for eventCount (R3F's eventCount).
+   * Count non-undefined handlers for eventCount 
    */
   private _countHandlers(handlers: EventHandlers): number {
     let count = 0;

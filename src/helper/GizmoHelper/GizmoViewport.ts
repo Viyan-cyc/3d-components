@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BaseGroup } from '../../core/BaseGroup';
+import type { IUpdatable, IDisposable } from '../../types';
 import type { GizmoContent } from './GizmoHelper';
 import { makeCircleTexture, makeRingTexture, makeBackdropTexture, makeLabelTexture } from './textures';
 
@@ -112,11 +112,11 @@ const AXES_DEF = [
  * gizmo.setContent(viewport);
  * ```
  *
- * @extends BaseGroup (THREE.Group)
+ * @extends THREE.Group
  *
- * Implements {@link GizmoContent} and {@link IDisposable}（继承自 BaseGroup）。
+ * Implements {@link GizmoContent} and {@link IDisposable}.
  */
-export class GizmoViewport extends BaseGroup implements GizmoContent {
+export class GizmoViewport extends THREE.Group implements IUpdatable, IDisposable, GizmoContent {
   /** 可被射线拾取的子对象（轴头气泡精灵）。 */
   readonly pickables: THREE.Object3D[] = [];
 
@@ -134,7 +134,8 @@ export class GizmoViewport extends BaseGroup implements GizmoContent {
    * @param options - 配置对象，所有属性均为可选（`onPick` 强烈建议提供）。
    */
   constructor(options: GizmoViewportOptions = {}) {
-    super({ name: options.name ?? 'GizmoViewport' });
+    super();
+    this.name = options.name ?? 'GizmoViewport';
 
     const {
       onPick,
@@ -346,6 +347,13 @@ export class GizmoViewport extends BaseGroup implements GizmoContent {
     for (const d of this._disposables) d.dispose();
     this._disposables.length = 0;
     this.pickables.length = 0;
-    super.dispose();
+    this.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material?.dispose();
+      }
+    });
+    this.clear();
   }
 }

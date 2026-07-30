@@ -5,7 +5,7 @@ import type * as THREE from 'three';
 /**
  * All pointer event types supported by {@link InteractiveManager}.
  *
- * Follows R3F's event model:
+ * Event model:
  *
  * | Type            | Source               | Bubbles | DOM equivalent  |
  * |-----------------|----------------------|---------|-----------------|
@@ -24,7 +24,7 @@ import type * as THREE from 'three';
  * | `contextmenu`   | DOM `contextmenu`    | Yes*    | `contextmenu`   |
  * | `pointermissed` | click on void        | —       | —               |
  *
- * * "Bubbles" in R3F means the event is dispatched on each intersection
+ * * "Bubbles" means the event is dispatched on each intersection
  *   in the flat sorted list; `stopPropagation()` breaks the iteration.
  *   This is NOT DOM-style parent-chain bubbling.
  */
@@ -49,7 +49,7 @@ export type PointerEventType =
 /**
  * A single raycast intersection resolved to a registered Object3D.
  *
- * Mirrors R3F's `Intersection`: when the ray hits a child mesh,
+ * When the ray hits a child mesh,
  * `object` is the actual hit mesh and `eventObject` is the
  * **registered** ancestor that owns the handler.
  *
@@ -79,11 +79,11 @@ export interface Intersection {
 // ─── Intersection Event ───────────────────────────────────────
 
 /**
- * Event object delivered to handlers, adapted from R3F's `IntersectionEvent`.
+ * Event object delivered to handlers.
  *
  * Carries full raycast context plus propagation control.
  * `stopPropagation()` breaks the flat intersection iteration
- * (same as R3F's `localState.stopped` mechanism).
+ * (stopped mechanism).
  */
 export interface IntersectionEvent {
   /** The actual Three.js object that the ray intersected. */
@@ -114,7 +114,7 @@ export interface IntersectionEvent {
   delta: number;
   /** The native DOM PointerEvent / WheelEvent that triggered this. */
   nativeEvent: PointerEvent | WheelEvent;
-  /** Call to stop the flat intersection iteration (R3F-style propagation). */
+  /** Call to stop the flat intersection iteration. */
   stopPropagation: () => void;
   /** Whether propagation has been stopped. */
   stopped: boolean;
@@ -196,7 +196,7 @@ export interface ControlsLike {
 // ─── Pointer Capture Target ───────────────────────────────────
 
 /**
- * Data stored per captured object, mirrors R3F's `PointerCaptureTarget`.
+ * Data stored per captured object.
  */
 export interface PointerCaptureTarget {
   intersection: Intersection;

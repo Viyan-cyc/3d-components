@@ -29,7 +29,7 @@ export interface FatLineOptions {
  * PivotControls 的可见操控件（箭头轴、平面外框、旋转弧）用它绘制；
  * `LineMaterial.resolution` 由 PivotControls 每帧统一刷新为画布像素尺寸。
  *
- * 对应 drei 的 `Line` 组件（仅取渲染部分，不含事件 / dashed）。
+ * 可控线宽线段（仅取渲染部分，不含事件 / dashed）。
  */
 export class FatLine extends Line2 {
 	/** 暴露给 PivotControls 刷新分辨率。 */

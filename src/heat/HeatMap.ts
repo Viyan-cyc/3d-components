@@ -195,7 +195,7 @@ function colourise(
  * HeatMap — a **canvas-based heatmap texture generator**.
  *
  * Renders data points onto an offscreen canvas using the two-pass alpha
- * channel technique inspired by [heatmap.js](https://github.com/pa7/heatmap.js):
+ * channel technique:
  *
  * 1. **Shadow pass** — each point is drawn as a radial-gradient circle whose
  *    alpha encodes intensity; overlapping circles accumulate naturally.

@@ -16,7 +16,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
 
-  // ---- 参考场景：一个灰色“模型”+ 三轴方向的彩色标记 ----
+  // ---- 场景：一个灰色”模型”+ 三轴方向的彩色标记 ----
   const ground = createGround(20);
   scene.add(ground);
 

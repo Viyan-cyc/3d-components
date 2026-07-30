@@ -9,14 +9,14 @@
 
 ## 0. 项目背景与上下文
 
-在 `@cyc/3d-components`（位于 `d:\cyc\project\octo\3d-components1`）组件库中，新增一个 **3D 图可视化组件**：基于图数据结构（Node/Edge），充分参考 AntV G6 的设计理念，渲染引擎基于 Three.js，支持三维空间下的布局与交互。
+在 `@cyc/3d-components`（位于 `d:\cyc\project\octo\3d-components1`）组件库中，新增一个 **3D 图可视化组件**：基于图数据结构（Node/Edge），渲染引擎基于 Three.js，支持三维空间下的布局与交互。
 
 **项目基线：**
 - npm 库 `@cyc/3d-components`，TypeScript strict，Vite 6 library mode，peerDeps: `three@^0.185`、`gsap`、`three-bvh-csg`、`three-mesh-bvh`。
 - 现有子模块：`core / heat / material / utils`，每个模块 barrel 导出（`Options 接口 + 类`），通过 `@cyc/3d-components/<sub>` 按需引入。**现已新增 `graph` 子模块。**
 - `verbatimModuleSyntax` + `isolatedModules`：类型导出必须用 `export type`，不能混用值导入。
 - 路径别名 `@/* → src/*`。
-- 代码惯例：组件继承 `THREE.Object3D` 子类；实现 `IUpdatable.update(delta)` + `IDisposable.dispose()`；声明式构造（单 `Options` 对象）；JSDoc 详尽（`@example`/`@default`/`@param`）；shader 内联 `/* glsl */\`...\``；算法移植来源标注注释。
+- 代码惯例：组件继承 `THREE.Object3D` 子类；实现 `IUpdatable.update(delta)` + `IDisposable.dispose()`；声明式构造（单 `Options` 对象）；JSDoc 详尽（`@example`/`@default`/`@param`）；shader 内联 `/* glsl */\`...\``。
 
 **可复用现成积木（按 Graph 四要素映射）：**
 
@@ -27,9 +27,8 @@
 | 边（管道/带/箭头） | `Path`（`mode:'tube'` 圆管 / `mode:'plane'` 扁平带+箭头） | `src/core/Path.ts` |
 | 节点描边/线框 | `Outlines`（法线外扩）/ `Wireframe`（重心坐标） | `src/core/Outlines.ts`、`src/core/Wireframe.ts` |
 | 大量节点（>1000） | `InstancedMesh2`（BVH 射线、视锥剔除、LOD） | `src/core/InstancedMesh2/` |
-| 节点材质 | `ShinyMaterial`（预配 PBR） | `src/material/ShinyMaterial.ts` |
 | 参考网格 | `Grid`（无限着色器网格） | `src/core/Grid.ts` |
-| 组件基类 | `BaseGroup`（IUpdatable + IDisposable + 声明式构造） | `src/core/BaseGroup.ts` |
+| 组件基类 | `THREE.Group`（IUpdatable + IDisposable + 声明式构造） | 直接使用 |
 | 工具函数 | `Util`（clamp/lerp/distance/smoothstep/createSphere/createSpiral） | `src/utils/index.ts` |
 | 场景搭建（仅 demo） | `createScene/createGround/startLoop/addSimpleOrbit` | `docs/shared/scene-setup.ts` |
 
@@ -56,7 +55,7 @@
 ├─────────────────────────────────────────────────┤
 │  Interaction 层 interaction/PickController.ts  Raycaster 拾取 + 事件分发  ⏳ Step 2
 ├─────────────────────────────────────────────────┤
-│  Graph 层   Graph3D.ts      extends BaseGroup，编排上述各层
+│  Graph 层   Graph3D.ts      extends THREE.Group，编排上述各层
 │             index.ts        barrel + ./graph 包导出
 └─────────────────────────────────────────────────┘
 ```
@@ -76,7 +75,7 @@
 ### 1.3 关键技术决策（已确认）
 
 - **模块定位**：新增 `src/graph/` 子模块 + `./graph` 包导出，与 `core/heat/material/utils` 并列。Graph 组件内部复用 `core` 的 `Html/Path`。
-- **树/层次布局**：自研轻量 TS 实现（Compact Box / Dendrogram），**不引入** `@antv/hierarchy`（项目零 @antv 依赖，保持纯净）。
+- **树/层次布局**：自研轻量 TS 实现（Compact Box / Dendrogram），不引入外部包。
 - **布局统一输出规范**：所有布局函数签名 `(nodes, config) => NodePos3D[]`，其中 `NodePos3D = { id: string|number; x: number; y: number; z: number }`。2D 布局通过 `plane: 'xy'|'xz'` 映射到三维平面，外加 `depthOffset`/`layerSpacing` 在被忽略轴上分层。
 - **方案文档持久化**：本文件即为仓库内方案文档；记忆系统 `project-graph3d.md` 已登记指针。
 - **材质粒度（2026-07-10 决策）**：**每元素 clone 独立材质**。`Graph3DOptions.nodeMaterial` / `edgeMaterial` 作为**材质模板（prototype）**传入，每个 `Node3D` / `Edge3D` 构造时 `material.clone()` 出独立实例，故各节点/边状态变更（改色/高亮）互不影响。`ownsMaterial` 字段已移除（clone 出的实例始终由元素自行释放）；`Node3D.getMaterial()` / `Edge3D.getMaterial()` 暴露独立实例供交互层直接改属性。权衡：1000 节点会产 1000 个材质对象、draw call 难合并——中小规模图（<500）首选此方案；大规模场景将来走 `InstancedMesh2` + per-instance color 路径（Step 5 预留切换点）。
@@ -135,8 +134,8 @@ export type LayoutFn<C extends BaseLayoutConfig = BaseLayoutConfig> =
 | `src/graph/layouts/types.ts` | 布局接口骨架（BaseLayoutConfig / LayoutFn） |
 | `src/graph/layouts/index.ts` | 布局 barrel（第一步仅类型） |
 | `src/graph/adapter.ts` | 数据适配层：`validate` / `normalize` / `buildIndex` / `prepare`（纯函数、零 three 依赖） |
-| `src/graph/elements/Node3D.ts` | 球体节点 `extends BaseGroup`，`setPosition/getSize/setSize/getMaterial`，每节点 clone 独立材质，`userData.nodeId` 供拾取回查，预留 `label` 槽位 |
-| `src/graph/elements/Edge3D.ts` | `THREE.LineSegments` 直线边 `extends BaseGroup`，`updateEnds(src,tgt)`/`getMaterial()`，每边 clone 独立材质 |
+| `src/graph/elements/Node3D.ts` | 球体节点 `extends THREE.Group`，`setPosition/getSize/setSize/getMaterial`，每节点 clone 独立材质，`userData.nodeId` 供拾取回查，预留 `label` 槽位 |
+| `src/graph/elements/Edge3D.ts` | `THREE.LineSegments` 直线边 `extends THREE.Group`，`updateEnds(src,tgt)`/`getMaterial()`，每边 clone 独立材质 |
 | `src/graph/elements/index.ts` | 元素 barrel |
 | `src/graph/Graph3D.ts` | 主组件：`setData/getNodes/getNode/getEdges/getData/getIndex/update/dispose` |
 | `src/graph/index.ts` | graph 模块 barrel |
@@ -238,7 +237,7 @@ pick.dispose();
 | `src/graph/layouts/util.ts` | 内部纯函数：`mapToPlane2D(x2,y2,plane,depth)`（2D→三维平面映射：`'xy'→(x,y,depth)`、`'xz'→(x,depth,y)`）、`resolvePlane`、`resolveDepth`。零 three 依赖，仅本地使用 |
 | `src/graph/layouts/types.ts` | 新增 `CircularLayoutConfig`（`radius/startAngle/endAngle/rings/radiusStep/groupBy`）、`ForceLayoutConfig`（`dimensions/iterations/linkDistance/linkStrength/chargeStrength/centerStrength/center/velocityDecay/edges`） |
 | `src/graph/layouts/circular.ts` | `circular: LayoutFn<CircularLayoutConfig>` 纯函数：三模式——`groupBy` 分组分层（每组一个深度层）/ `rings>1` 同心多环（按 index 轮询）/ 单圈单层。2D 圆周经 `plane` 映射 |
-| `src/graph/layouts/force.ts` | `force: LayoutFn<ForceLayoutConfig>` 纯函数：d3-force 思路三维力导向（库仑斥力 + 弹簧 + 中心引力 + alpha 冷却 + velocityDecay 阻尼）；稳定性守卫（`dist²≥1e-4` 防奇点、位置夹 `±1e4`、`Number.isFinite` 兜底）；`n>600` 自动减半 `iterations` + warn |
+| `src/graph/layouts/force.ts` | `force: LayoutFn<ForceLayoutConfig>` 纯函数：三维力导向（库仑斥力 + 弹簧 + 中心引力 + alpha 冷却 + velocityDecay 阻尼）；稳定性守卫（`dist²≥1e-4` 防奇点、位置夹 `±1e4`、`Number.isFinite` 兜底）；`n>600` 自动减半 `iterations` + warn |
 | `src/graph/layouts/index.ts` | barrel 导出 `circular`/`force` + 配置类型 + `Layouts` 命名空间（`{circular, force}`，对齐 `utils` 的 `Util` 模式） |
 | `src/graph/Graph3D.ts` | 新增 `applyLayout<C>(layout, config?, options?)`（克隆 config、自动注入 `edges`、泛型推断）、`applyPositions(positions, options?)`（按 id 应用）、`syncEdges(updatePath)`（line 每帧 / path 节流）、`killLayoutTween()`；`setData`/`dispose` 中 kill 动画；导出 `LayoutApplyOptions` |
 | `src/graph/index.ts` | 新增导出 `LayoutApplyOptions` |
@@ -286,7 +285,7 @@ graph.applyPositions(customPositions, { animate: true, onComplete: () => {} });
 | 文件 | 内容 |
 |---|---|
 | `src/graph/layouts/types.ts` | 新增 `HexLayoutConfig`（`radius`/`orientation`(`'flat'\|'pointy'`)/`layers`/`groupBy`）、`GridLayoutConfig`（`cols`/`rows`/`levels`/`spacingX`/`spacingY`/`spacingZ`） |
-| `src/graph/layouts/hex.ts` | `hex: LayoutFn<HexLayoutConfig>` 纯函数：轴向坐标 `(q,r)` 从中心逐环螺旋铺开（移植 RedBlobGames `cube_ring` 轴向版 + hex-to-pixel 公式），按 `orientation` 换算后经 `plane` 映射三维；三模式（`groupBy` 分组分层 / `layers>1` 多层堆叠 / 单层），与 `circular` 结构对齐 |
+| `src/graph/layouts/hex.ts` | `hex: LayoutFn<HexLayoutConfig>` 纯函数：轴向坐标 `(q,r)` 从中心逐环螺旋铺开（`cube_ring` 轴向版 + hex-to-pixel 公式），按 `orientation` 换算后经 `plane` 映射三维；三模式（`groupBy` 分组分层 / `layers>1` 多层堆叠 / 单层），与 `circular` 结构对齐 |
 | `src/graph/layouts/grid.ts` | `grid: LayoutFn<GridLayoutConfig>` 纯函数：行/列/层三维网格 `col→x`、`row→z`、`level→y`，居中于原点；`rows`/`cols`/`levels` 缺省自动推算（`cols=ceil(√(n/levels))`、`rows=ceil(n/(cols·levels))`）。本质 3D（`plane`/`depthOffset`/`layerSpacing` 为 no-op） |
 | `src/graph/layouts/index.ts` | barrel 增导出 `hex`/`grid` + 配置类型；`Layouts` 命名空间增 `{ hex, grid }` |
 | `docs/components/graph/demo.ts` | demo 升第四步：布局下拉增「六边形蜂巢 / 蜂巢多层堆叠 / 网格地面 / 三维网格(levels)」、新增「层数」滑杆（蜂巢 layers 与网格 levels 共用）、`pureFunctionCheck` 泛化为 `checkLayout(fn, cfg, label)` 对 hex/grid 亦做纯函数独立性自检 |
@@ -318,7 +317,7 @@ graph.applyLayout(Layouts.grid, { levels: 3, spacingY: 2.4 });
 
 ### Step 4 决策备注（2026-07-13）
 
-- **蜂巢用轴向螺旋而非矩形分桶**：从中心 `(0,0)` 起逐环扩展（第 k 环 `6k` 格，总 `1+3k(k+1)`），保证任意节点数下蜂巢**紧凑无空洞**、视觉对称；矩形分桶会在边界留下参差。环生成移植 RedBlobGames `cube_ring` 的轴向版（起点 = 中心 + `radius·dir[4]`，绕 6 边各走 `radius` 步）。
+- **蜂巢用轴向螺旋而非矩形分桶**：从中心 `(0,0)` 起逐环扩展（第 k 环 `6k` 格，总 `1+3k(k+1)`），保证任意节点数下蜂巢**紧凑无空洞**、视觉对称；矩形分桶会在边界留下参差。环生成采用 `cube_ring` 轴向版（起点 = 中心 + `radius·dir[4]`，绕 6 边各走 `radius` 步）。
 - **`orientation` 只切像素换算、不切轴向方向**：轴向邻居方向 `{(+1,0),(+1,-1),(0,-1),(-1,0),(-1,+1),(0,+1)}` 与 orientation 无关 —— 同一组轴向坐标，平顶（`x=1.5·q`、`y=√3/2·q+√3·r`）与尖顶（`x=√3·q+√3/2·r`、`y=1.5·r`）只差整体旋转 30°，故螺旋逻辑无需分支。默认 `'flat'`（自然蜂巢形态）。
 - **蜂巢分层与 circular 对齐**：`groupBy` 命中 → 每组一个深度层（组内各铺一张蜂巢）；否则 `layers>1` 按 index 轮询分入多层，每层一张蜂巢切片，在被忽略轴以 `layerSpacing` 分层。故蜂巢本质为「2D 切片 + 深度分层」，复用 `mapToPlane2D`/`resolveDepth`。
 - **网格本质 3D、不走 plane 映射**：DESIGN 明定「直接输出三维网格坐标」，故 `col→x`、`row→z`、`level→y` 直给，`plane`/`depthOffset`/`layerSpacing` 为 no-op（与 `force dimensions:3` 一致）；间距交由 `spacingX/Y/Z` 精细控制。居中偏移使网格几何中心落在原点（各方向首末关于 0 对称）。
@@ -374,7 +373,7 @@ Layouts.force(nodes, { edges, iterations: 300, barnesHut: true, theta: 0.9 });
 
 - **性能优化范围**：经确认采「统一配置 + Barnes-Hut + 文档」方案 —— 自包含算法提速（force 斥力 `O(n²)→O(n log n)`），保留每元素 clone 材质渲染（&lt;500 节点首选）。**InstancedMesh2 渲染路径暂缓**（重做元素层、与每元素材质并行），作「预留切换点」文档化于本节末。Barnes-Hut 不碰渲染层，零回归风险。
 - **Barnes-Hut 实现**：自建八叉树（Barnes & Hut 1986 思路），不引包。`barnesHutRepulsion` 与 force.ts 的精确成对分支**同接口**（写同一 `fx/fy/fz` 缓冲），故 force 内仅一处 `if (useBH)` 分支切换，零侵入。**仅 `dimensions:3` 生效** —— 平面点云八叉树退化为低效（2D 回退精确成对）。
-- **八叉树正确性验证方法**：力导向对微力敏感、多次迭代后收敛到**不同有效平衡态**（BH 近似引入的微力差被混沌放大），故不能用「迭代后位移和」判近似质量。正确判据是「**单步、θ→0 时 BH 与精确逐节点位移一致**」：实测 `θ=0.1` 对 4 点 max 相对误差 = 0（完全一致），证明八叉树聚合/开角逻辑正确。`θ=0.9` 是精度/速度权衡默认（d3-force 亦常用 0.9 附近）。
+- **八叉树正确性验证方法**：力导向对微力敏感、多次迭代后收敛到**不同有效平衡态**（BH 近似引入的微力差被混沌放大），故不能用「迭代后位移和」判近似质量。正确判据是「**单步、θ→0 时 BH 与精确逐节点位移一致**」：实测 `θ=0.1` 对 4 点 max 相对误差 = 0（完全一致），证明八叉树聚合/开角逻辑正确。`θ=0.9` 是精度/速度权衡默认。
 - **声明式 vs 命令式并存**：`setLayout`/`Graph3DOptions.layout`（声明式、记忆、setData 自动编排）与 `applyLayout`（命令式、一次性、不记忆）**互补不替换**。声明式适合「布局随数据变化自动重排」（如实时更新图）；命令式适合「一次性手动驱动」（如动画演示切换）。`setLayout(null)` 清除记忆退回占位。
 - **`setData` 自动编排的动画语义**：构造时/`setLayout` 主动切换 → 带 gsap 过渡动画；`setData` 内部自动重应用 → **瞬移**（`animate:false`）—— 因 setData 已清空重建元素，从占位环形 lerp 到正式布局的「飞行」无意义且易与重建竞态。这与 Step 3「动画中 setData 需 killLayoutTween」一致。
 - **`LayoutPreset` 判别联合**：`type` 字段决定 `config` 具体类型（TS 判别联合），调用点 `setLayout({ type: 'hex', config: {...} })` 即获 hex 配置的类型补全/校验，避免传错配置。`resolveLayoutPreset` 内部按 `type` 查 `LAYOUT_REGISTRY` 取函数，外部调用者无需关心函数引用。
@@ -386,7 +385,7 @@ Layouts.force(nodes, { edges, iterations: 300, barnesHut: true, theta: 0.9 });
 ## 4. 后续演进预案（Step 5 之后）
 
 - **节点 label**：`Node3D.label` 槽位以 `core/Html`（2D 投影 / CSS3D transform）或 `core/BitmapText`（SDF，CJK 支持）填充；接入 Html 后 `Graph3D.update(delta, camera?, renderer?)` 需透传 camera/renderer 给 Html 的每帧投影。
-- **树/层次布局**：自研 Compact Box / Dendrogram（参考 @antv/hierarchy 思路，不引包），支持 2D 平面映射与 3D 分层（层级在 Y 轴不同高度，同层在 XZ 展开）。签名沿用 `(nodes, config) => NodePos3D[]`，并入 `Layouts` 命名空间。
+- **树/层次布局**：自研 Compact Box / Dendrogram（不引包），支持 2D 平面映射与 3D 分层（层级在 Y 轴不同高度，同层在 XZ 展开）。签名沿用 `(nodes, config) => NodePos3D[]`，并入 `Layouts` 命名空间。
 - **大规模渲染**：见 Step 5 决策备注「预留切换点」—— `InstancedMesh2` + per-instance color 路径，&gt;1000 节点真实需求触发时实现。
 - **力导向增量/异步**：当前 force 是同步阻塞迭代；超大图可考虑 Web Worker 异步或增量迭代（每帧若干步，配合 `applyPositions` 渐进）。
 - **Barnes-Hut 2D**：当前仅 3D；若 2D 力导向大图需求出现，可加四叉树（quadtree）版本。

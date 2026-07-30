@@ -14,7 +14,7 @@ export type AxisIndex = 0 | 1 | 2;
 /**
  * 拖拽开始时回调收到的上下文信息。
  *
- * 移植自 [drei pivotControls/context](https://github.com/pmndrs/drei/blob/master/src/web/pivotControls/context.ts)。
+ * 拖拽上下文。
  */
 export interface OnDragStartProps {
 	/** 触发拖拽的操控件类型。 */
@@ -30,7 +30,7 @@ export interface OnDragStartProps {
 /**
  * 一次指针采样的输入（pointerdown / pointermove 共用）。
  *
- * 移植自 R3F 的 `ThreeEvent`：`point` 为射线命中点，`ray` 为当前相机射线，
+ * `point` 为射线命中点，`ray` 为当前相机射线，
  * `shiftKey` 用于旋转 / 缩放的吸附（按住 Shift 取整）。
  */
 export interface PointerSample {
@@ -43,7 +43,7 @@ export interface PointerSample {
 }
 
 /**
- * 各操控件共享的配置（等价于 drei 的 React Context）。
+ * 各操控件共享的配置。
  *
  * 由 {@link PivotControls} 构造后传给每个操控件实例。`translation.current` 为三轴共享的可变累积平移。
  */

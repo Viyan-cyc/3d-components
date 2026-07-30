@@ -7,7 +7,7 @@ import * as THREE from 'three';
  * around each pixel. The offset magnitude is controlled by a
  * `kernel` uniform that steps through progressively wider passes.
  *
- * Based on the Kawase blur filter used in pmndrs/drei.
+ * Based on the Kawase blur filter.
  *
  * @internal Used by {@link BlurPass}.
  */

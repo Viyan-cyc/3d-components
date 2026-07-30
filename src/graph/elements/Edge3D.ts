@@ -6,7 +6,7 @@
  * - `'path'`：复用 {@link Path}（`mode:'tube'`）生成圆管，可选末端箭头，
  *   用于有向边的强调呈现。
  *
- * 继承 {@link BaseGroup}。每条边构造时 `clone()` 一份独立材质实例，
+ * 继承 `THREE.Group`。每条边构造时 `clone()` 一份独立材质实例，
  * 故各边状态变更（改色/高亮等）互不影响（与 {@link Node3D} 统一策略）。
  *
  * 提供 `updateEnds(src, tgt)` 供布局变化后刷新几何（`'line'` 原地写顶点，
@@ -17,8 +17,7 @@
  */
 
 import * as THREE from 'three';
-import { BaseGroup } from '../../core/BaseGroup';
-import type { BaseGroupOptions } from '../../core/BaseGroup';
+import type { GroupComponentOptions, IUpdatable, IDisposable } from '../../types';
 import { Path } from '../../core/Path';
 import type { NodeId, NodePos3D } from '../types';
 
@@ -40,7 +39,7 @@ export type EdgeType = 'line' | 'path';
  * });
  * ```
  */
-export interface Edge3DOptions extends BaseGroupOptions {
+export interface Edge3DOptions extends GroupComponentOptions {
   /** 边 id。 */
   id?: NodeId;
   /** 起点坐标。 */
@@ -74,6 +73,10 @@ export interface Edge3DOptions extends BaseGroupOptions {
    * 实例（模板本身不被释放）。
    */
   material?: THREE.LineBasicMaterial | THREE.MeshStandardMaterial;
+  /**
+   * 整体缩放。 @default 1
+   */
+  scale?: number;
 }
 
 /**
@@ -90,9 +93,9 @@ export interface Edge3DOptions extends BaseGroupOptions {
  * edge.updateEnds(newP1, newP2);
  * ```
  *
- * @extends BaseGroup
+ * @extends THREE.Group
  */
-export class Edge3D extends BaseGroup {
+export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 边 id（便捷访问）。 */
   readonly edgeId: NodeId;
   /** 起点 id。 */
@@ -128,18 +131,17 @@ export class Edge3D extends BaseGroup {
    * @param options - 配置对象，见 {@link Edge3DOptions}。
    */
   constructor(options: Edge3DOptions) {
-    super({
-      name: options.name ?? `edge-${options.id ?? `${options.source.id}->${options.target.id}`}`,
-      visible: options.visible,
-      userData: {
-        ...options.userData,
-        edgeId: options.id,
-        sourceId: options.source.id,
-        targetId: options.target.id,
-      },
-      children: options.children,
-      scale: options.scale,
-    });
+    super();
+    this.name = options.name ?? `edge-${options.id ?? `${options.source.id}->${options.target.id}`}`;
+    if (options.visible !== undefined) this.visible = options.visible;
+    this.userData = {
+      ...options.userData,
+      edgeId: options.id,
+      sourceId: options.source.id,
+      targetId: options.target.id,
+    };
+    if (options.scale !== undefined) this.scale.setScalar(options.scale);
+    if (options.children) { for (const c of options.children) this.add(c); }
 
     this.edgeId = options.id ?? `${options.source.id}->${options.target.id}`;
     this.sourceId = options.source.id;
@@ -289,16 +291,19 @@ export class Edge3D extends BaseGroup {
    * - `'path'`：调用内部 Path.dispose（释放管几何）+ 释放 MeshStandardMaterial。
    *
    * 注：内部 `LineSegments` 是 `THREE.Line` 子类而非 `THREE.Mesh`，
-   * 故 {@link BaseGroup.dispose} 的 Mesh 遍历不会释放其几何/材质 —— 必须在此手动释放。
-   * `'path'` 形态的内部 mesh 是 `THREE.Mesh`，理论上会被父类遍历释放几何，
+   * 故通用 Mesh 遍历不会释放其几何/材质 —— 必须在此手动释放。
+   * `'path'` 形态的内部 mesh 是 `THREE.Mesh`，理论上会被遍历释放几何，
    * 但材质是共享 clone 实例（ownsMaterial=false 的 Path 不释放它），故也在此统一释放。
    * 提前 `clear()` 移除子级，语义与 {@link Node3D.dispose} 保持一致。
    */
+  update(_delta: number): void {
+    // no-op — override in subclasses if needed
+  }
+
   dispose(): void {
     this.disposeLine();
     this.disposePath();
     this.material.dispose();
     this.clear();
-    super.dispose();
   }
 }

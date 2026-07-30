@@ -103,14 +103,14 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   //   B. 两者重合处（小球嵌入大球的部分）——射线先命中 bigSphere 表面，再命中 smallSphere
   //   C. 只在大球上（大球表面不在小球范围内的部分）——射线只命中 bigSphere
   //
-  // R3F 祖先展开（"冒泡"）规则：
+  // 祖先展开（"冒泡"）规则：
   //   每个原始 ray hit 沿 parent 链向上走，每遇到一个注册对象就多产生
   //   一条 Intersection，同一个 hit 的 distance 相同。
   //
   //   - 区域 A：射线只命中 smallSphere → 展开到 bigSphere（parent）
   //             intersections = [(smallSphere, d), (bigSphere, d)]
   //             → 两者都收到事件，小球先派发，大球后派发（同 distance 按列表序）
-  //             → 这就是 R3F 的"冒泡"：子对象命中，父对象也收到
+  //             → 这就是"冒泡"：子对象命中，父对象也收到
   //
   //   - 区域 B：射线命中 bigSphere(d1) + smallSphere(d2)
   //             bigSphere 的 hit 展开只有 bigSphere 自身（无更上注册祖先）
@@ -152,7 +152,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
   );
   smallSphereMesh.name = 'SmallSphere';
   smallSphereMesh.position.set(0, 1, 0); // 偏移，部分在大球内，部分突出
-  // 小球是大球的子对象 → 命中小球时，祖先展开会走到大球（R3F 冒泡）
+  // 小球是大球的子对象 → 命中小球时，祖先展开会走到大球（冒泡）
   bigSphereMesh.add(smallSphereMesh);
 
   let bubbleStopped = false;
@@ -258,7 +258,7 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
     </label>
     <button id="im-dispose">Dispose</button>
     <div class="info" style="margin-top:6px;border-top:1px solid var(--border-lighter);padding-top:6px">
-      <b>R3F 事件模型</b><br>
+      <b>事件模型</b><br>
       • 每个原始 ray hit 沿 parent 链展开到注册祖先<br>
       • 展开后按 distance 排序，扁平列表依次派发<br>
       • stopPropagation() 中断后续派发<br>

@@ -139,7 +139,7 @@ export interface CircularLayoutConfig extends BaseLayoutConfig {
 /**
  * 力导向布局配置（Step 3）。
  *
- * 移植自 **d3-force** 思路（库仑斥力 + 弹簧吸引 + 中心引力 + alpha 冷却 + 速度阻尼），
+ * 库仑斥力 + 弹簧吸引 + 中心引力 + alpha 冷却 + 速度阻尼，
  * 直接迭代输出三维 {@link NodePos3D}。同步运行 `iterations` 步后返回静止态。
  *
  * 因统一签名 `(nodes, config) => NodePos3D[]` 不收边，**连接结构经
@@ -194,7 +194,7 @@ export interface ForceLayoutConfig extends BaseLayoutConfig {
    */
   center?: [number, number, number];
   /**
-   * 速度阻尼（每步速度乘以 `1 - velocityDecay`）。默认 `0.6` 比 d3-force 的 `0.4` 更阻尼，
+   * 速度阻尼（每步速度乘以 `1 - velocityDecay`）。默认 `0.6`，
    * 因本布局结果常作为 gsap 过渡的**静止态**，收敛稳定性优先于「活跃感」。
    * @default 0.6
    */
@@ -236,7 +236,7 @@ export interface ForceLayoutConfig extends BaseLayoutConfig {
  * 2. **多层堆叠**（`groupBy` 缺省且 `layers > 1`）：按 index 轮询均分到 `layers` 层，每层一张蜂巢。
  * 3. **单层蜂巢**（其余）：全部节点铺成一张蜂巢。
  *
- * 算法移植自 RedBlobGames《Hexagonal Grids》的 ring/spiral 与 hex-to-pixel 公式。
+ * ring/spiral 与 hex-to-pixel 公式。
  *
  * @example
  * ```ts

@@ -57,9 +57,9 @@
 </style>
   <h2>InteractiveManager</h2>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">基于 Raycaster 的集中式事件交互系统，忠实改编自 <a href="https://github.com/pmndrs/react-three-fiber/blob/master/packages/fiber/src/core/events.ts" target="_blank">react-three-fiber 的 <code>createEvents</code></a>。开发者只需注册 Object3D + 事件回调，无需关心 Raycaster、NDC 坐标转换、hover diffing 等底层原理。支持 <strong>click / doubleclick / pointerdown / pointerup / pointermove / pointerover / pointerout / pointerenter / pointerleave / wheel / contextmenu / pointermissed</strong> 全套事件，内置扁平列表传播、点击 vs 拖拽判别、指针捕获与相机控制器自动抑制。</p>
+  <p class="desc">基于 Raycaster 的集中式事件交互系统。开发者只需注册 Object3D + 事件回调，无需关心 Raycaster、NDC 坐标转换、hover diffing 等底层原理。支持 <strong>click / doubleclick / pointerdown / pointerup / pointermove / pointerover / pointerout / pointerenter / pointerleave / wheel / contextmenu / pointermissed</strong> 全套事件，内置扁平列表传播、点击 vs 拖拽判别、指针捕获与相机控制器自动抑制。</p>
 
-  <h3>R3F 事件模型</h3>
+  <h3>事件模型</h3>
   <div class="info">
     <p><strong>扁平传播（非 DOM 冒泡）</strong>：每次射线检测产生按 distance 排序的 <code>Intersection[]</code>，每个原始命中会向上展开到所有注册祖先。事件按此扁平列表顺序依次派发，<code>stopPropagation()</code> 中断后续迭代。</p>
     <p><strong>Hover Diffing</strong>：通过 composite-id（<code>eventObject.uuid/faceIndex/instanceId</code>）追踪悬停状态。进入新对象时 <code>over</code>+<code>enter</code> 同时触发；离开时 <code>out</code>+<code>leave</code> 同时触发（由 <code>cancelPointer</code> 执行）。</p>
@@ -128,7 +128,7 @@
   </table>
 
   <h3>EventHandlers</h3>
-  <p>R3F 的"冒泡"指事件通过 <code>handleIntersects</code> 扁平列表依次派发——射线命中子对象后，祖先展开使父对象也出现在列表中，从而收到事件。<code>stopPropagation()</code> 中断后续派发。</p>
+  <p>"冒泡"指事件通过 <code>handleIntersects</code> 扁平列表依次派发——射线命中子对象后，祖先展开使父对象也出现在列表中，从而收到事件。<code>stopPropagation()</code> 中断后续派发。</p>
   <table class="pt">
     <thead><tr><th>事件</th><th>冒泡</th><th>说明</th><th>触发方式</th></tr></thead>
     <tbody>
@@ -151,7 +151,7 @@
 
   <h3>祖先展开与重叠区域交互</h3>
   <div class="info">
-    <p>R3F 的"冒泡"本质是<strong>场景图祖先展开</strong>：射线命中子对象后，沿 <code>parent</code> 链向上走，每遇到一个注册对象就多产生一条 <code>Intersection</code>（同 distance）。两个同级对象之间不存在此路径——<strong>只有父子关系才能冒泡</strong>。</p>
+    <p>"冒泡"本质是<strong>场景图祖先展开</strong>：射线命中子对象后，沿 <code>parent</code> 链向上走，每遇到一个注册对象就多产生一条 <code>Intersection</code>（同 distance）。两个同级对象之间不存在此路径——<strong>只有父子关系才能冒泡</strong>。</p>
     <p>当小球是大球的子对象（<code>bigSphere.add(smallSphere)</code>），且部分嵌入大球时：</p>
     <ul>
       <li><strong>A区（仅小球）</strong>：射线只命中 smallSphere → 祖先展开到 bigSphere → 两者都收到事件（小球先派发，大球后派发）</li>

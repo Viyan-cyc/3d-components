@@ -10,8 +10,7 @@
  * - `FatLine` —— 可控线宽线段（Line2 封装）。
  * - `calculateScaleFactor` —— `fixed` 模式恒定像素尺寸所需的缩放因子。
  *
- * 参考 [drei PivotControls](https://github.com/pmndrs/drei/tree/master/src/web/pivotControls)，
- * 改写为原生 Three.js（`THREE.Group` 子类，无 React）。
+ * 原生 Three.js 实现（`THREE.Group` 子类，无 React）。
  *
  * ## 快速开始
  * ```ts

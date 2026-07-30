@@ -748,7 +748,7 @@ function buildTextGeometry(params: TextLayoutParams): {
 		// BR
 		uvs[ui++] = u1; uvs[ui++] = v1;
 
-		// Positions (Y negated to match t3d.js convention)
+		// Positions (Y negated to match convention)
 		const x = glyph.position[0] + bitmap.xoffset;
 		const y = glyph.position[1] + bitmap.yoffset;
 		const w = bitmap.width;

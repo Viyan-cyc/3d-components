@@ -3,7 +3,7 @@
   <span class="tag">extends <code>THREE.Group</code></span>
   <span class="tag">implements <code>IUpdatable</code></span>
   <span class="tag">implements <code>IDisposable</code></span>
-  <p class="desc">统一变换操控 Gizmo（平移 / 旋转 / 缩放一体）。参考 <a href="https://github.com/pmndrs/drei/tree/master/src/web/pivotControls" target="_blank">drei PivotControls</a> 的原生 Three.js 实现：在一个 gizmo 上<strong>同时</strong>呈现三根轴箭头（单轴平移）、三个平面滑块（双轴平移）、三段旋转弧（绕轴旋转）和三个缩放球（单轴缩放）。把受控内容 <code>pivot.add(model)</code>，拖拽 gizmo 即变换该组；每帧调用 <code>pivot.update(dt)</code>。</p>
+  <p class="desc">统一变换操控 Gizmo（平移 / 旋转 / 缩放一体）。原生 Three.js 实现：在一个 gizmo 上<strong>同时</strong>呈现三根轴箭头（单轴平移）、三个平面滑块（双轴平移）、三段旋转弧（绕轴旋转）和三个缩放球（单轴缩放）。把受控内容 <code>pivot.add(model)</code>，拖拽 gizmo 即变换该组；每帧调用 <code>pivot.update(dt)</code>。</p>
 
   <div class="demo-card">
     <canvas id="c-pivotcontrols"></canvas>

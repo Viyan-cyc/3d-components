@@ -6,7 +6,7 @@ import type { HandleConfig, PointerSample, AxisIndex } from './context';
 /**
  * 把 `offset` 分解到 `e1`/`e2` 二维基底上的系数 `[x, y]`（满足 `x*e1 + y*e2 ≈ offset`）。
  *
- * 通过选取绝对值最大的分量作主轴求解，避免基底退化时除零。移植自 drei PlaneSlider。
+ * 通过选取绝对值最大的分量作主轴求解，避免基底退化时除零。
  */
 const decomposeIntoBasis = (e1: THREE.Vector3, e2: THREE.Vector3, offset: THREE.Vector3): [number, number] => {
 	const i1 =
@@ -63,7 +63,7 @@ export class PlaneSlider extends PivotHandle {
 		const pos1 = fixed ? 1 / 7 : scale / 7;
 		const length = fixed ? 0.225 : scale * 0.225;
 
-		// 与 drei 一致：注释锚点在原点
+		// 注释锚点在原点
 		this.createAnnotation([0, 0, 0]);
 
 		// 实心填充平面（可见 + 命中区），位于 [pos1*1.7, pos1*1.7]，尺寸 length×length

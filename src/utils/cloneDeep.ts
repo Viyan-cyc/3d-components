@@ -3,7 +3,7 @@
  *
  * **Object 工具 (Object Utilities)**
  *
- * Deep-clone utility inspired by [lodash.clonedeep](https://lodash.com/docs/#cloneDeep).
+ * Deep-clone utility.
  * Handles plain objects, arrays, Dates, RegExps, Maps, Sets, ArrayBuffers,
  * TypedArrays, and circular references — without any runtime dependency.
  *
@@ -134,7 +134,7 @@ function isTypedArray(value: unknown): value is ArrayBufferView & { length: numb
 /**
  * Recursively deep-clone `value`, tracking circular references via `stack`.
  *
- * Follows the same two-phase pattern as lodash's `baseClone`:
+ * Two-phase clone:
  *   1. **init** — create an empty shell of the correct type
  *   2. **populate** — recursively fill the shell
  *
@@ -224,7 +224,7 @@ function baseClone<T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> {
     );
   }
 
-  // Copy symbol-keyed properties (lodash CLONE_SYMBOLS behavior)
+  // Copy symbol-keyed properties
   const symKeys = Object.getOwnPropertySymbols(value as object);
   for (let i = 0; i < symKeys.length; i++) {
     const sym = symKeys[i] as keyof typeof value;
@@ -246,7 +246,7 @@ function baseClone<T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> {
  * `RegExp`, `Map`, `Set`, `ArrayBuffer`, `DataView`, all TypedArrays,
  * and circular references. Symbol-keyed properties are also cloned.
  *
- * Functions are returned as-is (same reference) — matching lodash behavior.
+ * Functions are returned as-is (same reference).
  *
  * @param value - The value to recursively clone.
  * @returns A deep copy of `value`.

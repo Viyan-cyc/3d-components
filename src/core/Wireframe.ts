@@ -59,7 +59,7 @@ export interface WireframeOptions extends GroupComponentOptions {
   overrideMaterial?: boolean;
 }
 
-// ===================== GLSL shaders (源自 drei WireframeMaterial) =====================
+// ===================== GLSL shaders =====================
 
 /**
  * 顶点着色器：读取 `barycentric` 属性并传给片元。
@@ -79,7 +79,7 @@ const wireframeVertex = /* glsl */ `
 
 /**
  * 片元着色器核心：基于重心坐标计算每条边的抗锯齿线条，支持虚线 / 收窄。
- * 与 drei 实现一致，依赖 `fwidth`（standard derivatives）。
+ * 依赖 `fwidth`（standard derivatives）。
  */
 const wireframeFragment = /* glsl */ `
   #ifndef PI
@@ -190,7 +190,7 @@ const standaloneFragmentShader = /* glsl */ `
   }
 `;
 
-/** 默认 uniform 值（与 drei 一致）。 */
+/** 默认 uniform 值。 */
 function createWireframeUniforms() {
   return {
     strokeOpacity: { value: 1 },
@@ -235,7 +235,7 @@ function createWireframeMaterial(): THREE.ShaderMaterial {
  *
  * **索引几何必须先去索引**：相邻三角形共享同一顶点时，该顶点的重心坐标无法同时满足
  * 多个三角形，因此把几何体转成非索引（每个三角形独占 3 个顶点）后再赋值。
- * 这是 drei `Wireframe` 组件同样的做法。
+ * 这是同样的做法。
  *
  * > 注：本函数会**就地修改**传入几何体（添加 `barycentric` 属性）；
  * > 若需要保留原几何体，请传入副本。
@@ -274,7 +274,7 @@ function applyBarycentric(geometry: THREE.BufferGeometry): void {
 /**
  * 把线框逻辑注入到已有材质（`onBeforeCompile`），使其带光照渲染。
  *
- * 与 drei `setWireframeOverride` 等价：在顶点着色器插入 `initWireframe()`，
+ * 在顶点着色器插入 `initWireframe()`，
  * 在片元着色器把 `getWireframe()` 结果混合进 `diffuseColor`。被注入的材质会
  * 自动设为 `DoubleSide` + `transparent`。**注意：调用方需自行保证几何体
  * 已具备 `barycentric` 属性**（用 {@link applyBarycentric}）。
@@ -329,8 +329,7 @@ function applyWireframeOverride(material: THREE.Material, uniforms: Record<strin
 /**
  * Wireframe — 线框化组件。
  *
- * 参考自 [pmndrs/drei 的 `WireframeMaterial`](https://github.com/pmndrs/drei/blob/master/src/materials/WireframeMaterial.tsx)，
- * 实现为原生 Three.js 类（继承 `THREE.Group`），不依赖 React/R3F。
+ * 原生 Three.js 实现（继承 `THREE.Group`）。
  *
  * 工作原理：基于**重心坐标（barycentric）**在每个三角形内计算到三条边的最小距离，
  * 用 `fwidth` 抗锯齿画出线条；支持虚线、收窄、正反面不同色、半透明填充。
