@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { MeshReflectorMaterial } from '@cyc/3d-components/material';
+ * import { MeshReflectorMaterial } from '@a3d/a3d-components/material';
  *
  * const reflectorMat = new MeshReflectorMaterial({ mirror: 0.75, blur: [300, 100] });
  * const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), reflectorMat);

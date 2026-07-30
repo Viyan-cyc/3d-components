@@ -3,7 +3,7 @@
   "entryPoints": ["src/index.ts"],
   "entryPointStrategy": "expand",
   "out": "docs/api",
-  "name": "@cyc/3d-components",
+  "name": "@a3d/a3d-components",
   "includeVersion": true,
   "readme": "none",
   "excludeExternals": true,

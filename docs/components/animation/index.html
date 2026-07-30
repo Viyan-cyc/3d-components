@@ -111,7 +111,7 @@
 
   <h4>1. 基础单步动画</h4>
   <p>传入 <code>to</code> 指定目标属性值，配合 <code>duration</code> 和 <code>ease</code> 完成单步动画。</p>
-  <pre><code class="language-ts">import { animate } from '@cyc/3d-components/animation';
+  <pre><code class="language-ts">import { animate } from '@a3d/a3d-components/animation';
 
 animate(mesh, {
   to: { position: { x: 2 }, 'material.color': '#ff8800' },
@@ -272,7 +272,7 @@ anim.restart();        // 重新播放</code></pre>
 
   <h4>11. 自定义缓动</h4>
   <p>通过 <code>registerEasing</code> 注册自定义缓动函数，之后用名称引用。</p>
-  <pre><code class="language-ts">import { animate, registerEasing } from '@cyc/3d-components/animation';
+  <pre><code class="language-ts">import { animate, registerEasing } from '@a3d/a3d-components/animation';
 
 registerEasing('customElastic', (t) => {
   if (t === 0 || t === 1) return t;

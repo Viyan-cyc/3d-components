@@ -93,7 +93,7 @@ const fragmentShader = /* glsl */ `
  *
  * @example
  * ```ts
- * import { Sky } from '@cyc/3d-components/core';
+ * import { Sky } from '@a3d/a3d-components/core';
  *
  * // 天空穹顶
  * const sky = new Sky({

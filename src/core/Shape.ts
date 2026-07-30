@@ -248,7 +248,7 @@ function buildShapeGeometry(data: ShapeData): THREE.BufferGeometry | null {
  *
  * @example
  * ```ts
- * import { Shape } from '@cyc/3d-components/core';
+ * import { Shape } from '@a3d/a3d-components/core';
  *
  * // L 形异形台面
  * const shape = new Shape({

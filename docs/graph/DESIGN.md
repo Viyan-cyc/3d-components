@@ -9,11 +9,11 @@
 
 ## 0. 项目背景与上下文
 
-在 `@cyc/3d-components`（位于 `d:\cyc\project\octo\3d-components1`）组件库中，新增一个 **3D 图可视化组件**：基于图数据结构（Node/Edge），渲染引擎基于 Three.js，支持三维空间下的布局与交互。
+在 `@a3d/a3d-components`（位于 `d:\cyc\project\octo\3d-components1`）组件库中，新增一个 **3D 图可视化组件**：基于图数据结构（Node/Edge），渲染引擎基于 Three.js，支持三维空间下的布局与交互。
 
 **项目基线：**
-- npm 库 `@cyc/3d-components`，TypeScript strict，Vite 6 library mode，peerDeps: `three@^0.185`、`gsap`、`three-bvh-csg`、`three-mesh-bvh`。
-- 现有子模块：`core / heat / material / utils`，每个模块 barrel 导出（`Options 接口 + 类`），通过 `@cyc/3d-components/<sub>` 按需引入。**现已新增 `graph` 子模块。**
+- npm 库 `@a3d/a3d-components`，TypeScript strict，Vite 6 library mode，peerDeps: `three@^0.185`、`gsap`、`three-bvh-csg`、`three-mesh-bvh`。
+- 现有子模块：`core / heat / material / utils`，每个模块 barrel 导出（`Options 接口 + 类`），通过 `@a3d/a3d-components/<sub>` 按需引入。**现已新增 `graph` 子模块。**
 - `verbatimModuleSyntax` + `isolatedModules`：类型导出必须用 `export type`，不能混用值导入。
 - 路径别名 `@/* → src/*`。
 - 代码惯例：组件继承 `THREE.Object3D` 子类；实现 `IUpdatable.update(delta)` + `IDisposable.dispose()`；声明式构造（单 `Options` 对象）；JSDoc 详尽（`@example`/`@default`/`@param`）；shader 内联 `/* glsl */\`...\``。
@@ -157,13 +157,13 @@ graph.getEdges(): Edge3D[];                  graph.getData(): GraphData | null; 
 graph.update(delta): void;                   graph.dispose(): void;
 
 // 数据适配（可在组件外部独立使用）
-import { validate, normalize, buildIndex, prepare } from '@cyc/3d-components/graph';
+import { validate, normalize, buildIndex, prepare } from '@a3d/a3d-components/graph';
 ```
 
 ### 验证方式（Step 1 完成判定）
 
 1. `npx tsc --noEmit` 通过；`npm run build` 产出 `dist/es/graph.js` + `dist/cjs/graph.cjs` + `.d.ts`。
-2. 从 `@cyc/3d-components/graph` 与 `@cyc/3d-components` 两个路径都能 `import { Graph3D, type GraphData, type NodePos3D }`。
+2. 从 `@a3d/a3d-components/graph` 与 `@a3d/a3d-components` 两个路径都能 `import { Graph3D, type GraphData, type NodePos3D }`。
 3. `npm run docs:serve` 打开文档站 `#graph`：浅灰底 + 球体节点 + 线段边，OrbitControls 可旋转缩放；点「重新生成」按钮后节点/边正确重建无残留。
 4. 反复重建数据，DevTools Memory 中 geometry/material 计数不持续增长。
 
@@ -195,7 +195,7 @@ edge.updateEnds(src, tgt);   // 'line' 原地写顶点；'path' 重建 Path 几�
 edge.getMaterial(): LineBasicMaterial | MeshStandardMaterial;
 
 // 交互
-import { PickController, type GraphEvent } from '@cyc/3d-components/graph';
+import { PickController, type GraphEvent } from '@a3d/a3d-components/graph';
 const pick = new PickController({
   domElement, graph, camera,
   selectionMode?: 'single' | 'multiple',   // @default 'single'
@@ -247,7 +247,7 @@ pick.dispose();
 ### 关键 API（Step 3 新增）
 
 ```ts
-import { Graph3D, Layouts } from '@cyc/3d-components/graph';
+import { Graph3D, Layouts } from '@a3d/a3d-components/graph';
 
 // 布局纯函数（可独立调用，零 three 依赖）
 Layouts.circular(nodes, { radius: 4, plane: 'xz' });
@@ -294,7 +294,7 @@ graph.applyPositions(customPositions, { animate: true, onComplete: () => {} });
 ### 关键 API（Step 4 新增）
 
 ```ts
-import { Graph3D, Layouts } from '@cyc/3d-components/graph';
+import { Graph3D, Layouts } from '@a3d/a3d-components/graph';
 
 // 布局纯函数（可独立调用，零 three 依赖）
 Layouts.hex(nodes, { radius: 1.3, plane: 'xz' });                 // 单层平顶蜂巢
@@ -344,7 +344,7 @@ graph.applyLayout(Layouts.grid, { levels: 3, spacingY: 2.4 });
 ### 关键 API（Step 5 新增）
 
 ```ts
-import { Graph3D, type LayoutPreset } from '@cyc/3d-components/graph';
+import { Graph3D, type LayoutPreset } from '@a3d/a3d-components/graph';
 
 // 声明式：构造时指定，setData 自动应用并记忆
 const graph = new Graph3D({

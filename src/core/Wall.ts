@@ -368,7 +368,7 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
  *
  * @example
  * ```ts
- * import { Wall } from '@cyc/3d-components/core';
+ * import { Wall } from '@a3d/a3d-components/core';
  *
  * const wall = new Wall({
  *   walls: [

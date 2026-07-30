@@ -141,7 +141,7 @@ function createOutlinesMaterial(): THREE.ShaderMaterial {
  *
  * @example
  * ```ts
- * import { Outlines } from '@cyc/3d-components/core';
+ * import { Outlines } from '@a3d/a3d-components/core';
  *
  * const mesh = new THREE.Mesh(geometry, material);
  * const outline = new Outlines({ mesh, color: 'red', thickness: 0.05 });

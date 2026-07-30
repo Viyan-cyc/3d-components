@@ -1,5 +1,5 @@
 {
-  "name": "@cyc/3d-components",
+  "name": "@a3d/a3d-components",
   "version": "0.1.0",
   "description": "3D component library based on Three.js — general, heat, material components with utility tools",
   "type": "module",

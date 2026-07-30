@@ -4,26 +4,26 @@
   <h3>安装</h3>
   <p>本库依赖 <code>three</code> 和 <code>gsap</code>（peer dependencies）:</p>
   <pre><code class="language-bash">npm install three gsap
-npm install @cyc/3d-components</code></pre>
+npm install @a3d/a3d-components</code></pre>
 
   <h3>引入方式</h3>
   <p>支持<strong>整包引入</strong>和<strong>按需引入</strong>（tree-shaking），兼容 ESM / CJS：</p>
 
   <h4>整包 (ESM)</h4>
-  <pre><code class="language-ts">import { HeatMap, Util } from '@cyc/3d-components';</code></pre>
+  <pre><code class="language-ts">import { HeatMap, Util } from '@a3d/a3d-components';</code></pre>
 
   <h4>按需引入（推荐）</h4>
-  <pre><code class="language-ts">import { Grid } from '@cyc/3d-components/core';
-import { HeatMap } from '@cyc/3d-components/heat';
-import { MeshReflectorMaterial } from '@cyc/3d-components/material';
-import { Util } from '@cyc/3d-components/utils';</code></pre>
+  <pre><code class="language-ts">import { Grid } from '@a3d/a3d-components/core';
+import { HeatMap } from '@a3d/a3d-components/heat';
+import { MeshReflectorMaterial } from '@a3d/a3d-components/material';
+import { Util } from '@a3d/a3d-components/utils';</code></pre>
 
   <h4>CommonJS</h4>
-  <pre><code class="language-ts">const { Util } = require('@cyc/3d-components/utils');</code></pre>
+  <pre><code class="language-ts">const { Util } = require('@a3d/a3d-components/utils');</code></pre>
 
   <h3>快速示例</h3>
   <pre><code class="language-ts">import * as THREE from 'three';
-import { Grid } from '@cyc/3d-components/core';
+import { Grid } from '@a3d/a3d-components/core';
 
 const grid = new Grid({ primaryScale: 5, secondaryScale: 1 });
 scene.add(grid);</code></pre>

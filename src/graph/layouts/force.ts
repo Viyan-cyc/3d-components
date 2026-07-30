@@ -40,7 +40,7 @@ const ALPHA_MIN = 0.001;
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  * // 3D 力导向（默认）
  * Layouts.force(nodes, { edges, iterations: 300 });
  * // 平面力导向（xy 计算后映射到 xz 平面）

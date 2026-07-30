@@ -1,7 +1,7 @@
 /**
  * @packageDocumentation
  *
- * # @cyc/3d-components
+ * # @a3d/a3d-components
  *
  * A 3D component library built on **Three.js** and **GSAP**.
  *
@@ -21,13 +21,13 @@
  * ## Quick Start
  * ```ts
  * // Full import
- * import { HeatMap, Util } from '@cyc/3d-components';
+ * import { HeatMap, Util } from '@a3d/a3d-components';
  *
  * // On-demand import (tree-shaking friendly)
- * import { Grid } from '@cyc/3d-components/core';
- * import { HeatMap } from '@cyc/3d-components/heat';
- * import { MeshReflectorMaterial } from '@cyc/3d-components/material';
- * import { Util } from '@cyc/3d-components/utils';
+ * import { Grid } from '@a3d/a3d-components/core';
+ * import { HeatMap } from '@a3d/a3d-components/heat';
+ * import { MeshReflectorMaterial } from '@a3d/a3d-components/material';
+ * import { Util } from '@a3d/a3d-components/utils';
  * ```
  */
 

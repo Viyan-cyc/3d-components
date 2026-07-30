@@ -64,7 +64,7 @@ export interface BaseLayoutConfig {
  *
  * @example
  * ```ts
- * import type { LayoutFn } from '@cyc/3d-components/graph';
+ * import type { LayoutFn } from '@a3d/a3d-components/graph';
  *
  * const circular: LayoutFn<CircularLayoutConfig> = (nodes, config) => {
  *   // ... 计算 ...
@@ -93,7 +93,7 @@ export type LayoutFn<C extends BaseLayoutConfig = BaseLayoutConfig> = (
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  *
  * // 地面（xz 平面）单圈
  * Layouts.circular(nodes, { radius: 4, plane: 'xz' });
@@ -147,7 +147,7 @@ export interface CircularLayoutConfig extends BaseLayoutConfig {
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  *
  * // 3D 力导向（默认）
  * Layouts.force(nodes, { edges, iterations: 300 });
@@ -240,7 +240,7 @@ export interface ForceLayoutConfig extends BaseLayoutConfig {
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  *
  * // 单层平顶蜂巢（地面 xz）
  * Layouts.hex(nodes, { radius: 1.2, plane: 'xz' });
@@ -295,7 +295,7 @@ export interface HexLayoutConfig extends BaseLayoutConfig {
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  *
  * // 地面平铺网格（自动推算行列）
  * Layouts.grid(nodes, { spacingX: 1.2, spacingZ: 1.2 });
@@ -354,7 +354,7 @@ export type LayoutType = 'circular' | 'force' | 'hex' | 'grid';
  *
  * @example
  * ```ts
- * import { Graph3D, type LayoutPreset } from '@cyc/3d-components/graph';
+ * import { Graph3D, type LayoutPreset } from '@a3d/a3d-components/graph';
  *
  * // 构造时声明初始布局
  * const layout: LayoutPreset = { type: 'force', config: { iterations: 300 } };

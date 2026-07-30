@@ -722,7 +722,7 @@ function buildPathGeometry(data: PathData): THREE.BufferGeometry | null {
  *
  * @example
  * ```ts
- * import { Path } from '@cyc/3d-components/core';
+ * import { Path } from '@a3d/a3d-components/core';
  *
  * // 3D 折线 → 圆管（带封盖）
  * const tube = new Path({

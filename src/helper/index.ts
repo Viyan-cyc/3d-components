@@ -15,7 +15,7 @@
  *
  * ## 快速开始
  * ```ts
- * import { GizmoHelper, GizmoViewport } from '@cyc/3d-components/helper';
+ * import { GizmoHelper, GizmoViewport } from '@a3d/a3d-components/helper';
  *
  * const gizmo = new GizmoHelper({ camera, renderer, controls });
  * gizmo.setContent(new GizmoViewport({ onPick: (dir) => gizmo.tweenCamera(dir) }));

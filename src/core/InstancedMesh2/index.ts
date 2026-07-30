@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { InstancedMesh2 } from '@cyc/3d-components/core';
+ * import { InstancedMesh2 } from '@a3d/a3d-components/core';
  *
  * const mesh = new InstancedMesh2(geometry, material, { capacity: 10000 });
  * mesh.addInstances(100, (entity, i) => {

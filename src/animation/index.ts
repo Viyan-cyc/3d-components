@@ -16,7 +16,7 @@
  *
  * ## 快速开始
  * ```ts
- * import { animate } from '@cyc/3d-components/animation';
+ * import { animate } from '@a3d/a3d-components/animation';
  *
  * // 简单动画
  * animate(mesh, { to: { position: { x: 2 } }, duration: 1 }).play();

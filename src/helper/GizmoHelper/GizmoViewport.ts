@@ -106,7 +106,7 @@ const AXES_DEF = [
  *
  * @example
  * ```ts
- * import { GizmoViewport } from '@cyc/3d-components/helper';
+ * import { GizmoViewport } from '@a3d/a3d-components/helper';
  *
  * const viewport = new GizmoViewport({ onPick: (dir) => gizmo.tweenCamera(dir) });
  * gizmo.setContent(viewport);

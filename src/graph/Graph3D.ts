@@ -144,7 +144,7 @@ export interface LayoutApplyOptions {
  *
  * @example
  * ```ts
- * import { Graph3D } from '@cyc/3d-components/graph';
+ * import { Graph3D } from '@a3d/a3d-components/graph';
  *
  * const graph = new Graph3D();
  * graph.setData({
@@ -337,7 +337,7 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    *
    * @example
    * ```ts
-   * import { Graph3D, Layouts } from '@cyc/3d-components/graph';
+   * import { Graph3D, Layouts } from '@a3d/a3d-components/graph';
    * // 环形（地面 xz 平面）
    * graph.applyLayout(Layouts.circular, { radius: 4, plane: 'xz' });
    * // 3D 力导向（带过渡动画）

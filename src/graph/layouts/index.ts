@@ -15,7 +15,7 @@
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  *
  * // 命名空间风格
  * Layouts.circular(nodes, { radius: 4 });
@@ -24,7 +24,7 @@
  * Layouts.grid(nodes, { levels: 3, spacingX: 1.2, spacingY: 2.4, spacingZ: 1.2 });
  *
  * // 命名导入风格（更利于 tree-shaking）
- * import { circular, hex } from '@cyc/3d-components/graph';
+ * import { circular, hex } from '@a3d/a3d-components/graph';
  * circular(nodes, { radius: 4 });
  * ```
  */

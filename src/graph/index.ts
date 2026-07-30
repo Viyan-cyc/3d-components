@@ -15,7 +15,7 @@
  *
  * ## 快速开始
  * ```ts
- * import { Graph3D } from '@cyc/3d-components/graph';
+ * import { Graph3D } from '@a3d/a3d-components/graph';
  *
  * const graph = new Graph3D();
  * graph.setData({

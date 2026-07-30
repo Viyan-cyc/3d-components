@@ -59,7 +59,7 @@ function ringPositions(
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  * const pos = Layouts.circular(nodes, { radius: 4, plane: 'xz', rings: 3 });
  * ```
  */

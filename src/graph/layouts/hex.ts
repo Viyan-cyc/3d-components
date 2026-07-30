@@ -140,7 +140,7 @@ function honeycombLayer(
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  * // 单层平顶蜂巢
  * Layouts.hex(nodes, { radius: 1.2, plane: 'xz' });
  * // 三层堆叠

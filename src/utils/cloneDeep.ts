@@ -11,13 +11,13 @@
  *
  * **Namespace style:**
  * ```ts
- * import { Util } from '@cyc/3d-components';
+ * import { Util } from '@a3d/a3d-components';
  * const copy = Util.cloneDeep(original);
  * ```
  *
  * **Tree-shaking style:**
  * ```ts
- * import { cloneDeep } from '@cyc/3d-components/utils';
+ * import { cloneDeep } from '@a3d/a3d-components/utils';
  * const copy = cloneDeep(original);
  * ```
  */

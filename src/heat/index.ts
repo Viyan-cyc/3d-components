@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { HeatMap } from '@cyc/3d-components/heat';
+ * import { HeatMap } from '@a3d/a3d-components/heat';
  *
  * // Canvas heatmap texture
  * const heatMap = new HeatMap({ width: 512, height: 512, radius: 50 });

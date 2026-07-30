@@ -3,7 +3,7 @@
  *
  * Orbit-style camera controller with smooth transitions.
  *
- * Rewritten to match `@cyc/3d-components` conventions
+ * Rewritten to match `@a3d/a3d-components` conventions
  * (options-object constructor, `import * as THREE`, typed events, JSDoc, etc.).
  */
 

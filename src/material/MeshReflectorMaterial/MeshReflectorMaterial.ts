@@ -163,7 +163,7 @@ export interface MeshReflectorMaterialOptions {
  *
  * @example
  * ```ts
- * import { MeshReflectorMaterial } from '@cyc/3d-components/material';
+ * import { MeshReflectorMaterial } from '@a3d/a3d-components/material';
  *
  * // Create a reflective floor
  * const reflectorMat = new MeshReflectorMaterial({

@@ -11,9 +11,9 @@
  *
  * **Namespace style (recommended for discoverability):**
  * ```ts
- * import { Util } from '@cyc/3d-components/utils';
+ * import { Util } from '@a3d/a3d-components/utils';
  * // or
- * import { Util } from '@cyc/3d-components';
+ * import { Util } from '@a3d/a3d-components';
  *
  * Util.clamp(5, 0, 10);
  * Util.hexToRgb('#ff0000');
@@ -22,7 +22,7 @@
  *
  * **Tree-shaking style (smaller bundle):**
  * ```ts
- * import { clamp, lerp, hexToRgb } from '@cyc/3d-components/utils';
+ * import { clamp, lerp, hexToRgb } from '@a3d/a3d-components/utils';
  *
  * clamp(5, 0, 10);
  * hexToRgb('#ff0000');
@@ -50,7 +50,7 @@ import * as cloneDeepUtils from './cloneDeep';
  * sub-modules. Use this for convenient discovery and ergonomic calling:
  *
  * ```ts
- * import { Util } from '@cyc/3d-components/utils';
+ * import { Util } from '@a3d/a3d-components/utils';
  * Util.clamp(value, 0, 1);
  * Util.createSphere(radius, count);
  * ```

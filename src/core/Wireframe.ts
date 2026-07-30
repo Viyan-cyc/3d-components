@@ -351,7 +351,7 @@ function applyWireframeOverride(material: THREE.Material, uniforms: Record<strin
  *
  * @example
  * ```ts
- * import { Wireframe } from '@cyc/3d-components/core';
+ * import { Wireframe } from '@a3d/a3d-components/core';
  *
  * const mesh = new THREE.Mesh(geometry, standardMaterial);
  * const wf = new Wireframe({ mesh, stroke: '#ff0000', thickness: 0.1, dash: true });

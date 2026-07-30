@@ -830,7 +830,7 @@ function buildTextGeometry(params: TextLayoutParams): {
  *
  * @example
  * ```ts
- * import { BitmapText } from '@cyc/3d-components/core';
+ * import { BitmapText } from '@a3d/a3d-components/core';
  *
  * const text = new BitmapText({
  *   text: 'Hello 世界',

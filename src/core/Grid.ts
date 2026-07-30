@@ -224,7 +224,7 @@ const _vm = new THREE.Matrix4();
  *
  * @example
  * ```ts
- * import { Grid } from '@cyc/3d-components/core';
+ * import { Grid } from '@a3d/a3d-components/core';
  *
  * // 作为无限地面参考网
  * const grid = new Grid({ primaryScale: 5, secondaryScale: 1 });

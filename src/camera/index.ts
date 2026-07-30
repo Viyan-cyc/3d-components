@@ -10,7 +10,7 @@
  *
  * @example
  * ```ts
- * import { CameraControls } from '@cyc/3d-components/camera';
+ * import { CameraControls } from '@a3d/a3d-components/camera';
  *
  * const controls = new CameraControls({
  *   camera,

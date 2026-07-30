@@ -17,7 +17,7 @@
  *
  * ## Quick Start
  * ```ts
- * import { InteractiveManager } from '@cyc/3d-components/interactive';
+ * import { InteractiveManager } from '@a3d/a3d-components/interactive';
  *
  * const manager = new InteractiveManager({
  *   camera,

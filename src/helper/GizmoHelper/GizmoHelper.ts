@@ -124,7 +124,7 @@ const TURN_RATE = 2 * Math.PI;
  *
  * @example
  * ```ts
- * import { GizmoHelper, GizmoViewport } from '@cyc/3d-components/helper';
+ * import { GizmoHelper, GizmoViewport } from '@a3d/a3d-components/helper';
  *
  * const gizmo = new GizmoHelper({
  *   camera,

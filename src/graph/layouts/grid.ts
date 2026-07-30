@@ -29,7 +29,7 @@ import type { GridLayoutConfig } from './types';
  *
  * @example
  * ```ts
- * import { Layouts } from '@cyc/3d-components/graph';
+ * import { Layouts } from '@a3d/a3d-components/graph';
  * // 地面平铺（自动推算行列）
  * Layouts.grid(nodes, { spacingX: 1.2, spacingZ: 1.2 });
  * // 三维网格（3 层）

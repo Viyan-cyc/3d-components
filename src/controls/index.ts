@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { PivotControls } from '@cyc/3d-components/controls';
+ * import { PivotControls } from '@a3d/a3d-components/controls';
  *
  * const pivot = new PivotControls({ camera, renderer, controls: orbit });
  * scene.add(pivot);
