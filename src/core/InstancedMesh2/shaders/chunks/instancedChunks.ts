@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+// Variable names use snake_case to match Three.js ShaderChunk conventions.
+
 export const instanced_pars_vertex = /* glsl */`
 #ifdef USE_INSTANCING_INDIRECT
   attribute uint instanceIndex;
@@ -80,3 +83,4 @@ export const instanced_skinning_pars_vertex = /* glsl */`
   }
 #endif
 `;
+/* eslint-enable @typescript-eslint/naming-convention */

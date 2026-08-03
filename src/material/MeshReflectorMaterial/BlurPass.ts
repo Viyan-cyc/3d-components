@@ -1,5 +1,79 @@
+
 import * as THREE from 'three';
 import { ConvolutionMaterial } from './ConvolutionMaterial';
+
+/**
+ * Default blur width in pixels when not specified.
+ */
+const DEFAULT_BLUR_WIDTH = 500;
+
+/**
+ * Default blur height in pixels when not specified.
+ */
+const DEFAULT_BLUR_HEIGHT = 500;
+
+/**
+ * Default depth-to-blur ratio bias for depth-aware blurring.
+ */
+const DEFAULT_DEPTH_TO_BLUR_RATIO_BIAS = 0.25;
+
+/**
+ * Number of components per vertex position (x, y, z).
+ */
+const POSITION_COMPONENTS = 3;
+
+/**
+ * X coordinate for the oversized full-screen triangle vertex.
+ * Extends to 3 so the triangle covers the entire [-1,1] clip-space viewport.
+ */
+const OVERSIZED_TRIANGLE_X = 3;
+
+/**
+ * Y coordinate for the oversized full-screen triangle vertex.
+ * Extends to 3 so the triangle covers the entire [-1,1] clip-space viewport.
+ */
+const OVERSIZED_TRIANGLE_Y = 3;
+
+/**
+ * Create a full-screen triangle geometry for rendering blur passes.
+ * Uses an oversized triangle that covers the entire viewport.
+ */
+const createFullscreenTriangleGeometry = (): THREE.BufferGeometry => {
+  // Oversized triangle covering the viewport: (-1,-1), (3,-1), (-1,3)
+  const vertices = new Float32Array([-1, -1, 0, OVERSIZED_TRIANGLE_X, -1, 0, -1, OVERSIZED_TRIANGLE_Y, 0]);
+  const uvs = new Float32Array([0, 0, 2, 0, 0, 2]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(vertices, POSITION_COMPONENTS),
+  );
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  return geometry;
+};
+
+/**
+ * Create and configure a ConvolutionMaterial with the given blur parameters.
+ */
+const createConvolutionMaterial = (opts: {
+  width: number;
+  height: number;
+  minDepthThreshold: number;
+  maxDepthThreshold: number;
+  depthScale: number;
+  depthToBlurRatioBias: number;
+}): ConvolutionMaterial => {
+  const mat = new ConvolutionMaterial();
+  mat.setTexelSize(1.0 / opts.width, 1.0 / opts.height);
+  mat.setResolution(new THREE.Vector2(opts.width, opts.height));
+  mat.uniforms.minDepthThreshold.value = opts.minDepthThreshold;
+  mat.uniforms.maxDepthThreshold.value = opts.maxDepthThreshold;
+  mat.uniforms.depthScale.value = opts.depthScale;
+  mat.uniforms.depthToBlurRatioBias.value = opts.depthToBlurRatioBias;
+  if (opts.depthScale > 0) {
+    mat.defines.USE_DEPTH = '';
+  }
+  return mat;
+};
 
 /**
  * Multi-pass Kawase blur pass for reflection textures.
@@ -37,12 +111,12 @@ export class BlurPass {
   }) {
     const {
       resolution,
-      width = 500,
-      height = 500,
+      width = DEFAULT_BLUR_WIDTH,
+      height = DEFAULT_BLUR_HEIGHT,
       minDepthThreshold = 0,
       maxDepthThreshold = 1,
       depthScale = 0,
-      depthToBlurRatioBias = 0.25,
+      depthToBlurRatioBias = DEFAULT_DEPTH_TO_BLUR_RATIO_BIAS,
     } = options;
 
     const rtParams = {
@@ -56,26 +130,16 @@ export class BlurPass {
     this.renderTargetA = new THREE.WebGLRenderTarget(resolution, resolution, rtParams);
     this.renderTargetB = this.renderTargetA.clone();
 
-    this.convolutionMaterial = new ConvolutionMaterial();
-    this.convolutionMaterial.setTexelSize(1.0 / width, 1.0 / height);
-    this.convolutionMaterial.setResolution(new THREE.Vector2(width, height));
+    this.convolutionMaterial = createConvolutionMaterial({
+      width,
+      height,
+      minDepthThreshold,
+      maxDepthThreshold,
+      depthScale,
+      depthToBlurRatioBias,
+    });
 
-    this.convolutionMaterial.uniforms.minDepthThreshold.value = minDepthThreshold;
-    this.convolutionMaterial.uniforms.maxDepthThreshold.value = maxDepthThreshold;
-    this.convolutionMaterial.uniforms.depthScale.value = depthScale;
-    this.convolutionMaterial.uniforms.depthToBlurRatioBias.value = depthToBlurRatioBias;
-
-    if (depthScale > 0) {
-      this.convolutionMaterial.defines.USE_DEPTH = '';
-    }
-
-    // Full-screen quad
-    const vertices = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
-    const uvs = new Float32Array([0, 0, 2, 0, 0, 2]);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-
+    const geometry = createFullscreenTriangleGeometry();
     this._scene = new THREE.Scene();
     this._camera = new THREE.Camera();
     this._screen = new THREE.Mesh(geometry, this.convolutionMaterial);

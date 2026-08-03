@@ -29,12 +29,12 @@
 export { CameraControls } from './CameraControls';
 export { ACTION, MOUSE_BUTTON, DOLLY_DIRECTION } from './types';
 export type {
-	CameraControlsOptions,
-	CameraControlsEventMap,
-	CameraControlsEventType,
-	CameraControlsEvent,
-	CameraControlsLerpState,
-	MouseButtons,
-	Touches,
-	FitToOptions,
+  CameraControlsOptions,
+  CameraControlsEventMap,
+  CameraControlsEventType,
+  CameraControlsEvent,
+  CameraControlsLerpState,
+  MouseButtons,
+  Touches,
+  FitToOptions,
 } from './types';

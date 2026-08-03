@@ -5,7 +5,7 @@
  * Extract averaged client coordinates from an array of active pointers.
  */
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import type { PointerInput } from '../types';
 
 /**
@@ -14,18 +14,21 @@ import type { PointerInput } from '../types';
  * @param pointers  Active pointer list.
  * @param out       Receiving `Vector2` (x → clientX, y → clientY).
  */
-export function extractClientCoordFromEvent( pointers: PointerInput[], out: THREE.Vector2 ): void {
+export const extractClientCoordFromEvent = (
+  pointers: PointerInput[],
+  out: THREE.Vector2,
+): void => {
 
-	out.set( 0, 0 );
+  out.set(0, 0);
 
-	for ( let i = 0; i < pointers.length; i ++ ) {
+  for (const pointer of pointers) {
 
-		out.x += pointers[ i ].clientX;
-		out.y += pointers[ i ].clientY;
+    out.x += pointer.clientX;
+    out.y += pointer.clientY;
 
-	}
+  }
 
-	out.x /= pointers.length;
-	out.y /= pointers.length;
+  out.x /= pointers.length;
+  out.y /= pointers.length;
 
-}
+};

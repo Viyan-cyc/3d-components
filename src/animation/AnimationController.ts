@@ -7,19 +7,19 @@
  * @module animation/AnimationController
  */
 
+import type * as THREE from 'three';
 import type {
   AnimationConfig,
-  AnimationController as IAnimationController,
   AnimationState,
   AnimationStep,
+  AnimationController as IAnimationController,
   AnimationStepBuilder as IAnimationStepBuilder,
   InternalAnimationConfig,
   PropertyTarget,
   SerialStep,
 } from './types';
-import * as THREE from 'three';
+import { type LifecycleCallbacks, buildTimeline } from './timelineBuilder';
 import { mergeWithDefaults } from './defaults';
-import { buildTimeline, type LifecycleCallbacks } from './timelineBuilder';
 
 // ─── StepBuilder 内部实现 ────────────────────────────────
 
@@ -57,14 +57,19 @@ class StepBuilderImpl implements IAnimationStepBuilder {
 export class AnimationControllerImpl implements IAnimationController {
   /** 动画目标对象数组 */
   private _targets: THREE.Object3D[];
+
   /** 动画步骤列表 */
   private _steps: AnimationStep[] = [];
+
   /** 实例级配置（从 animate() 传入的配置合并默认值后） */
   private _config: InternalAnimationConfig;
+
   /** GSAP Timeline 实例（首次 play() 时创建） */
   private _timeline: gsap.core.Timeline | null = null;
+
   /** 当前播放状态 */
   private _state: AnimationState = 'idle';
+
   /** 是否已构建 Timeline（构建后不再接受新的 .to()/.parallel()） */
   private _built = false;
 
@@ -95,6 +100,7 @@ export class AnimationControllerImpl implements IAnimationController {
   to(properties: PropertyTarget, config?: Partial<AnimationConfig>): this {
     this.assertNotDestroyed();
     if (this._built) {
+      // eslint-disable-next-line no-console
       console.warn('[animation] Timeline 已构建，无法再添加步骤');
       return this;
     }
@@ -113,6 +119,7 @@ export class AnimationControllerImpl implements IAnimationController {
   parallel(groups: ((group: IAnimationStepBuilder) => void)[]): this {
     this.assertNotDestroyed();
     if (this._built) {
+      // eslint-disable-next-line no-console
       console.warn('[animation] Timeline 已构建，无法再添加步骤');
       return this;
     }
@@ -159,7 +166,9 @@ export class AnimationControllerImpl implements IAnimationController {
 
   pause(): this {
     this.assertNotDestroyed();
-    if (!this._timeline) return this;
+    if (!this._timeline) {
+      return this;
+    }
 
     this._timeline.pause();
     this._state = 'paused';
@@ -169,7 +178,9 @@ export class AnimationControllerImpl implements IAnimationController {
 
   resume(): this {
     this.assertNotDestroyed();
-    if (!this._timeline) return this;
+    if (!this._timeline) {
+      return this;
+    }
 
     this._timeline.resume();
     this._state = 'playing';
@@ -186,7 +197,8 @@ export class AnimationControllerImpl implements IAnimationController {
 
     const progress = this._timeline.progress();
     this._timeline.pause();
-    this._timeline.progress(0, true); // suppressEvents
+    // suppressEvents
+    this._timeline.progress(0, true);
     this._state = 'stopped';
     this._onStop?.(progress);
     return this;
@@ -205,7 +217,9 @@ export class AnimationControllerImpl implements IAnimationController {
 
   seek(progress: number): this {
     this.assertNotDestroyed();
-    if (!this._timeline) return this;
+    if (!this._timeline) {
+      return this;
+    }
 
     const clamped = Math.max(0, Math.min(1, progress));
     this._timeline.progress(clamped);
@@ -217,7 +231,9 @@ export class AnimationControllerImpl implements IAnimationController {
 
   getProgress(): number {
     this.assertNotDestroyed();
-    if (!this._timeline) return 0;
+    if (!this._timeline) {
+      return 0;
+    }
     return this._timeline.progress();
   }
 
@@ -227,14 +243,18 @@ export class AnimationControllerImpl implements IAnimationController {
 
   getDuration(): number {
     this.assertNotDestroyed();
-    if (!this._timeline) return 0;
+    if (!this._timeline) {
+      return 0;
+    }
     return this._timeline.duration();
   }
 
   // ─── 生命周期 ──────────────────────────────────
 
   destroy(): void {
-    if (this._state === 'destroyed') return;
+    if (this._state === 'destroyed') {
+      return;
+    }
 
     // 杀死 GSAP Timeline（同时杀死所有子 tween）
     if (this._timeline) {

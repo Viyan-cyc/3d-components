@@ -1,5 +1,16 @@
 import type { Vec3 } from '../types';
 
+// ─── Geometry constants ──────────────────────────────────────────────────────
+
+/** Coefficient used in the Fibonacci golden angle formula. */
+const FIBONACCI_COEFFICIENT = 3;
+
+/** Radicand used in the Fibonacci golden angle formula. */
+const FIBONACCI_RADICAND = 5;
+
+/** Golden angle (radians) used by the Fibonacci sphere algorithm. */
+const GOLDEN_ANGLE = Math.PI * (FIBONACCI_COEFFICIENT - Math.sqrt(FIBONACCI_RADICAND));
+
 /**
  * Create a 2D grid of points on the XY plane, centered at the origin.
  *
@@ -24,11 +35,11 @@ import type { Vec3 } from '../types';
  * );
  * ```
  */
-export function createGrid(
+export const createGrid = (
   rows: number,
   cols: number,
   spacing: number,
-): Vec3[] {
+): Vec3[] => {
   const points: Vec3[] = [];
   const offsetX = ((cols - 1) * spacing) / 2;
   const offsetY = ((rows - 1) * spacing) / 2;
@@ -43,7 +54,7 @@ export function createGrid(
     }
   }
   return points;
-}
+};
 
 /**
  * Create points arranged evenly on a circle in the XY plane.
@@ -65,7 +76,7 @@ export function createGrid(
  * const line = new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color: 0xffffff }));
  * ```
  */
-export function createCircle(radius: number, segments: number): Vec3[] {
+export const createCircle = (radius: number, segments: number): Vec3[] => {
   const points: Vec3[] = [];
   for (let i = 0; i < segments; i++) {
     const angle = (i / segments) * Math.PI * 2;
@@ -76,7 +87,7 @@ export function createCircle(radius: number, segments: number): Vec3[] {
     });
   }
   return points;
-}
+};
 
 /**
  * Create points evenly distributed on the surface of a sphere.
@@ -101,14 +112,13 @@ export function createCircle(radius: number, segments: number): Vec3[] {
  * const cloud = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.05 }));
  * ```
  */
-export function createSphere(radius: number, count: number): Vec3[] {
+export const createSphere = (radius: number, count: number): Vec3[] => {
   const points: Vec3[] = [];
-  const phi = Math.PI * (3 - Math.sqrt(5));
 
   for (let i = 0; i < count; i++) {
     const y = 1 - (i / (count - 1)) * 2;
     const radiusAtY = Math.sqrt(1 - y * y);
-    const theta = phi * i;
+    const theta = GOLDEN_ANGLE * i;
 
     points.push({
       x: Math.cos(theta) * radiusAtY * radius,
@@ -117,7 +127,7 @@ export function createSphere(radius: number, count: number): Vec3[] {
     });
   }
   return points;
-}
+};
 
 /**
  * Create points forming an Archimedean spiral on the XY plane.
@@ -136,11 +146,11 @@ export function createSphere(radius: number, count: number): Vec3[] {
  * // 300 points forming 5 turns, max radius 3
  * ```
  */
-export function createSpiral(
+export const createSpiral = (
   turns: number,
   pointsPerTurn: number,
   radius: number,
-): Vec3[] {
+): Vec3[] => {
   const total = turns * pointsPerTurn;
   const points: Vec3[] = [];
   for (let i = 0; i < total; i++) {
@@ -154,4 +164,4 @@ export function createSpiral(
     });
   }
   return points;
-}
+};

@@ -24,4 +24,6 @@
  */
 
 export { HeatMap } from './HeatMap';
-export type { HeatMapOptions, HeatMapPoint, HeatMapData, HeatMapGradient } from './HeatMap';
+export type {
+  HeatMapOptions, HeatMapPoint, HeatMapData, HeatMapGradient,
+} from './HeatMap';

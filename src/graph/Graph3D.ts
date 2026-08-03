@@ -26,14 +26,35 @@
  */
 
 import * as THREE from 'three';
-import { animate, type AnimationController } from '../animation';
-import type { GroupComponentOptions, IUpdatable, IDisposable } from '../types';
-import { prepare, type GraphIndex } from './adapter';
+import type { GroupComponentOptions, IDisposable, IUpdatable } from '../types';
+import type { BaseLayoutConfig, LayoutFn, LayoutPreset } from './layouts/types';
+import type {
+  EdgeData, GraphData, NodeData, NodeId, NodePos3D,
+} from './types';
+import { type AnimationController, animate } from '../animation';
+import { type GraphIndex, prepare } from './adapter';
 import { Edge3D } from './elements/Edge3D';
 import { Node3D } from './elements/Node3D';
+
 import { resolveLayoutPreset } from './layouts';
-import type { BaseLayoutConfig, LayoutFn, LayoutPreset } from './layouts/types';
-import type { GraphData, NodeData, NodeId, NodePos3D } from './types';
+
+/** 默认节点尺寸。 */
+const DEFAULT_NODE_SIZE = 0.3;
+
+/** 默认占位环形散布半径。 */
+const DEFAULT_INITIAL_RADIUS = 3;
+
+/** 默认管道半径。 */
+const DEFAULT_PATH_RADIUS = 0.05;
+
+/** 默认过渡动画时长（秒）。 */
+const DEFAULT_ANIM_DURATION = 0.6;
+
+/** 默认布局切换动画时长（秒）。 */
+const DEFAULT_LAYOUT_SWITCH_DURATION = 0.7;
+
+/** 圆周角度系数。 */
+const TAU = Math.PI * 2;
 
 /**
  * {@link Graph3D} 构造参数。
@@ -49,20 +70,24 @@ import type { GraphData, NodeData, NodeId, NodePos3D } from './types';
  * ```
  */
 export interface Graph3DOptions extends GroupComponentOptions {
+
   /**
    * 初始图数据。若提供，构造后立即 {@link Graph3D.setData}。
    */
   data?: GraphData;
+
   /**
    * 节点默认尺寸（球体半径）。当节点自身未指定 `size` 时使用。
    * @default 0.3
    */
   nodeSize?: number;
+
   /**
    * 节点材质**模板**。每个节点构造时 `clone()` 一份独立实例，故各节点状态变更
    * （改色/高亮等）互不影响；不传则用内置默认 `MeshStandardMaterial` 作模板。
    */
   nodeMaterial?: THREE.MeshStandardMaterial;
+
   /**
    * 节点几何体**工厂**（可选）。传入则每个节点用其返回值替代默认球体，
    * 可实现自定义节点形状（如六边形瓦片）。工厂接收节点尺寸 `size`，须返回
@@ -70,11 +95,13 @@ export interface Graph3DOptions extends GroupComponentOptions {
    * 即「重新生成」数据后形状不丢。运行时用 {@link Graph3D.setNodeGeometry} 切换。
    */
   nodeGeometry?: (size: number) => THREE.BufferGeometry;
+
   /**
    * 边材质**模板**（`LineBasicMaterial`）。每条边构造时 `clone()` 一份独立实例，
    * 故各边状态变更互不影响；不传则用内置默认值作模板。模板本身不被释放。
    */
   edgeMaterial?: THREE.LineBasicMaterial;
+
   /**
    * 边形态。
    * - `'line'`（默认）：`LineSegments` 直线段。
@@ -84,19 +111,23 @@ export interface Graph3DOptions extends GroupComponentOptions {
    * @default 'line'
    */
   edgeType?: 'line' | 'path';
+
   /**
    * `'path'` 形态边的管道半径。 @default 0.05
    */
   edgePathRadius?: number;
+
   /**
    * `'path'` 形态边是否在末端生成箭头（有向边）。 @default false
    */
   edgeArrow?: boolean;
+
   /**
    * 占位环形散布的半径（仅当节点无显式坐标时使用）。
    * @default 3
    */
   initialRadius?: number;
+
   /**
    * 声明式布局预设（Step 5）。若提供，每次 {@link Graph3D.setData} 后自动应用该布局
    * （无需手动 `applyLayout`），构造时也会立即应用一次。
@@ -112,6 +143,7 @@ export interface Graph3DOptions extends GroupComponentOptions {
    * ```
    */
   layout?: LayoutPreset;
+
   /**
    * 整体缩放。
    * @default 1
@@ -123,16 +155,19 @@ export interface Graph3DOptions extends GroupComponentOptions {
  * {@link Graph3D.applyLayout} / {@link Graph3D.applyPositions} 的过渡选项。
  */
 export interface LayoutApplyOptions {
+
   /**
    * 是否启用过渡动画。关闭则瞬移到目标坐标。
    * @default false
    */
   animate?: boolean;
+
   /**
    * 动画时长（秒）。
    * @default 0.6
    */
   duration?: number;
+
   /**
    * 动画/置位完成回调。
    */
@@ -159,35 +194,49 @@ export interface LayoutApplyOptions {
 export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 节点元素列表（id → Node3D）。 */
   private readonly nodes = new Map<NodeId, Node3D>();
+
   /** 边元素列表。 */
   private readonly edges: Edge3D[] = [];
+
   /** 边 id → Edge3D（便捷回查，供交互层 getEdge 用）。 */
   private readonly edgeById = new Map<NodeId, Edge3D>();
+
   /** 节点 id 顺序（与构造顺序一致，供环形散布等遍历）。 */
   private readonly nodeOrder: NodeId[] = [];
+
   /** 当前规范化后的图数据。 */
   private graphData: GraphData | null = null;
+
   /** 数据索引（邻接表等）。 */
   private graphIndex: GraphIndex | null = null;
 
   /** 节点默认尺寸。 */
   private readonly nodeSize: number;
+
   /** 节点材质模板（各节点 clone 自它）。 */
   private readonly nodeMaterial?: THREE.MeshStandardMaterial;
+
   /** 节点几何工厂（可选；各节点构造/重建时调用）。运行时 setNodeGeometry 可改。 */
   private nodeGeometry?: (size: number) => THREE.BufferGeometry;
+
   /** 边材质模板（各边 clone 自它）。 */
   private readonly edgeMaterial?: THREE.LineBasicMaterial;
+
   /** 占位环形散布半径。 */
   private readonly initialRadius: number;
+
   /** 边形态默认（可被单边 EdgeData.type 覆盖）。 */
   private readonly edgeType: 'line' | 'path';
+
   /** 'path' 形态管道半径。 */
   private readonly edgePathRadius: number;
+
   /** 'path' 形态是否带箭头。 */
   private readonly edgeArrow: boolean;
+
   /** 当前布局过渡动画的控制器；无动画时为 null。 */
   private layoutAnim: AnimationController | null = null;
+
   /**
    * 当前声明的布局预设（Step 5）。`setData` 后自动重应用；`setLayout` 写入。
    * `null` 表示未声明布局（用占位环形散布）。
@@ -199,24 +248,42 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    */
   constructor(options: Graph3DOptions = {}) {
     super();
-    if (options.name ?? 'graph3d') this.name = options.name ?? 'graph3d';
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
-    if (options.scale !== undefined) this.scale.setScalar(options.scale);
-    if (options.children) { for (const c of options.children) this.add(c); }
-
-    this.nodeSize = options.nodeSize ?? 0.3;
+    this.applyBaseOptions(options);
+    this.nodeSize = options.nodeSize ?? DEFAULT_NODE_SIZE;
     this.nodeMaterial = options.nodeMaterial;
     this.nodeGeometry = options.nodeGeometry;
     this.edgeMaterial = options.edgeMaterial;
-    this.initialRadius = options.initialRadius ?? 3;
+    this.initialRadius = options.initialRadius ?? DEFAULT_INITIAL_RADIUS;
     this.edgeType = options.edgeType ?? 'line';
-    this.edgePathRadius = options.edgePathRadius ?? 0.05;
+    this.edgePathRadius = options.edgePathRadius ?? DEFAULT_PATH_RADIUS;
     this.edgeArrow = options.edgeArrow ?? false;
     this.layoutPreset = options.layout ?? null;
 
     if (options.data) {
       this.setData(options.data);
+    }
+  }
+
+  /**
+   * 应用基础选项（name/visible/userData/scale/children）。
+   */
+  private applyBaseOptions(options: Graph3DOptions): void {
+    if (options.name ?? 'graph3d') {
+      this.name = options.name ?? 'graph3d';
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
+    if (options.scale !== undefined) {
+      this.scale.setScalar(options.scale);
+    }
+    if (options.children) {
+      for (const c of options.children) {
+        this.add(c);
+      }
     }
   }
 
@@ -242,6 +309,21 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
     this.clearElements();
 
     // 3. 生成节点（含初始坐标）
+    this.buildNodes(norm);
+
+    // 4. 生成边
+    this.buildEdges(norm);
+
+    // 5. 自动编排声明的布局（Step 5）
+    if (this.layoutPreset) {
+      this.applyLayoutPreset(this.layoutPreset, false);
+    }
+  }
+
+  /**
+   * 生成节点元素。
+   */
+  private buildNodes(norm: GraphData): void {
     const positions = this.computeInitialPositions(norm.nodes);
     for (const nodeData of norm.nodes) {
       const node = new Node3D({
@@ -255,32 +337,45 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
       this.nodeOrder.push(nodeData.id);
       this.add(node);
     }
+  }
 
-    // 4. 生成边（type 取单边 EdgeData.type，缺省回退全局 edgeType）
+  /**
+   * 生成边元素。
+   */
+  private buildEdges(norm: GraphData): void {
+    const positions = this.computeInitialPositions(norm.nodes);
     for (const edgeData of norm.edges) {
       const srcPos = positions.get(edgeData.source);
       const tgtPos = positions.get(edgeData.target);
-      if (!srcPos || !tgtPos) continue;
-      const edgeType = edgeData.type ?? this.edgeType;
-      const edge = new Edge3D({
-        id: edgeData.id,
-        source: srcPos,
-        target: tgtPos,
-        type: edgeType,
-        pathRadius: this.edgePathRadius,
-        arrow: this.edgeArrow,
-        material: this.edgeMaterial,
-      });
-      this.edges.push(edge);
-      this.edgeById.set(edge.edgeId, edge);
-      this.add(edge);
+      if (!srcPos || !tgtPos) {
+        // skip edges with missing endpoints
+      } else {
+        this.createEdge(edgeData, srcPos, tgtPos);
+      }
     }
+  }
 
-    // 5. 自动编排声明的布局（Step 5）：若声明了 layoutPreset，生成完元素后立即应用，
-    //    使 setData 后即呈现正式布局（无需调用者手动 applyLayout）。
-    if (this.layoutPreset) {
-      this.applyLayoutPreset(this.layoutPreset, false);
-    }
+  /**
+   * 创建并添加一条边。
+   */
+  private createEdge(
+    edgeData: EdgeData,
+    srcPos: NodePos3D,
+    tgtPos: NodePos3D,
+  ): void {
+    const edgeType = edgeData.type ?? this.edgeType;
+    const edge = new Edge3D({
+      id: edgeData.id,
+      source: srcPos,
+      target: tgtPos,
+      type: edgeType,
+      pathRadius: this.edgePathRadius,
+      arrow: this.edgeArrow,
+      material: this.edgeMaterial,
+    });
+    this.edges.push(edge);
+    this.edgeById.set(edge.edgeId, edge);
+    this.add(edge);
   }
 
   /**
@@ -296,7 +391,7 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
     const auto = nodes.filter((n) => n.x === undefined && n.y === undefined && n.z === undefined);
     const n = auto.length;
     for (let i = 0; i < n; i++) {
-      const theta = (i / Math.max(n, 1)) * Math.PI * 2;
+      const theta = (i / Math.max(n, 1)) * TAU;
       positions.set(auto[i].id, {
         id: auto[i].id,
         x: Math.cos(theta) * this.initialRadius,
@@ -306,13 +401,16 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
     }
     // 有显式坐标的节点
     for (const node of nodes) {
-      if (positions.has(node.id)) continue;
-      positions.set(node.id, {
-        id: node.id,
-        x: node.x ?? 0,
-        y: node.y ?? 0,
-        z: node.z ?? 0,
-      });
+      if (positions.has(node.id)) {
+        // already placed in ring
+      } else {
+        positions.set(node.id, {
+          id: node.id,
+          x: node.x ?? 0,
+          y: node.y ?? 0,
+          z: node.z ?? 0,
+        });
+      }
     }
     return positions;
   }
@@ -349,7 +447,9 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
     config?: C,
     options?: LayoutApplyOptions,
   ): void {
-    if (!this.graphData || this.nodes.size === 0) return;
+    if (!this.graphData || this.nodes.size === 0) {
+      return;
+    }
     // 克隆 config 并自动注入当前图的边（调用者显式 edges 优先）。
     const explicitEdges = (
       config as { edges?: Array<{ source: NodeId; target: NodeId }> } | undefined
@@ -373,57 +473,118 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    * @param options - 过渡选项（见 {@link LayoutApplyOptions}）。
    */
   applyPositions(positions: NodePos3D[], options?: LayoutApplyOptions): void {
-    if (this.nodes.size === 0) return;
-    const target = new Map<NodeId, NodePos3D>();
-    for (const p of positions) target.set(p.id, p);
+    if (this.nodes.size === 0) {
+      return;
+    }
+    const target = this.buildPositionMap(positions);
 
     // 非动画：直接置位 + 全量同步边（含 path 重建）。
     if (!options?.animate) {
-      for (const node of this.nodes.values()) {
-        const t = target.get(node.nodeId);
-        if (t) node.setPosition(t);
-      }
-      this.syncEdges(true);
+      this.applyPositionsDirectly(target);
       options?.onComplete?.();
       return;
     }
 
-    // 动画：animate 纯 onUpdate 模式，逐帧 lerp 起止位 + 同步 line 边（path 边节流到完成帧）。
+    // 动画
+    this.applyPositionsWithAnimation(target, options);
+  }
+
+  /**
+   * 构建位置映射。
+   */
+  private buildPositionMap(positions: NodePos3D[]): Map<NodeId, NodePos3D> {
+    const target = new Map<NodeId, NodePos3D>();
+    for (const p of positions) {
+      target.set(p.id, p);
+    }
+    return target;
+  }
+
+  /**
+   * 非动画：直接置位节点 + 全量同步边。
+   */
+  private applyPositionsDirectly(target: Map<NodeId, NodePos3D>): void {
+    for (const node of this.nodes.values()) {
+      const t = target.get(node.nodeId);
+      if (t) {
+        node.setPosition(t);
+      }
+    }
+    this.syncEdges(true);
+  }
+
+  /**
+   * 动画：animate 纯 onUpdate 模式，逐帧 lerp 起止位 + 同步 line 边。
+   */
+  private applyPositionsWithAnimation(
+    target: Map<NodeId, NodePos3D>,
+    options: LayoutApplyOptions,
+  ): void {
     this.killLayoutTween();
+    const { startMap, targetMap } = this.buildAnimationMaps(target);
+    const scratch = new THREE.Vector3();
+    const duration = options?.duration ?? DEFAULT_ANIM_DURATION;
+    // 用一个临时 Object3D 作为 animate 目标（animate 需要 Object3D），
+    // 利用纯 onUpdate 模式：progress 从 0→1，不驱动任何实际属性。
+    const proxyObj = new THREE.Object3D();
+    proxyObj.name = '__layoutAnimProxy';
+    const controller = animate(proxyObj, {
+      duration,
+      ease: 'easeInOutQuad',
+      onUpdate: (progress: number) => {
+        this.lerpNodePositions(startMap, targetMap, scratch, progress);
+        this.syncEdges(false);
+      },
+      onComplete: () => {
+        this.syncEdges(true);
+        if (this.layoutAnim === controller) {
+          this.layoutAnim = null;
+        }
+        options?.onComplete?.();
+      },
+    });
+    this.layoutAnim = controller;
+    controller.play();
+  }
+
+  /**
+   * 构建动画用起止位置映射。
+   */
+  private buildAnimationMaps(target: Map<NodeId, NodePos3D>): {
+    startMap: Map<NodeId, THREE.Vector3>;
+    targetMap: Map<NodeId, THREE.Vector3>;
+  } {
     const startMap = new Map<NodeId, THREE.Vector3>();
     const targetMap = new Map<NodeId, THREE.Vector3>();
     for (const node of this.nodes.values()) {
       startMap.set(node.nodeId, node.position.clone());
       const t = target.get(node.nodeId);
-      if (t) targetMap.set(node.nodeId, new THREE.Vector3(t.x, t.y, t.z));
+      if (t) {
+        targetMap.set(node.nodeId, new THREE.Vector3(t.x, t.y, t.z));
+      }
     }
-    const scratch = new THREE.Vector3();
-    const duration = options?.duration ?? 0.6;
-    // 用一个临时 Object3D 作为 animate 目标（animate 需要 Object3D），
-    // 利用纯 onUpdate 模式：progress 从 0→1，不驱动任何实际属性。
-    const proxyObj = new THREE.Object3D();
-    proxyObj.name = '__layoutAnimProxy';
-    const anim = animate(proxyObj, {
-      duration,
-      ease: 'easeInOutQuad',
-      onUpdate: (progress: number) => {
-        for (const node of this.nodes.values()) {
-          const src = startMap.get(node.nodeId);
-          const tgt = targetMap.get(node.nodeId);
-          if (!src || !tgt) continue;
-          scratch.lerpVectors(src, tgt, progress);
-          node.setPosition(scratch);
-        }
-        this.syncEdges(false);
-      },
-      onComplete: () => {
-        this.syncEdges(true);
-        if (this.layoutAnim === anim) this.layoutAnim = null;
-        options?.onComplete?.();
-      },
-    });
-    this.layoutAnim = anim;
-    anim.play();
+    return { startMap, targetMap };
+  }
+
+  /**
+   * 逐帧 lerp 节点位置。
+   */
+  private lerpNodePositions(
+    startMap: Map<NodeId, THREE.Vector3>,
+    targetMap: Map<NodeId, THREE.Vector3>,
+    scratch: THREE.Vector3,
+    progress: number,
+  ): void {
+    for (const node of this.nodes.values()) {
+      const src = startMap.get(node.nodeId);
+      const tgt = targetMap.get(node.nodeId);
+      if (!src || !tgt) {
+        // skip nodes without animation data
+      } else {
+        scratch.lerpVectors(src, tgt, progress);
+        node.setPosition(scratch);
+      }
+    }
   }
 
   /**
@@ -474,22 +635,24 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    * 应用一个布局预设（内部）：解析预设 → `applyLayout`。
    *
    * @param preset - 声明式布局预设。
-   * @param animate - 是否启用过渡动画（`setData` 自动编排时不动画，瞬移到正式布局；
+   * @param useAnim - 是否启用过渡动画（`setData` 自动编排时不动画，瞬移到正式布局；
    * `setLayout` 主动切换时动画）。
    * @param options - 调用者显式过渡选项（覆盖默认）。
    */
   private applyLayoutPreset(
     preset: LayoutPreset,
-    animate: boolean,
+    useAnim: boolean,
     options?: LayoutApplyOptions,
   ): void {
     const resolved = resolveLayoutPreset(preset);
-    if (!resolved) return;
+    if (!resolved) {
+      return;
+    }
     const opts: LayoutApplyOptions = options ?? {
-      animate,
-      duration: animate ? 0.7 : 0,
+      animate: useAnim,
+      duration: useAnim ? DEFAULT_LAYOUT_SWITCH_DURATION : 0,
     };
-    this.applyLayout(resolved.layout as LayoutFn<BaseLayoutConfig>, resolved.config, opts);
+    this.applyLayout(resolved.layout, resolved.config, opts);
   }
 
   /**
@@ -563,8 +726,11 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
     this.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry?.dispose();
-        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-        else child.material?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material?.dispose();
+        }
       }
     });
     this.clear();
@@ -600,13 +766,30 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
    */
   private syncEdges(updatePath: boolean): void {
     for (const edge of this.edges) {
-      if (edge.type === 'path' && !updatePath) continue;
-      const s = this.nodes.get(edge.sourceId);
-      const t = this.nodes.get(edge.targetId);
-      if (!s || !t) continue;
+      if (edge.type === 'path' && !updatePath) {
+        // skip path edges during animation (throttled to final frame)
+      } else {
+        this.syncSingleEdge(edge);
+      }
+    }
+  }
+
+  /**
+   * 同步单条边端点。
+   */
+  private syncSingleEdge(edge: Edge3D): void {
+    const s = this.nodes.get(edge.sourceId);
+    const t = this.nodes.get(edge.targetId);
+    if (!s || !t) {
+      // skip edges with missing nodes
+    } else {
       edge.updateEnds(
-        { id: edge.sourceId, x: s.position.x, y: s.position.y, z: s.position.z },
-        { id: edge.targetId, x: t.position.x, y: t.position.y, z: t.position.z },
+        {
+          id: edge.sourceId, x: s.position.x, y: s.position.y, z: s.position.z,
+        },
+        {
+          id: edge.targetId, x: t.position.x, y: t.position.y, z: t.position.z,
+        },
       );
     }
   }

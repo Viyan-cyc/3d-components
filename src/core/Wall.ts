@@ -1,25 +1,34 @@
 
 import * as THREE from 'three';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
-import type { GroupComponentOptions, IDisposable } from '../types';
 import {
-  type Vec3Tuple,
-  type V2,
   type Corner,
   EPS,
-  dedupe,
-  radiusAtWithDefault,
+  type V2,
+  type Vec3Tuple,
   computeCorner,
-  filletPolyline,
-  signedArea,
+  dedupe,
   ensureCCW,
   ensureCW,
-  traceContour,
+  filletPolyline,
+  radiusAtWithDefault,
+  signedArea,
   toShape2D,
+  traceContour,
 } from '../utils/filletUtils';
+import type { GroupComponentOptions, IDisposable } from '../types';
 
 // Re-export Vec3Tuple for backward compatibility
 export type { Vec3Tuple };
+
+// ===================== constants =====================
+
+const MIN_HOLE_PATH_POINTS = 3;
+const MIN_CLOSED_PATH_POINTS = 3;
+const DEFAULT_RADIUS_SEGMENTS = 8;
+const HOLE_OVERSIZE = 1;
+
+// ===================== types =====================
 
 /**
  * 单个墙洞（窗户 / 门）的配置。
@@ -28,6 +37,7 @@ export type { Vec3Tuple };
  * 每个墙洞归属于某一段墙体（`segment`），并用该段的局部 2D 坐标描述轮廓。
  */
 export interface WallHole {
+
   /** 所属墙段的索引。段 `i` 对应路径 `path[i] → path[i+1]`。 */
   segment: number;
 
@@ -49,12 +59,16 @@ export interface WallHole {
 
 /** 单面墙的配置。 */
 export interface WallData {
+
   /** 墙体中心线路径，XZ 平面坐标 `[x, y, z]`（y 被忽略，墙体从 y=0 向上生长）。 */
   path: Vec3Tuple[];
+
   /** 墙体厚度（向路径两侧各加厚 `width / 2`）。 */
   width: number;
+
   /** 墙体高度（沿 Y 轴挤出）。 */
   height: number;
+
   /**
    * 拐角圆角半径。可为：
    *  - 统一数值：所有拐角使用同一半径（全局值）；
@@ -65,10 +79,13 @@ export interface WallData {
    * @default 0
    */
   radius?: number | (number | undefined)[];
+
   /** 圆角分段数（越大越圆滑）。 @default 8 */
   radiusSegments?: number;
+
   /** 墙体首尾是否闭合（闭合时形成环形墙体）。 @default false */
   close?: boolean;
+
   /**
    * 墙面贴图的 UV 映射方式（参考 {@link Path} 的 `uvMode`）。
    *
@@ -83,39 +100,46 @@ export interface WallData {
    * @default 'repeat'
    */
   uvMode?: 'repeat' | 'stretch';
+
   /** 墙洞（窗户 / 门）列表，按 `segment` 归属到对应墙段，贯通墙体厚度。 */
   hole?: WallHole[];
 }
 
 /** Options for constructing a {@link Wall}. */
 export interface WallOptions extends GroupComponentOptions {
+
   /** 一组墙体数据，每个元素绘制一面墙。 */
   walls: WallData[];
+
   /** 共享材质。所有墙体复用。不传则使用默认 `MeshStandardMaterial`（`dispose()` 时一并释放）。 */
   material?: THREE.Material;
 }
 
 // ===================== internal 2D helpers =====================
-// (dedupe, radiusAt, computeCorner, filletPolyline, signedArea, ensureCCW, ensureCW,
-//  traceContour, toShape2D are now imported from ./filletUtils)
 
 /** A straight run between (possibly rounded) corners. */
 interface Run {
-  start: V2; // world XZ
-  end: V2; // world XZ
+  // world XZ
+  start: V2;
+  // world XZ
+  end: V2;
   len: number;
 }
 
 /** Decompose a world-XZ path into straight runs (for hole placement). */
-function decomposePath(input: V2[], radius: number[], close: boolean): Run[] {
+const decomposePath = (input: V2[], radius: number[], close: boolean): Run[] => {
   const pts = dedupe(input);
   const n = pts.length;
-  if (n < 2) return [];
+  if (n < 2) {
+    return [];
+  }
   const nSeg = close ? n : n - 1;
   const cornerAt: (Corner | null)[] = new Array(n).fill(null);
   for (let i = 0; i < n; i++) {
-    const internal = close ? n >= 3 : i >= 1 && i <= n - 2;
-    if (!internal) continue;
+    const internal = close ? n >= MIN_CLOSED_PATH_POINTS : i >= 1 && i <= n - 2;
+    if (!internal) {
+      continue; // eslint-disable-line no-continue
+    }
     cornerAt[i] = computeCorner(pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n], radius[i] ?? 0);
   }
   const runs: Run[] = [];
@@ -129,7 +153,65 @@ function decomposePath(input: V2[], radius: number[], close: boolean): Run[] {
     runs.push({ start, end, len: start.distanceTo(end) });
   }
   return runs;
+};
+
+// ===================== UV recalculation helpers =====================
+
+/** Compute segment lengths and cumulative arc lengths for wall samples. */
+const computeWallArcLengths = (samples: V2[], closed: boolean) => {
+  const m = samples.length;
+  const segLen = new Float64Array(m);
+  for (let i = 0; i < m - 1; i++) {
+    segLen[i] = samples[i].distanceTo(samples[i + 1]);
+  }
+  if (closed) {
+    segLen[m - 1] = samples[m - 1].distanceTo(samples[0]);
+  }
+  const cum = new Float64Array(m);
+  for (let i = 1; i < m; i++) {
+    cum[i] = cum[i - 1] + segLen[i - 1];
+  }
+  const totalLen = closed ? cum[m - 1] + segLen[m - 1] : cum[m - 1];
+  return { segLen, cum, totalLen };
+};
+
+/** Arc length data for projection. */
+interface ArcLengthData {
+  segLen: Float64Array;
+  cum: Float64Array;
 }
+
+/** Project a point onto the closest wall segment and return its arc length. */
+const projectToWallArc = (
+  qx: number, qy: number,
+  samples: V2[], segCount: number,
+  arcData: ArcLengthData,
+): number => {
+  const m = samples.length;
+  let bestDist = Infinity;
+  let bestArc = 0;
+  for (let s = 0; s < segCount; s++) {
+    const a = samples[s];
+    const b = samples[(s + 1) % m];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 > EPS ? ((qx - a.x) * dx + (qy - a.y) * dy) / len2 : 0;
+    if (t < 0) {
+      t = 0;
+    } else if (t > 1) {
+      t = 1;
+    }
+    const px = a.x + dx * t;
+    const py = a.y + dy * t;
+    const dd = (px - qx) * (px - qx) + (py - qy) * (py - qy);
+    if (dd < bestDist) {
+      bestDist = dd;
+      bestArc = arcData.cum[s] + t * arcData.segLen[s];
+    }
+  }
+  return bestArc;
+};
 
 /**
  * 重算墙体 UV，让纹理沿墙长（u = 圆角中心线弧长）向上铺贴（v = 世界高度），
@@ -144,79 +226,48 @@ function decomposePath(input: V2[], radius: number[], close: boolean): Run[] {
  * three-bvh-csg 的 Evaluator 默认会插值 `uv` 属性，因此 CSG 挖出的墙洞会继承这些 UV，
  * 贴图在开口周围连续过渡。
  */
-function applyWallUV(
+const applyWallUV = (
   geo: THREE.BufferGeometry,
   samples: V2[],
   height: number,
   uvMode: 'repeat' | 'stretch',
   closed: boolean,
-): void {
+): void => {
   const posAttr = geo.getAttribute('position');
   const uvAttr = geo.getAttribute('uv');
-  if (!posAttr || !uvAttr) return;
+  if (!posAttr || !uvAttr) {
+    return;
+  }
 
   const m = samples.length;
-  if (m < 2) return;
+  if (m < 2) {
+    return;
+  }
 
-  // 各段长度 + 累积弧长（闭合时含末段→首段的回环段）。
-  const segLen = new Float64Array(m);
-  for (let i = 0; i < m - 1; i++) segLen[i] = samples[i].distanceTo(samples[i + 1]);
-  if (closed) segLen[m - 1] = samples[m - 1].distanceTo(samples[0]);
-  const cum = new Float64Array(m);
-  for (let i = 1; i < m; i++) cum[i] = cum[i - 1] + segLen[i - 1];
-  const totalLen = closed ? cum[m - 1] + segLen[m - 1] : cum[m - 1];
-
-  const uScale = uvMode === 'stretch' ? totalLen || 1 : 1; // repeat → 原始米数
+  const { segLen, cum, totalLen } = computeWallArcLengths(samples, closed);
+  // repeat → 原始米数
+  const uScale = uvMode === 'stretch' ? totalLen || 1 : 1;
   const vScale = uvMode === 'stretch' ? height || 1 : 1;
-
   const segCount = closed ? m : m - 1;
   const count = posAttr.count;
+
   for (let i = 0; i < count; i++) {
     // 世界顶点 (x, y, z) → 中心线 shape space (x, -z)。
     const qx = posAttr.getX(i);
     const qy = -posAttr.getZ(i);
-
-    // 投影到最近的中心线段 → 弧长参数。
-    let bestDist = Infinity;
-    let bestArc = 0;
-    for (let s = 0; s < segCount; s++) {
-      const a = samples[s];
-      const b = samples[(s + 1) % m];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const len2 = dx * dx + dy * dy;
-      let t = len2 > EPS ? ((qx - a.x) * dx + (qy - a.y) * dy) / len2 : 0;
-      if (t < 0) t = 0;
-      else if (t > 1) t = 1;
-      const px = a.x + dx * t;
-      const py = a.y + dy * t;
-      const dd = (px - qx) * (px - qx) + (py - qy) * (py - qy);
-      if (dd < bestDist) {
-        bestDist = dd;
-        bestArc = cum[s] + t * segLen[s];
-      }
-    }
-
+    const bestArc = projectToWallArc(qx, qy, samples, segCount, { segLen, cum });
     const u = bestArc / uScale;
     const vWorld = posAttr.getY(i);
     const v = uvMode === 'stretch' ? vWorld / vScale : vWorld;
     uvAttr.setXY(i, u, v);
   }
   uvAttr.needsUpdate = true;
-}
+};
 
-/**
- * Build the wall BODY as a single water-tight extruded footprint: the rounded thick-stroke
- * outline of the centerline (closed ⇒ outer rail + inner rail hole; open ⇒ single outline),
- * extruded upward by `height`. Smooth rounded corners, crisp edges, no seams.
- */
-function buildBodyGeometry(data: WallData, radius: number | number[], radiusSegments: number, close: boolean): THREE.BufferGeometry | null {
-  const halfWidth = data.width / 2;
-  const centerline = data.path.map(toShape2D);
-  const samples = filletPolyline(centerline, radius, radiusSegments, close);
-  if (samples.length < 2) return null;
+// ===================== geometry builder helpers =====================
 
-  // Offset rails (±halfWidth) along each sample's normal.
+/** Compute offset rails (left/right) along sample normals. */
+const computeOffsetRails = (samples: V2[], halfWidth: number, close: boolean) => {
   const m = samples.length;
   const left: V2[] = [];
   const right: V2[] = [];
@@ -240,53 +291,94 @@ function buildBodyGeometry(data: WallData, radius: number | number[], radiusSegm
     left.push(new THREE.Vector2(samples[i].x + nx * halfWidth, samples[i].y + ny * halfWidth));
     right.push(new THREE.Vector2(samples[i].x - nx * halfWidth, samples[i].y - ny * halfWidth));
   }
+  return { left, right };
+};
 
+/** Build closed annulus shape (outer contour + inner hole). */
+const buildAnnulusShape = (left: V2[], right: V2[], shape: THREE.Shape): void => {
+  const outer = Math.abs(signedArea(left)) >= Math.abs(signedArea(right))
+    ? left : right;
+  const inner = outer === left ? right : left;
+  ensureCCW(outer);
+  ensureCW(inner);
+  traceContour(shape, outer);
+  if (inner.length >= MIN_CLOSED_PATH_POINTS) {
+    const ip = new THREE.Path();
+    traceContour(ip, inner);
+    shape.holes.push(ip);
+  }
+};
+
+/** Build open outline shape (left + reversed right). */
+const buildOutlineShape = (left: V2[], right: V2[], shape: THREE.Shape): void => {
+  const outline: V2[] = [...left, ...right.reverse()];
+  ensureCCW(outline);
+  traceContour(shape, outline);
+};
+
+/**
+ * Build the wall BODY as a single water-tight extruded footprint: the rounded thick-stroke
+ * outline of the centerline (closed => outer rail + inner rail hole; open => single outline),
+ * extruded upward by `height`. Smooth rounded corners, crisp edges, no seams.
+ */
+const buildBodyGeometry = (
+  data: WallData,
+  radius: number | number[],
+  radiusSegments: number,
+  close: boolean,
+): THREE.BufferGeometry | null => {
+  const halfWidth = data.width / 2;
+  const centerline = data.path.map(toShape2D);
+  const samples = filletPolyline(centerline, radius, radiusSegments, close);
+  if (samples.length < 2) {
+    return null;
+  }
+
+  const { left, right } = computeOffsetRails(samples, halfWidth, close);
+  const m = samples.length;
   const shape = new THREE.Shape();
-  if (close && m >= 3) {
-    // Annulus footprint: bigger rail = outer contour, smaller = inner hole.
-    const outer = Math.abs(signedArea(left)) >= Math.abs(signedArea(right)) ? left : right;
-    const inner = outer === left ? right : left;
-    ensureCCW(outer);
-    ensureCW(inner);
-    traceContour(shape, outer);
-    if (inner.length >= 3) {
-      const ip = new THREE.Path();
-      traceContour(ip, inner);
-      shape.holes.push(ip);
-    }
+  if (close && m >= MIN_CLOSED_PATH_POINTS) {
+    buildAnnulusShape(left, right, shape);
   } else {
-    const outline: V2[] = [...left, ...right.reverse()];
-    ensureCCW(outline);
-    traceContour(shape, outline);
+    buildOutlineShape(left, right, shape);
   }
 
   const geo = new THREE.ExtrudeGeometry(shape, { depth: data.height, bevelEnabled: false, steps: 1 });
-  geo.rotateX(-Math.PI / 2); // shape space (x, -z, height) → world (x, height, z)
+  // shape space (x, -z, height) → world (x, height, z)
+  geo.rotateX(-Math.PI / 2);
   // 用沿墙长 / 墙高的 UV 覆盖 ExtrudeGeometry 默认的俯视轮廓 UV（墙洞经 CSG 插值继承）。
   applyWallUV(geo, samples, data.height, data.uvMode ?? 'repeat', close);
   return geo;
-}
+};
 
 /**
  * Build one hole as a water-tight extruded prism in WORLD space, positioned/oriented on its
  * segment's face and oversized across so it cuts clean through the wall thickness.
  */
-function buildHoleGeometry(h: WallHole, runs: Run[], width: number): THREE.BufferGeometry | null {
-  if (h.segment < 0 || h.segment >= runs.length) return null;
-  if (!Array.isArray(h.path) || h.path.length < 3) return null;
+const buildHoleGeometry = (h: WallHole, runs: Run[], width: number): THREE.BufferGeometry | null => {
+  if (h.segment < 0 || h.segment >= runs.length) {
+    return null;
+  }
+  if (!Array.isArray(h.path) || h.path.length < MIN_HOLE_PATH_POINTS) {
+    return null;
+  }
   const run = runs[h.segment];
-  if (run.len <= EPS) return null;
+  if (run.len <= EPS) {
+    return null;
+  }
 
-  const seg = h.radiusSegments ?? 8;
+  const seg = h.radiusSegments ?? DEFAULT_RADIUS_SEGMENTS;
   const raw = h.path.map((p) => new THREE.Vector2(p[0], p[1]));
   const rounded = filletPolyline(raw, h.radius ?? 0, seg, true);
-  if (rounded.length < 3) return null;
+  if (rounded.length < MIN_HOLE_PATH_POINTS) {
+    return null;
+  }
 
   const shape = new THREE.Shape();
   traceContour(shape, rounded);
 
   // Oversized across so the prism pokes through both wall surfaces → clean boolean cut.
-  const acrossDepth = width + 1;
+  const acrossDepth = width + HOLE_OVERSIZE;
   const geo = new THREE.ExtrudeGeometry(shape, { depth: acrossDepth, bevelEnabled: false, steps: 1 });
 
   // Orient: shape.x → along run, shape.y → up, shape.z → across; origin at run.start, centered across.
@@ -299,19 +391,23 @@ function buildHoleGeometry(h: WallHole, runs: Run[], width: number): THREE.Buffe
     new THREE.Vector3(0, 1, 0),
     new THREE.Vector3(ax, 0, ay),
   );
-  mat.setPosition(new THREE.Vector3(run.start.x - (ax * acrossDepth) / 2, 0, run.start.y - (ay * acrossDepth) / 2));
+  const posX = run.start.x - (ax * acrossDepth) / 2;
+  const posZ = run.start.y - (ay * acrossDepth) / 2;
+  mat.setPosition(new THREE.Vector3(posX, 0, posZ));
   geo.applyMatrix4(mat);
   return geo;
-}
+};
 
 /** Build one wall's final geometry: body minus all holes (CSG). */
-function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGeometry | null {
-  if (!Array.isArray(data.path) || data.path.length < 2 || data.width <= 0 || data.height <= 0) return null;
-  const close = data.close === true && data.path.length >= 3;
-  const radiusSegments = data.radiusSegments ?? 8;
+const buildWallGeometry = (data: WallData, evaluator: Evaluator): THREE.BufferGeometry | null => {
+  if (!Array.isArray(data.path) || data.path.length < 2 || data.width <= 0 || data.height <= 0) {
+    return null;
+  }
+  const close = data.close === true && data.path.length >= MIN_CLOSED_PATH_POINTS;
+  const radiusSegments = data.radiusSegments ?? DEFAULT_RADIUS_SEGMENTS;
   // Resolve per-vertex radii with global fallback:
   // scalar → all corners use the same radius; array → per-vertex, undefined → global value.
-  // Then snap any radius ≤ halfWidth to 0 (sharp): a smaller radius makes the inner offset
+  // Then snap any radius <= halfWidth to 0 (sharp): a smaller radius makes the inner offset
   // rail self-intersect (negative inner radius) and corrupts the top-face triangulation,
   // and it can't be rounded on the inside anyway.
   const halfWidth = data.width / 2;
@@ -323,10 +419,14 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
   });
 
   const body = buildBodyGeometry(data, radii, radiusSegments, close);
-  if (!body) return null;
+  if (!body) {
+    return null;
+  }
 
   const holes = Array.isArray(data.hole) ? data.hole : [];
-  if (holes.length === 0) return body;
+  if (holes.length === 0) {
+    return body;
+  }
 
   // Straight runs (world XZ) for hole placement.
   const runs = decomposePath(
@@ -339,13 +439,15 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
   current.updateMatrixWorld();
   for (const h of holes) {
     const hg = buildHoleGeometry(h, runs, data.width);
-    if (!hg) continue;
+    if (!hg) {
+      continue; // eslint-disable-line no-continue
+    }
     const hb = new Brush(hg);
     hb.updateMatrixWorld();
     current = evaluator.evaluate(current, hb, SUBTRACTION);
   }
   return current.geometry;
-}
+};
 
 // ===================== Wall component =====================
 
@@ -359,10 +461,11 @@ function buildWallGeometry(data: WallData, evaluator: Evaluator): THREE.BufferGe
  * **特性:**
  * - 继承 `THREE.Group`，可直接加入任意 Three.js 场景
  * - 墙体路径定义在 XZ 平面（y 被忽略），从 `y = 0` 向上生长至 `y = height`
- * - 每个拐角按 `radius` 倒圆角；数组形式可逐顶点指定，`undefined` 回退到全局值；`close = true` 时形成环形墙体
+ * - 每个拐角按 `radius` 倒圆角；数组形式可逐顶点指定，`undefined` 回退到全局值；
+ *   `close = true` 时形成环形墙体
  * - 支持每段独立的墙洞（{@link WallHole}，窗 / 门），按段局部坐标描述并贯通墙体厚度
- * - UV 沿墙长（u）/ 墙高（v）重算，支持 `uvMode: 'repeat' | 'stretch'`，便于整面贴图（砖墙 / 窗户）；
- *   墙洞经 CSG 挖出后贴图在开口周围连续过渡
+ * - UV 沿墙长（u）/ 墙高（v）重算，支持 `uvMode: 'repeat' | 'stretch'`，
+ *   便于整面贴图（砖墙 / 窗户）；墙洞经 CSG 挖出后贴图在开口周围连续过渡
  * - 所有墙体共享同一材质；未传入材质时使用默认 `MeshStandardMaterial`
  * - 实现 {@link IDisposable} —— `dispose()` 释放全部几何体（自建材质一并释放）
  *
@@ -400,9 +503,15 @@ export class Wall extends THREE.Group implements IDisposable {
   constructor(options: WallOptions) {
     super();
 
-    if (options.name) this.name = options.name;
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
+    if (options.name) {
+      this.name = options.name;
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
 
     this.ownsMaterial = !options.material;
     this.material =
@@ -420,7 +529,9 @@ export class Wall extends THREE.Group implements IDisposable {
     const walls = Array.isArray(options.walls) ? options.walls : [];
     for (const data of walls) {
       const geometry = buildWallGeometry(data, this.evaluator);
-      if (!geometry) continue;
+      if (!geometry) {
+        continue; // eslint-disable-line no-continue
+      }
       const mesh = new THREE.Mesh(geometry, this.material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -428,7 +539,9 @@ export class Wall extends THREE.Group implements IDisposable {
     }
 
     if (options.children) {
-      for (const child of options.children) this.add(child);
+      for (const child of options.children) {
+        this.add(child);
+      }
     }
   }
 
@@ -436,7 +549,9 @@ export class Wall extends THREE.Group implements IDisposable {
   dispose(): void {
     this.traverse((child) => {
       const mesh = child as THREE.Mesh;
-      if (mesh.isMesh) mesh.geometry?.dispose();
+      if (mesh.isMesh) {
+        mesh.geometry?.dispose();
+      }
     });
     this.clear();
     if (this.ownsMaterial) {

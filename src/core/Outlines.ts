@@ -1,19 +1,25 @@
+
 import * as THREE from 'three';
-import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GroupComponentOptions, IDisposable } from '../types';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * Outlines 的配置选项。
  */
 export interface OutlinesOptions extends GroupComponentOptions {
+
   /** 要描边的父级网格。支持普通 `Mesh`、`SkinnedMesh`、`InstancedMesh`。 */
   mesh: THREE.Mesh | THREE.SkinnedMesh | THREE.InstancedMesh;
+
   /** 描边颜色。 @default 'black' */
   color?: THREE.ColorRepresentation;
+
   /** 描边不透明度。 @default 1 */
   opacity?: number;
+
   /** 描边是否透明。 @default false */
   transparent?: boolean;
+
   /**
    * 线宽是否与缩放无关（屏幕空间恒定）。
    * - `true`：厚度按世界单位沿法线偏移，与摄像机距离无关；
@@ -21,8 +27,10 @@ export interface OutlinesOptions extends GroupComponentOptions {
    * @default false
    */
   screenspace?: boolean;
+
   /** 描边线宽。 @default 0.05 */
   thickness?: number;
+
   /**
    * 几何折痕角度（弧度）。
    * - `0` = 不分裂、直接复用父级法线；
@@ -30,14 +38,19 @@ export interface OutlinesOptions extends GroupComponentOptions {
    * @default Math.PI
    */
   angle?: number;
+
   /** 渲染顺序。 @default 0 */
   renderOrder?: number;
+
   /** 是否启用多边形偏移（避免与父级表面 Z-fighting）。 @default false */
   polygonOffset?: boolean;
+
   /** 多边形偏移因子。 @default 0 */
   polygonOffsetFactor?: number;
+
   /** 是否参与色调映射。 @default true */
   toneMapped?: boolean;
+
   /** 裁剪平面列表。 */
   clippingPlanes?: THREE.Plane[];
 }
@@ -109,20 +122,21 @@ const fragmentShader = /* glsl */ `
 /**
  * 创建描边材质（背面渲染、自定义着色器）。
  */
-function createOutlinesMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
+const DEFAULT_THICKNESS = 0.05;
+
+const createOutlinesMaterial = (): THREE.ShaderMaterial =>
+  new THREE.ShaderMaterial({
     side: THREE.BackSide,
     uniforms: {
       color: { value: new THREE.Color('black') },
       opacity: { value: 1 },
-      thickness: { value: 0.05 },
+      thickness: { value: DEFAULT_THICKNESS },
       screenspace: { value: false },
       size: { value: new THREE.Vector2(1, 1) },
     },
     vertexShader,
     fragmentShader,
   });
-}
 
 /**
  * Outlines — 描边组件。
@@ -156,14 +170,19 @@ function createOutlinesMaterial(): THREE.ShaderMaterial {
 export class Outlines extends THREE.Group implements IDisposable {
   /** 父级网格（描边的来源）。 */
   private readonly mesh: NonNullable<OutlinesOptions['mesh']>;
+
   /** 描边着色器材质（由本组件持有并释放）。 */
   private readonly material: THREE.ShaderMaterial;
+
   /** 由本组件生成、需要释放的描边几何体（angle > 0 时为分裂法线后的副本）。 */
   private outlineGeometry: THREE.BufferGeometry | null = null;
+
   /** 上一轮使用的折痕角度，用于判断是否需要重建几何体。 */
   private currentAngle = 0;
+
   /** 用于读取绘图缓冲尺寸（screenspace 偏移归一化）。 */
   private renderer: THREE.WebGLRenderer | null = null;
+
   /** 绑定的 resize 监听（卸载时移除）。 */
   private resizeHandler: (() => void) | null = null;
 
@@ -173,9 +192,15 @@ export class Outlines extends THREE.Group implements IDisposable {
   constructor(options: OutlinesOptions) {
     super();
 
-    if (options.name) this.name = options.name;
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
+    if (options.name) {
+      this.name = options.name;
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
 
     this.mesh = options.mesh;
     this.material = createOutlinesMaterial();
@@ -188,7 +213,9 @@ export class Outlines extends THREE.Group implements IDisposable {
     this.applyOptions(options);
 
     if (options.children) {
-      for (const child of options.children) this.add(child);
+      for (const child of options.children) {
+        this.add(child);
+      }
     }
   }
 
@@ -203,12 +230,16 @@ export class Outlines extends THREE.Group implements IDisposable {
   private rebuild(angle: number): void {
     const parent = this.mesh;
     const geometry = parent.geometry;
-    if (!geometry) return;
+    if (!geometry) {
+      return;
+    }
 
     // 释放旧的描边网格与（自建的）几何体。
     const old = this.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh | undefined;
     if (old) {
-      if (this.outlineGeometry) this.outlineGeometry.dispose();
+      if (this.outlineGeometry) {
+        this.outlineGeometry.dispose();
+      }
       this.remove(old);
     }
 
@@ -242,7 +273,9 @@ export class Outlines extends THREE.Group implements IDisposable {
    */
   private applyOptions(options: OutlinesOptions): void {
     const mesh = this.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh | undefined;
-    if (!mesh) return;
+    if (!mesh) {
+      return;
+    }
 
     mesh.renderOrder = options.renderOrder ?? 0;
 
@@ -250,7 +283,7 @@ export class Outlines extends THREE.Group implements IDisposable {
     const color = new THREE.Color(options.color ?? 'black');
     u.color.value.copy(color);
     u.opacity.value = options.opacity ?? 1;
-    u.thickness.value = options.thickness ?? 0.05;
+    u.thickness.value = options.thickness ?? DEFAULT_THICKNESS;
     u.screenspace.value = options.screenspace ?? false;
 
     this.material.transparent = options.transparent ?? false;
@@ -259,7 +292,7 @@ export class Outlines extends THREE.Group implements IDisposable {
     this.material.polygonOffsetFactor = options.polygonOffsetFactor ?? 0;
     const planes = options.clippingPlanes;
     this.material.clippingPlanes = planes ? planes.slice() : null;
-    this.material.clipping = !!(planes && planes.length > 0);
+    this.material.clipping = Boolean(planes && planes.length > 0);
   }
 
   /**
@@ -272,7 +305,9 @@ export class Outlines extends THREE.Group implements IDisposable {
   attachRenderer(renderer: THREE.WebGLRenderer): void {
     this.renderer = renderer;
     const update = (): void => {
-      if (!this.renderer) return;
+      if (!this.renderer) {
+        return;
+      }
       this.material.uniforms.size.value.copy(this.renderer.getDrawingBufferSize(new THREE.Vector2()));
     };
     update();
@@ -293,7 +328,9 @@ export class Outlines extends THREE.Group implements IDisposable {
    * @param angle - 新的折痕角度（弧度）。`0` = 不分裂法线。
    */
   setAngle(angle: number): void {
-    if (this.currentAngle === angle) return;
+    if (this.currentAngle === angle) {
+      return;
+    }
     this.rebuild(angle);
   }
 
@@ -315,7 +352,9 @@ export class Outlines extends THREE.Group implements IDisposable {
     }
     this.material.dispose();
     const ro = this.userData.__outlinesRO as ResizeObserver | undefined;
-    if (ro) ro.disconnect();
+    if (ro) {
+      ro.disconnect();
+    }
     this.clear();
   }
 }

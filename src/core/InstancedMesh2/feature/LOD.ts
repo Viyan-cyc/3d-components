@@ -1,270 +1,491 @@
-// @ts-nocheck
 /**
  * @internal LOD (Level of Detail) feature module.
  */
 
-import { BufferGeometry, Material, ShaderMaterial } from 'three';
+import {
+  type BufferGeometry,
+  type Material,
+  type Object3DEventMap,
+  ShaderMaterial,
+} from 'three';
 import type { InstancedMesh2, InstancedMesh2Params } from '../InstancedMesh2';
 
 /**
  * LOD information for an InstancedMesh2.
  */
-export interface LODInfo<TData = {}> {
-    render: LODRenderList<TData>;
-    shadowRender: LODRenderList<TData>;
-    objects: InstancedMesh2<TData>[];
+export interface LODInfo<TData = Record<string, never>> {
+  render: LODRenderList<TData> | null;
+  shadowRender: LODRenderList<TData> | null;
+  objects: InstancedMesh2<TData>[];
 }
 
 /**
  * A list of render levels for LOD.
  */
-export interface LODRenderList<TData = {}> {
-    levels: LODLevel<TData>[];
-    count: number[];
+export interface LODRenderList<TData = Record<string, never>> {
+  levels: LODLevel<TData>[];
+  count: number[];
 }
 
 /**
  * A single LOD level.
  */
-export interface LODLevel<TData = {}> {
-    distance: number;
-    hysteresis: number;
-    object: InstancedMesh2<TData>;
+export interface LODLevel<TData = Record<string, never>> {
+  distance: number;
+  hysteresis: number;
+  object: InstancedMesh2<TData>;
 }
 
-export function setFirstLODDistance(this: InstancedMesh2, distance: number): InstancedMesh2 {
-    if (this._parentLOD) {
-        throw new Error('Cannot create LOD for this InstancedMesh2.');
+const disposeLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(object: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>): void {
+  object.geometry.dispose();
+  const mat = object.material;
+  if (Array.isArray(mat)) {
+    for (const m of mat) {
+      m.dispose();
     }
+  } else {
+    mat.dispose();
+  }
+};
 
-    if (!this.LODinfo) {
-        this.LODinfo = { render: null, shadowRender: null, objects: [this] };
-    }
+const patchProperty = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  obj: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  propertyName: keyof InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+): void {
+  Object.defineProperty(obj, propertyName, {
+    get(this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>) {
+      return this._parentLOD![propertyName];
+    },
+  });
+};
 
-    if (!this.LODinfo.render) {
-        this.LODinfo.render = {
-            levels: [{ distance, hysteresis: 0, object: this }],
-            count: [0]
-        };
-    }
+const patchLevel = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  obj: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+): void {
+  const props: (keyof InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>)[] = [
+    'renderOrder', '_lastRenderInfo', 'matricesTexture',
+    'colorsTexture', 'uniformsTexture', 'morphTexture',
+    'boneTexture', 'skeleton', 'bindMatrixInverse', 'bindMatrix',
+  ];
+  for (const prop of props) {
+    patchProperty(obj, prop);
+  }
+};
 
-    return this;
+interface AddLevelOptions<TData = Record<string, never>> {
+  renderList: LODRenderList<TData>;
+  geometry: BufferGeometry;
+  material: Material | Material[] | null;
+  distance: number;
+  hysteresis: number;
 }
 
-export function addLOD(this: InstancedMesh2, geometry: BufferGeometry, material: Material | Material[], distance = 0, hysteresis = 0): InstancedMesh2 {
-    if (this._parentLOD) {
-        throw new Error('Cannot create LOD for this InstancedMesh2.');
+const addLevel = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  options: AddLevelOptions<TData>,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  const {
+    renderList, geometry, material, distance, hysteresis,
+  } = options;
+  const objectsList = this.LODinfo!.objects;
+  const levels = renderList.levels;
+  let index: number;
+  let object: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+  const squaredDistance = distance ** 2;
+
+  const objIndex = objectsList.findIndex((e) => e.geometry === geometry);
+  if (objIndex === -1) {
+    const params: InstancedMesh2Params = { capacity: this._capacity, renderer: this._renderer ?? undefined };
+    const ctor = this.constructor as new (
+      geometry: BufferGeometry,
+      material: Material | Material[],
+      params: InstancedMesh2Params,
+      lod?: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+    ) => InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+    // eslint-disable-next-line new-cap
+    object = new ctor(geometry, material ?? new ShaderMaterial(), params, this);
+    object.frustumCulled = false;
+    patchLevel.call(this, object);
+    objectsList.push(object);
+    this.add(object);
+  } else {
+    object = objectsList[objIndex] as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+    if (material) {
+      object.material = material as TMaterial;
     }
+  }
 
-    if (!this.LODinfo?.render && distance === 0) {
-        throw new Error('Cannot set distance to 0 for the first LOD. Call "setFirstLODDistance" before "addLOD".');
+  for (index = 0; index < levels.length; index++) {
+    if (squaredDistance < levels[index].distance) {
+      break;
     }
+  }
 
-    setFirstLODDistance.call(this, 0);
+  levels.splice(index, 0, { distance: squaredDistance, hysteresis, object });
+  renderList.count.push(0);
 
-    addLevel.call(this, this.LODinfo.render, geometry, material, distance, hysteresis);
+  return object;
+};
 
-    return this;
-}
+export const setFirstLODDistance = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  distance: number,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  if (this._parentLOD) {
+    throw new Error('Cannot create LOD for this InstancedMesh2.');
+  }
 
-export function addShadowLOD(this: InstancedMesh2, geometry: BufferGeometry, distance = 0, hysteresis = 0): InstancedMesh2 {
-    if (this._parentLOD) {
-        throw new Error('Cannot create LOD for this InstancedMesh2.');
+  if (!this.LODinfo) {
+    this.LODinfo = { render: null, shadowRender: null, objects: [this] };
+  }
+
+  if (!this.LODinfo.render) {
+    this.LODinfo.render = {
+      levels: [{ distance, hysteresis: 0, object: this }],
+      count: [0],
+    };
+  }
+
+  return this;
+};
+
+export const addLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  geometry: BufferGeometry,
+  material: Material | Material[],
+  distance = 0,
+  hysteresis = 0,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  if (this._parentLOD) {
+    throw new Error('Cannot create LOD for this InstancedMesh2.');
+  }
+
+  if (!this.LODinfo?.render && distance === 0) {
+    throw new Error('Cannot set distance to 0 for the first LOD.'
+      + ' Call "setFirstLODDistance" before "addLOD".');
+  }
+
+  setFirstLODDistance.call(this, 0);
+  addLevel.call(this, {
+    renderList: this.LODinfo!.render!, geometry, material, distance, hysteresis,
+  });
+
+  return this;
+};
+
+export const addShadowLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  geometry: BufferGeometry,
+  distance = 0,
+  hysteresis = 0,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  if (this._parentLOD) {
+    throw new Error('Cannot create LOD for this InstancedMesh2.');
+  }
+
+  if (!this.LODinfo) {
+    this.LODinfo = { render: null, shadowRender: null, objects: [this] };
+  }
+
+  if (!this.LODinfo.shadowRender) {
+    this.LODinfo.shadowRender = { levels: [], count: [] };
+  }
+
+  const object = addLevel.call(this, {
+    renderList: this.LODinfo.shadowRender, geometry, material: null, distance, hysteresis,
+  });
+  object.castShadow = true;
+  this.castShadow = true;
+
+  return this;
+};
+
+const updateLevel = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  renderList: LODRenderList<TData> | null,
+  levelIndex: number,
+  distance: number | null | undefined,
+  hysteresis: number | null | undefined,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  if (!renderList) {
+    throw new Error('Render list is invalid.');
+  }
+
+  const level = renderList.levels[levelIndex];
+  if (!level) {
+    throw new Error('Cannot update an empty LOD.');
+  }
+
+  if (distance !== null && distance !== undefined && !Number.isNaN(distance)) {
+    level.distance = distance ** 2;
+  }
+  if (hysteresis !== null && hysteresis !== undefined && !Number.isNaN(hysteresis)) {
+    level.hysteresis = hysteresis;
+  }
+
+  return this;
+};
+
+export const updateLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  levelIndex: number,
+  distance?: number,
+  hysteresis?: number,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  const list = this?.LODinfo?.render;
+  if (levelIndex === 0) {
+    throw new Error('Cannot change distance for LOD0.');
+  }
+  return updateLevel.call(
+    this,
+    list as LODRenderList<TData> | null,
+    levelIndex, distance, hysteresis,
+  ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+};
+
+export const updateShadowLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  levelIndex: number,
+  distance?: number,
+  hysteresis?: number,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  return updateLevel.call(
+    this,
+    this.LODinfo?.shadowRender as LODRenderList<TData> | null,
+    levelIndex, distance, hysteresis,
+  ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+};
+
+const validateDistances = function (distances: number[]): void {
+  for (let i = 1; i < distances.length; i++) {
+    if (distances[i] <= distances[i - 1]) {
+      throw new Error('LOD distances must be strictly increasing:'
+        + ` d[${i - 1}]=${distances[i - 1]} < d[${i}]=${distances[i]}`);
     }
+  }
+};
 
-    if (!this.LODinfo) {
-        this.LODinfo = { render: null, shadowRender: null, objects: [this] };
+const buildDistances = function <TData>(
+  isRender: boolean,
+  levels: LODLevel<TData>[],
+  start: number,
+  distances: number[] | undefined,
+): number[] {
+  if (!distances?.length) {
+    return [];
+  }
+
+  let result: number[];
+  if (isRender && distances[0] === 0) {
+    result = distances.slice(1, Math.min(levels.length, distances.length));
+  } else {
+    result = distances.slice(0, Math.min(levels.length - start, distances.length));
+  }
+
+  validateDistances(result);
+  return result;
+};
+
+const updateAllLevels = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  renderList: LODRenderList<TData> | null,
+  distances: number[] | undefined,
+  hysteresis?: number | number[],
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  if (!renderList?.levels) {
+    throw new Error('Invalid LOD list.');
+  }
+  const levels = renderList.levels;
+  const isRender = this.LODinfo?.render === renderList;
+
+  const start = isRender ? 1 : 0;
+  if (isRender) {
+    levels[0].distance = 0;
+  }
+
+  const hasDistances = distances !== undefined && distances.length > 0;
+  const resolvedDistances = buildDistances(isRender, levels, start, distances);
+
+  const total = hasDistances
+    ? resolvedDistances.length
+    : (levels.length - start);
+
+  for (let i = 0; i < total; i++) {
+    const distance = hasDistances ? resolvedDistances[i] : undefined;
+    const hyst = Array.isArray(hysteresis) ? hysteresis[i] : hysteresis;
+    updateLevel.call(this, renderList, start + i, distance, hyst);
+  }
+
+  return this;
+};
+
+export const updateAllLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  distances?: number[],
+  hysteresis?: number | number[],
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  return updateAllLevels.call(
+    this,
+    this.LODinfo?.render as LODRenderList<TData> | null,
+    distances, hysteresis,
+  ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+};
+
+export const updateAllShadowLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  distances?: number[],
+  hysteresis?: number | number[],
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  return updateAllLevels.call(
+    this,
+    this.LODinfo?.shadowRender as LODRenderList<TData> | null,
+    distances, hysteresis,
+  ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
+};
+
+const removeShadowLevel = function <TData>(
+  info: LODInfo<TData>,
+  levelIndex: number,
+): void {
+  const shadow = info?.shadowRender;
+  if (shadow?.levels && levelIndex < shadow.levels.length) {
+    shadow.levels.splice(levelIndex, 1);
+    shadow.count?.splice?.(levelIndex, 1);
+    if (shadow.levels.length === 0) {
+      info.shadowRender = null;
     }
+  }
+};
 
-    if (!this.LODinfo.shadowRender) {
-        this.LODinfo.shadowRender = { levels: [], count: [] };
+const removeLevelObject = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  info: LODInfo<TData>,
+  obj: InstancedMesh2<TData>,
+  removeObject: boolean,
+): void {
+  if (!removeObject || obj === this) {
+    return;
+  }
+  try {
+    this.remove(obj);
+    const idx = info.objects?.indexOf(obj) ?? -1;
+    if (idx !== -1) {
+      info.objects.splice(idx, 1);
     }
+    disposeLOD(obj);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(e);
+  }
+};
 
-    const object = addLevel.call(this, this.LODinfo.shadowRender, geometry, null, distance, hysteresis);
-    object.castShadow = true;
-    this.castShadow = true;
+export const removeLOD = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  levelIndex: number,
+  removeObject = true,
+): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
+  const info = this.LODinfo;
+  const list = info?.render;
+  if (!list?.levels) {
+    throw new Error('Invalid LOD list.');
+  }
 
-    return this;
-}
+  const n = list.levels.length;
+  if (levelIndex < 0 || levelIndex >= n) {
+    throw new Error('Level index OOB');
+  }
+  if (n > 1 && levelIndex === 0) {
+    throw new Error('Cannot remove LOD0 while others exist');
+  }
 
-function addLevel(this: InstancedMesh2, renderList: LODRenderList, geometry: BufferGeometry, material: Material, distance: number, hysteresis: number): InstancedMesh2 {
-    const objectsList = this.LODinfo.objects;
-    const levels = renderList.levels;
-    let index: number;
-    let object: InstancedMesh2;
-    distance = distance ** 2;
+  const [removed] = list.levels.splice(levelIndex, 1);
+  list.count?.splice?.(levelIndex, 1);
+  if (list.levels.length <= 1) {
+    info!.render = null;
+  }
 
-    const objIndex = objectsList.findIndex((e) => e.geometry === geometry);
-    if (objIndex === -1) {
-        const params: InstancedMesh2Params = { capacity: this._capacity, renderer: this._renderer };
-        object = new (this as any).constructor(geometry, material ?? new ShaderMaterial(), params, this);
-        object.frustumCulled = false;
-        patchLevel.call(this, object);
-        objectsList.push(object);
-        this.add(object);
-    } else {
-        object = objectsList[objIndex];
-        if (material) object.material = material;
-    }
+  const obj = removed.object;
+  removeShadowLevel(info!, levelIndex);
+  removeLevelObject.call(
+    this,
+    info!, obj, removeObject,
+  );
 
-    for (index = 0; index < levels.length; index++) {
-        if (distance < levels[index].distance) break;
-    }
-
-    levels.splice(index, 0, { distance, hysteresis, object });
-    renderList.count.push(0);
-
-    return object;
-}
-
-export function updateLOD(this: InstancedMesh2, levelIndex: number, distance?: number, hysteresis?: number): InstancedMesh2 {
-    const list = this?.LODinfo?.render;
-    if (levelIndex === 0) throw new Error('Cannot change distance for LOD0.');
-    return updateLevel.call(this, list, levelIndex, distance, hysteresis);
-}
-
-export function updateShadowLOD(this: InstancedMesh2, levelIndex: number, distance?: number, hysteresis?: number): InstancedMesh2 {
-    return updateLevel.call(this, this.LODinfo?.shadowRender, levelIndex, distance, hysteresis);
-}
-
-function updateLevel(this: InstancedMesh2, renderList: LODRenderList, levelIndex: number, distance: number, hysteresis: number): InstancedMesh2 {
-    if (!renderList) throw new Error('Render list is invalid.');
-
-    const level = renderList.levels[levelIndex];
-    if (!level) throw new Error('Cannot update an empty LOD.');
-
-    if (distance != null && !Number.isNaN(distance)) {
-        level.distance = distance ** 2;
-    }
-    if (hysteresis != null && !Number.isNaN(hysteresis)) {
-        level.hysteresis = hysteresis;
-    }
-
-    return this;
-}
-
-export function updateAllLOD(this: InstancedMesh2, distances?: number[], hysteresis?: number | number[]): InstancedMesh2 {
-    return updateAllLevels.call(this, this.LODinfo?.render, distances, hysteresis);
-}
-
-export function updateAllShadowLOD(this: InstancedMesh2, distances?: number[], hysteresis?: number | number[]): InstancedMesh2 {
-    return updateAllLevels.call(this, this.LODinfo?.shadowRender, distances, hysteresis);
-}
-
-function updateAllLevels(this: InstancedMesh2, renderList: LODRenderList, distances: number[], hysteresis?: number | number[]): InstancedMesh2 {
-    if (!renderList?.levels) throw new Error('Invalid LOD list.');
-    const levels = renderList.levels;
-    const isRender = this.LODinfo?.render === renderList;
-
-    const start = isRender ? 1 : 0;
-    if (isRender) levels[0].distance = 0;
-
-    const hasDistances = distances?.length > 0;
-
-    let _distances: number[] = [];
-    if (hasDistances) {
-        _distances = (isRender && distances[0] === 0)
-            ? distances.slice(1, Math.min(levels.length, distances.length))
-            : distances.slice(0, Math.min(levels.length - start, distances.length));
-
-        _distances.every((_d, i) => {
-            if (i > 0 && _d <= _distances[i - 1]) throw new Error(`LOD distances must be strictly increasing: d[${i - 1}]=${_distances[i - 1]} < d[${i}]=${_d}`);
-            return true;
-        });
-    }
-
-    const total = hasDistances ? _distances.length : (levels.length - start);
-
-    for (let i = 0; i < total; i++) {
-        const _d = hasDistances ? _distances[i] : undefined;
-        const _h = Array.isArray(hysteresis) ? (hysteresis as number[])[i] : hysteresis;
-
-        updateLevel.call(this, renderList, start + i, _d, _h);
-    }
-
-    return this;
-}
-
-export function removeLOD(this: InstancedMesh2, levelIndex: number, removeObject = true): InstancedMesh2 {
-    const info = this.LODinfo;
-    const list = info?.render;
-    if (!list?.levels) throw new Error('Invalid LOD list.');
-
-    const n = list.levels.length;
-    if (levelIndex < 0 || levelIndex >= n) throw new Error('Level index OOB');
-    if (n > 1 && levelIndex === 0) throw new Error('Cannot remove LOD0 while others exist');
-
-    const [removed] = list.levels.splice(levelIndex, 1);
-    list.count?.splice?.(levelIndex, 1);
-    if (list.levels.length <= 1) info.render = null;
-
-    const obj = removed.object;
-
-    const shadow = this.LODinfo?.shadowRender;
-    if (shadow?.levels && levelIndex < shadow.levels.length) {
-        shadow.levels.splice(levelIndex, 1);
-        shadow.count?.splice?.(levelIndex, 1);
-        if (shadow.levels.length === 0) this.LODinfo.shadowRender = null;
-    }
-
-    if (removeObject && obj !== this) {
-        try {
-            this.remove(obj);
-            const idx = info.objects?.indexOf(obj) ?? -1;
-            if (idx !== -1) info.objects.splice(idx, 1);
-            disposeLOD(obj);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-    return this;
-}
-
-function disposeLOD(object: InstancedMesh2): void {
-    object.geometry.dispose();
-    const mat = object.material;
-    if (Array.isArray(mat)) for (const m of mat) m.dispose();
-    else mat.dispose();
-}
-
-function patchLevel(this: InstancedMesh2, obj: InstancedMesh2): void {
-    Object.defineProperty(obj, 'renderOrder', {
-        get(this: InstancedMesh2) { return this._parentLOD.renderOrder; }
-    });
-
-    Object.defineProperty(obj, '_lastRenderInfo', {
-        get(this: InstancedMesh2) { return this._parentLOD._lastRenderInfo; }
-    });
-
-    Object.defineProperty(obj, 'matricesTexture', {
-        get(this: InstancedMesh2) { return this._parentLOD.matricesTexture; }
-    });
-
-    Object.defineProperty(obj, 'colorsTexture', {
-        get(this: InstancedMesh2) { return this._parentLOD.colorsTexture; }
-    });
-
-    Object.defineProperty(obj, 'uniformsTexture', {
-        get(this: InstancedMesh2) { return this._parentLOD.uniformsTexture; }
-    });
-
-    Object.defineProperty(obj, 'morphTexture', {
-        get(this: InstancedMesh2) { return this._parentLOD.morphTexture; }
-    });
-
-    Object.defineProperty(obj, 'boneTexture', {
-        get(this: InstancedMesh2) { return this._parentLOD.boneTexture; }
-    });
-
-    Object.defineProperty(obj, 'skeleton', {
-        get(this: InstancedMesh2) { return this._parentLOD.skeleton; }
-    });
-
-    Object.defineProperty(obj, 'bindMatrixInverse', {
-        get(this: InstancedMesh2) { return this._parentLOD.bindMatrixInverse; }
-    });
-
-    Object.defineProperty(obj, 'bindMatrix', {
-        get(this: InstancedMesh2) { return this._parentLOD.bindMatrix; }
-    });
-}
+  return this;
+};

@@ -10,4 +10,6 @@
 
 export { PickController } from './PickController';
 export type { PickControllerOptions } from './PickController';
-export type { GraphEvent, GraphEventType, GraphEventHandler, GraphPickKind } from './types';
+export type {
+  GraphEvent, GraphEventType, GraphEventHandler, GraphPickKind,
+} from './types';

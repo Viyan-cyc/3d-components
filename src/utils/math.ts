@@ -1,5 +1,13 @@
 import type { Vec3 } from '../types';
 
+// ─── Math constants ──────────────────────────────────────────────────────────
+
+/** Number of degrees per radian, used for degree ↔ radian conversion. */
+const DEGREES_PER_RADIAN = 180;
+
+/** Hermite smoothstep coefficient for the cubic term. */
+const HERMITE_COEFFICIENT = 3;
+
 /**
  * Clamp a number to the inclusive [min, max] range.
  *
@@ -15,9 +23,8 @@ import type { Vec3 } from '../types';
  * Util.clamp(99, 0, 10);  // → 10
  * ```
  */
-export function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
+export const clamp = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
 
 /**
  * Linearly interpolate between two values by a factor `t`.
@@ -36,9 +43,8 @@ export function clamp(value: number, min: number, max: number): number {
  * Util.lerp(10, 20, 0.25);  // → 12.5
  * ```
  */
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+export const lerp = (a: number, b: number, t: number): number =>
+  a + (b - a) * t;
 
 /**
  * Map a value from one numeric range to another.
@@ -59,15 +65,14 @@ export function lerp(a: number, b: number, t: number): number {
  * Util.mapRange(0, -1, 1, 0, 360);   // → 180
  * ```
  */
-export function mapRange(
+export const mapRange = (
   value: number,
   inMin: number,
   inMax: number,
   outMin: number,
   outMax: number,
-): number {
-  return outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin);
-}
+): number =>
+  outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin);
 
 /**
  * Convert an angle from degrees to radians.
@@ -81,9 +86,8 @@ export function mapRange(
  * Util.degToRad(90);   // → 1.570796... (π/2)
  * ```
  */
-export function degToRad(degrees: number): number {
-  return degrees * (Math.PI / 180);
-}
+export const degToRad = (degrees: number): number =>
+  degrees * (Math.PI / DEGREES_PER_RADIAN);
 
 /**
  * Convert an angle from radians to degrees.
@@ -97,9 +101,8 @@ export function degToRad(degrees: number): number {
  * Util.radToDeg(Math.PI / 2); // → 90
  * ```
  */
-export function radToDeg(radians: number): number {
-  return radians * (180 / Math.PI);
-}
+export const radToDeg = (radians: number): number =>
+  radians * (DEGREES_PER_RADIAN / Math.PI);
 
 /**
  * Return a random floating-point number in [min, max).
@@ -114,9 +117,8 @@ export function radToDeg(radians: number): number {
  * Util.randomRange(-5, 5);    // → e.g. -2.114...
  * ```
  */
-export function randomRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
+export const randomRange = (min: number, max: number): number =>
+  min + Math.random() * (max - min);
 
 /**
  * Return a random integer in the inclusive [min, max] range.
@@ -131,9 +133,8 @@ export function randomRange(min: number, max: number): number {
  * Util.randomInt(0, 2);  // → 0, 1, or 2
  * ```
  */
-export function randomInt(min: number, max: number): number {
-  return Math.floor(randomRange(min, max + 1));
-}
+export const randomInt = (min: number, max: number): number =>
+  Math.floor(randomRange(min, max + 1));
 
 /**
  * Calculate the Euclidean distance between two 3D points.
@@ -149,12 +150,12 @@ export function randomInt(min: number, max: number): number {
  * Util.distance(a, b);  // → 5
  * ```
  */
-export function distance(a: Vec3, b: Vec3): number {
+export const distance = (a: Vec3, b: Vec3): number => {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   const dz = a.z - b.z;
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
-}
+};
 
 /**
  * Smooth Hermite interpolation between two edges.
@@ -178,7 +179,7 @@ export function distance(a: Vec3, b: Vec3): number {
  * Util.smoothstep(0, 1, 1.5);   // → 1 (clamped)
  * ```
  */
-export function smoothstep(edge0: number, edge1: number, x: number): number {
+export const smoothstep = (edge0: number, edge1: number, x: number): number => {
   const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
+  return t * t * (HERMITE_COEFFICIENT - 2 * t);
+};

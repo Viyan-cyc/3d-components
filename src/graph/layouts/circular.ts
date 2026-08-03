@@ -18,6 +18,9 @@ import type { NodeData, NodeId, NodePos3D } from '../types';
 import type { CircularLayoutConfig } from './types';
 import { mapToPlane2D, resolveDepth, resolvePlane } from './util';
 
+/** 环形默认半径。 */
+const DEFAULT_RADIUS = 3;
+
 /**
  * 把一组节点绕一圈，返回其 2D + 层索引结果（再统一映射到 3D）。
  *
@@ -26,7 +29,7 @@ import { mapToPlane2D, resolveDepth, resolvePlane } from './util';
  * @param layerIndex - 本层在被忽略轴上的层级索引。
  * @param cfg - 配置（取 startAngle/endAngle/plane 与分层参数）。
  */
-function ringPositions(
+const ringPositions = function (
   group: NodeData[],
   radius: number,
   layerIndex: number,
@@ -48,7 +51,32 @@ function ringPositions(
     out.push({ id: group[i].id, ...p });
   }
   return out;
-}
+};
+
+/**
+ * 构建同心多环布局（按 index 轮询均分到各环）。
+ */
+const buildConcentricRings = function (
+  nodes: NodeData[],
+  radius: number,
+  radiusStep: number,
+  rings: number,
+  cfg: CircularLayoutConfig,
+): NodePos3D[] {
+  const perRingBuckets: NodeData[][] = Array.from({ length: rings }, () => []);
+  for (let i = 0; i < nodes.length; i++) {
+    perRingBuckets[i % rings].push(nodes[i]);
+  }
+  const result: NodePos3D[] = [];
+  for (let ring = 0; ring < rings; ring++) {
+    const group = perRingBuckets[ring];
+    if (group.length > 0) {
+      const r = radius + ring * radiusStep;
+      result.push(...ringPositions(group, r, ring, cfg));
+    }
+  }
+  return result;
+};
 
 /**
  * 环形布局（3D 化）。
@@ -63,9 +91,9 @@ function ringPositions(
  * const pos = Layouts.circular(nodes, { radius: 4, plane: 'xz', rings: 3 });
  * ```
  */
-export function circular(nodes: NodeData[], config?: CircularLayoutConfig): NodePos3D[] {
+export const circular = function (nodes: NodeData[], config?: CircularLayoutConfig): NodePos3D[] {
   const cfg = config ?? {};
-  const radius = cfg.radius ?? 3;
+  const radius = cfg.radius ?? DEFAULT_RADIUS;
   const radiusStep = cfg.radiusStep ?? 1;
   const groupBy = cfg.groupBy;
   const rings = Math.max(1, cfg.rings ?? 1);
@@ -76,7 +104,7 @@ export function circular(nodes: NodeData[], config?: CircularLayoutConfig): Node
     const buckets = new Map<unknown, NodeData[]>();
     for (const n of nodes) {
       const key = (n as Record<string, unknown>)[groupBy];
-      if (!buckets.has(key)) {
+      if (buckets.has(key) === false) {
         buckets.set(key, []);
         groupOrder.push(key as NodeId);
       }
@@ -92,20 +120,9 @@ export function circular(nodes: NodeData[], config?: CircularLayoutConfig): Node
 
   // 2) 同心多环：groupBy 缺省且 rings>1 —— 按 index 轮询均分到各环。
   if (rings > 1) {
-    const perRingBuckets: NodeData[][] = Array.from({ length: rings }, () => []);
-    for (let i = 0; i < nodes.length; i++) {
-      perRingBuckets[i % rings].push(nodes[i]);
-    }
-    const result: NodePos3D[] = [];
-    for (let ring = 0; ring < rings; ring++) {
-      const group = perRingBuckets[ring];
-      if (group.length === 0) continue;
-      const r = radius + ring * radiusStep;
-      result.push(...ringPositions(group, r, ring, cfg));
-    }
-    return result;
+    return buildConcentricRings(nodes, radius, radiusStep, rings, cfg);
   }
 
   // 3) 单圈单层：最常见。
   return ringPositions(nodes, radius, 0, cfg);
-}
+};

@@ -32,4 +32,6 @@
 
 export { PivotControls } from './PivotControls';
 export type { PivotControlsOptions, PivotControlsLike } from './PivotControls';
-export type { OnDragStartProps, LimitsTuple, AxisLimit, AxisIndex, PointerSample } from './context';
+export type {
+  OnDragStartProps, LimitsTuple, AxisLimit, AxisIndex, PointerSample,
+} from './context';

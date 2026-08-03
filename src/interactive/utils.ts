@@ -1,5 +1,6 @@
+
 import type * as THREE from 'three';
-import type { Intersection, EventHandlers } from './types';
+import type { EventHandlers, Intersection } from './types';
 
 // ─── Registration Entry (internal) ────────────────────────────
 
@@ -10,6 +11,7 @@ import type { Intersection, EventHandlers } from './types';
 export interface RegistrationEntry {
   object: THREE.Object3D;
   handlers: EventHandlers;
+
   /** Number of event handlers registered. */
   eventCount: number;
 }
@@ -23,15 +25,15 @@ export interface RegistrationEntry {
  * to Normalized Device Coordinates (−1 to +1) expected by
  * `Raycaster.setFromCamera`.
  */
-export function computeNDC(
+export const computeNDC = (
   event: PointerEvent | WheelEvent,
   rect: DOMRect,
   target: THREE.Vector2,
-): THREE.Vector2 {
+): THREE.Vector2 => {
   target.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   target.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   return target;
-}
+};
 
 // ─── makeIntersectionId ───────────────────────────────────────
 
@@ -45,14 +47,12 @@ export function computeNDC(
  * @param intersection - The intersection to identify.
  * @returns A string key unique to this (eventObject, index, instanceId) triple.
  */
-export function makeIntersectionId(intersection: Intersection): string {
-  return (
-    intersection.eventObject.uuid +
-    '/' +
-    (intersection.index ?? '') +
-    (intersection.instanceId ?? '')
-  );
-}
+export const makeIntersectionId = (intersection: Intersection): string => (
+  `${intersection.eventObject.uuid
+  }/${
+    intersection.index ?? ''
+  }${intersection.instanceId ?? ''}`
+);
 
 // ─── hasPointerHandlers ───────────────────────────────────────
 
@@ -61,16 +61,14 @@ export function makeIntersectionId(intersection: Intersection): string {
  * handlers. Used to filter objects for move-event raycasting
  * (filter pointer events).
  */
-export function hasPointerHandlers(entry: RegistrationEntry): boolean {
+export const hasPointerHandlers = (entry: RegistrationEntry): boolean => {
   const h = entry.handlers;
-  return !!(
-    h.onPointerMove ||
+  return Boolean(h.onPointerMove ||
     h.onPointerOver ||
     h.onPointerEnter ||
     h.onPointerOut ||
-    h.onPointerLeave
-  );
-}
+    h.onPointerLeave);
+};
 
 // ─── handlerKey ───────────────────────────────────────────────
 
@@ -78,7 +76,7 @@ export function hasPointerHandlers(entry: RegistrationEntry): boolean {
  * Map a {@link PointerEventType} string to the corresponding
  * {@link EventHandlers} callback key.
  */
-export function handlerKey(type: PointerEventType): keyof EventHandlers {
+export const handlerKey = (type: PointerEventType): keyof EventHandlers => {
   const COMPOUND: Record<string, string> = {
     pointerdown: 'onPointerDown',
     pointerup: 'onPointerUp',
@@ -93,8 +91,10 @@ export function handlerKey(type: PointerEventType): keyof EventHandlers {
     pointercancel: 'onPointerCancel',
     lostpointercapture: 'onLostPointerCapture',
   };
-  if (type in COMPOUND) return COMPOUND[type] as keyof EventHandlers;
-  return ('on' + type.charAt(0).toUpperCase() + type.slice(1)) as keyof EventHandlers;
-}
+  if (type in COMPOUND) {
+    return COMPOUND[type] as keyof EventHandlers;
+  }
+  return (`on${ type.charAt(0).toUpperCase() }${type.slice(1)}`) as keyof EventHandlers;
+};
 
 type PointerEventType = import('./types').PointerEventType;

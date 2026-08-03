@@ -6,8 +6,10 @@
  * @module animation/animate
  */
 
-import * as THREE from 'three';
-import type { AnimationConfig, AnimationController, AnimationTarget, InternalAnimationConfig } from './types';
+import type * as THREE from 'three';
+import type {
+  AnimationConfig, AnimationController, AnimationTarget, InternalAnimationConfig,
+} from './types';
 import { AnimationControllerImpl } from './AnimationController';
 import { mergeWithDefaults } from './defaults';
 
@@ -18,7 +20,7 @@ import { mergeWithDefaults } from './defaults';
  * @returns 归一化后的 Object3D 数组
  * @throws 目标为 null/undefined/空数组时抛出 TypeError
  */
-function normalizeTarget(target: AnimationTarget): THREE.Object3D[] {
+const normalizeTarget = (target: AnimationTarget): THREE.Object3D[] => {
   if (!target) {
     throw new TypeError('动画目标不能为 null 或 undefined');
   }
@@ -36,7 +38,7 @@ function normalizeTarget(target: AnimationTarget): THREE.Object3D[] {
   }
 
   return [target];
-}
+};
 
 /**
  * 创建一个动画控制器。
@@ -79,7 +81,7 @@ function normalizeTarget(target: AnimationTarget): THREE.Object3D[] {
  * }).play();
  * ```
  */
-export function animate(target: AnimationTarget, config?: AnimationConfig): AnimationController {
+const animate = (target: AnimationTarget, config?: AnimationConfig): AnimationController => {
   // 1. 校验并归一化目标
   const targets = normalizeTarget(target);
 
@@ -96,4 +98,6 @@ export function animate(target: AnimationTarget, config?: AnimationConfig): Anim
 
   // 5. autoPlay 始终为 false，用户必须显式调用 .play()
   return controller;
-}
+};
+
+export { animate };

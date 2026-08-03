@@ -1,10 +1,10 @@
-// @ts-nocheck
 /**
  * @internal BVH internal types - inlined from bvh.js to avoid external dependency.
  */
 
 /** Float array type used by BVH nodes and utilities. */
 export type FloatArray = Float32Array | Float64Array;
+
 /** Float array constructor type. */
 export type FloatArrayType = typeof Float32Array | typeof Float64Array;
 

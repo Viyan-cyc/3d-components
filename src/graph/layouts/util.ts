@@ -28,21 +28,21 @@ interface XYZ {
  * @param depth - 在被忽略轴上的偏移量（由 `depthOffset + layerIndex*layerSpacing` 计算后传入）。
  * @returns 三维坐标。
  */
-export function mapToPlane2D(
+export const mapToPlane2D = function (
   x2: number,
   y2: number,
   plane: 'xy' | 'xz',
   depth: number,
 ): XYZ {
   return plane === 'xy' ? { x: x2, y: y2, z: depth } : { x: x2, y: depth, z: y2 };
-}
+};
 
 /**
  * 从 {@link BaseLayoutConfig} 解析 plane 默认值（缺省 `'xz'`）。
  */
-export function resolvePlane(cfg: BaseLayoutConfig | undefined): 'xy' | 'xz' {
+export const resolvePlane = function (cfg: BaseLayoutConfig | undefined): 'xy' | 'xz' {
   return cfg?.plane ?? 'xz';
-}
+};
 
 /**
  * 计算某层在被忽略轴上的深度：`depthOffset + layerIndex * layerSpacing`。
@@ -50,6 +50,6 @@ export function resolvePlane(cfg: BaseLayoutConfig | undefined): 'xy' | 'xz' {
  * @param cfg - 公共基类配置。
  * @param layerIndex - 该节点所属层级（分组/同心环索引）。
  */
-export function resolveDepth(cfg: BaseLayoutConfig | undefined, layerIndex: number): number {
+export const resolveDepth = function (cfg: BaseLayoutConfig | undefined, layerIndex: number): number {
   return (cfg?.depthOffset ?? 0) + layerIndex * (cfg?.layerSpacing ?? 0);
-}
+};

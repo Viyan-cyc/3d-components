@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 import type { GroupComponentOptions, IDisposable } from '../types';
 
@@ -5,18 +6,25 @@ import type { GroupComponentOptions, IDisposable } from '../types';
  * Wireframe 的配置选项。
  */
 export interface WireframeOptions extends GroupComponentOptions {
+
   /** 要线框化的父级网格。 */
   mesh: THREE.Mesh;
+
   /** 线条（描边）颜色。 @default '#ff0000' */
   stroke?: THREE.ColorRepresentation;
+
   /** 背面线条颜色（仅在 `colorBackfaces` 为真时用于背面）。 @default '#0000ff' */
   backfaceStroke?: THREE.ColorRepresentation;
+
   /** 填充颜色（三角形内部）。 @default '#00ff00' */
   fill?: THREE.ColorRepresentation;
+
   /** 线条不透明度。 @default 1 */
   strokeOpacity?: number;
+
   /** 填充不透明度。 @default 0.25 */
   fillOpacity?: number;
+
   /**
    * 填充颜色与原材质 `diffuse` 的混合比例（仅 `overrideMaterial` 模式有效）。
    * - `0` = 完全用 `fill`；
@@ -24,30 +32,42 @@ export interface WireframeOptions extends GroupComponentOptions {
    * @default 0
    */
   fillMix?: number;
+
   /** 线条粗细（0–1，经 `map(0,1,0,0.34)` 映射为实际像素厚度）。 @default 0.05 */
   thickness?: number;
+
   /** 是否给背面单独着色（用 `backfaceStroke`）。 @default false */
   colorBackfaces?: boolean;
+
   /** 是否启用虚线。 @default false */
   dash?: boolean;
+
   /** 虚线是否反转（亮 / 暗段互换）。 @default true */
   dashInvert?: boolean;
+
   /** 虚线重复次数（每条边重复几段）。 @default 4 */
   dashRepeats?: number;
+
   /** 虚线一段中「亮」的占比（0–1）。 @default 0.5 */
   dashLength?: number;
+
   /** 是否启用中间收窄（线条向段中心变细）。 @default false */
   squeeze?: boolean;
+
   /** 收窄最小值。 @default 0.2 */
   squeezeMin?: number;
+
   /** 收窄最大值。 @default 1 */
   squeezeMax?: number;
+
   /**
    * 渲染顺序。 @default 0
    */
   renderOrder?: number;
+
   /** 是否参与色调映射。 @default false */
   toneMapped?: boolean;
+
   /**
    * 是否覆盖父级材质（`onBeforeCompile` 注入），而非生成独立线框网格。
    * - `false`（默认）：创建一个 `THREE.Mesh` 子级，用独立 `WireframeMaterial` 渲染线框，
@@ -191,25 +211,23 @@ const standaloneFragmentShader = /* glsl */ `
 `;
 
 /** 默认 uniform 值。 */
-function createWireframeUniforms() {
-  return {
-    strokeOpacity: { value: 1 },
-    fillOpacity: { value: 0.25 },
-    fillMix: { value: 0 },
-    thickness: { value: 0.05 },
-    colorBackfaces: { value: false },
-    dashInvert: { value: true },
-    dash: { value: false },
-    dashRepeats: { value: 4 },
-    dashLength: { value: 0.5 },
-    squeeze: { value: false },
-    squeezeMin: { value: 0.2 },
-    squeezeMax: { value: 1 },
-    stroke: { value: new THREE.Color('#ff0000') },
-    backfaceStroke: { value: new THREE.Color('#0000ff') },
-    fill: { value: new THREE.Color('#00ff00') },
-  };
-}
+const createWireframeUniforms = () => ({
+  strokeOpacity: { value: 1 },
+  fillOpacity: { value: 0.25 },
+  fillMix: { value: 0 },
+  thickness: { value: 0.05 },
+  colorBackfaces: { value: false },
+  dashInvert: { value: true },
+  dash: { value: false },
+  dashRepeats: { value: 4 },
+  dashLength: { value: 0.5 },
+  squeeze: { value: false },
+  squeezeMin: { value: 0.2 },
+  squeezeMax: { value: 1 },
+  stroke: { value: new THREE.Color('#ff0000') },
+  backfaceStroke: { value: new THREE.Color('#0000ff') },
+  fill: { value: new THREE.Color('#00ff00') },
+});
 
 /**
  * 创建独立的线框 `ShaderMaterial`（双面、透明）。
@@ -217,15 +235,13 @@ function createWireframeUniforms() {
  * > `fwidth`（standard derivatives）在 WebGL2 下默认可用，无需显式开启；
  * > WebGL1 时代需要的 `derivatives: true` 标志已被 Three.js 移除。
  */
-function createWireframeMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: createWireframeUniforms(),
-    vertexShader: standaloneVertexShader,
-    fragmentShader: standaloneFragmentShader,
-    transparent: true,
-    side: THREE.DoubleSide,
-  });
-}
+const createWireframeMaterial = (): THREE.ShaderMaterial => new THREE.ShaderMaterial({
+  uniforms: createWireframeUniforms(),
+  vertexShader: standaloneVertexShader,
+  fragmentShader: standaloneFragmentShader,
+  transparent: true,
+  side: THREE.DoubleSide,
+});
 
 /**
  * 为几何体计算 `barycentric` 顶点属性（线框着色器的核心输入）。
@@ -240,23 +256,30 @@ function createWireframeMaterial(): THREE.ShaderMaterial {
  * > 注：本函数会**就地修改**传入几何体（添加 `barycentric` 属性）；
  * > 若需要保留原几何体，请传入副本。
  */
-function applyBarycentric(geometry: THREE.BufferGeometry): void {
+const BARYCENTRIC_COMPONENTS = 3;
+
+const applyBarycentric = (geometry: THREE.BufferGeometry): void => {
   const index = geometry.getIndex();
   const position = geometry.getAttribute('position');
-  if (!position) return;
+  if (!position) {
+    return;
+  }
 
   // 非索引化：让每个三角形独占顶点，避免共享顶点的重心坐标冲突。
   const nonIndexed = index ? geometry.toNonIndexed() : geometry;
   const count = nonIndexed.getAttribute('position').count;
 
   // 每 3 个顶点（一个三角形）依次赋 (1,0,0)/(0,1,0)/(0,0,1)。
-  const barycentric = new Float32Array(count * 3);
+  const barycentric = new Float32Array(count * BARYCENTRIC_COMPONENTS);
   for (let i = 0; i < count; i++) {
-    const corner = i % 3;
-    barycentric[i * 3 + corner] = 1;
+    const corner = i % BARYCENTRIC_COMPONENTS;
+    barycentric[i * BARYCENTRIC_COMPONENTS + corner] = 1;
   }
 
-  nonIndexed.setAttribute('barycentric', new THREE.BufferAttribute(barycentric, 3));
+  nonIndexed.setAttribute(
+    'barycentric',
+    new THREE.BufferAttribute(barycentric, BARYCENTRIC_COMPONENTS),
+  );
 
   // 若原几何是索引的，toNonIndexed 已生成新缓冲；把它写回原 geometry。
   if (index) {
@@ -264,12 +287,16 @@ function applyBarycentric(geometry: THREE.BufferGeometry): void {
     geometry.setAttribute('barycentric', nonIndexed.getAttribute('barycentric'));
     // 同步其它已存在的属性（uv / normal 等）以免丢失。
     for (const key of Object.keys(nonIndexed.attributes)) {
-      if (key === 'position' || key === 'barycentric') continue;
-      if (!geometry.getAttribute(key)) geometry.setAttribute(key, nonIndexed.getAttribute(key));
+      if (key === 'position' || key === 'barycentric') {
+        continue; // eslint-disable-line no-continue
+      }
+      if (!geometry.getAttribute(key)) {
+        geometry.setAttribute(key, nonIndexed.getAttribute(key));
+      }
     }
     geometry.setIndex(null);
   }
-}
+};
 
 /**
  * 把线框逻辑注入到已有材质（`onBeforeCompile`），使其带光照渲染。
@@ -282,7 +309,10 @@ function applyBarycentric(geometry: THREE.BufferGeometry): void {
  * @param material - 要注入的材质（如 `MeshStandardMaterial`）。
  * @param uniforms - 线框 uniform 集合（由 {@link createWireframeUniforms} 创建）。
  */
-function applyWireframeOverride(material: THREE.Material, uniforms: Record<string, THREE.IUniform>): void {
+const applyWireframeOverride = (
+  material: THREE.Material,
+  uniforms: Record<string, THREE.IUniform>,
+): void => {
   material.onBeforeCompile = (shader) => {
     shader.uniforms = { ...shader.uniforms, ...uniforms };
 
@@ -324,7 +354,7 @@ function applyWireframeOverride(material: THREE.Material, uniforms: Record<strin
   (material as THREE.Material & { side: THREE.Side }).side = THREE.DoubleSide;
   (material as THREE.Material & { transparent: boolean }).transparent = true;
   material.needsUpdate = true;
-}
+};
 
 /**
  * Wireframe — 线框化组件。
@@ -366,14 +396,48 @@ function applyWireframeOverride(material: THREE.Material, uniforms: Record<strin
 export class Wireframe extends THREE.Group implements IDisposable {
   /** 父级网格。 */
   private readonly mesh: THREE.Mesh;
+
   /** 独立线框材质（由本组件持有并释放；overrideMaterial 模式下为注入用的 uniform 容器）。 */
   private readonly material: THREE.ShaderMaterial;
+
   /** 是否走材质覆盖路径。 */
   private readonly override: boolean;
+
   /** 由本组件生成、需释放的线框几何体（独立模式下为父级几何的 barycentric 副本）。 */
   private wireGeometry: THREE.BufferGeometry | null = null;
+
   /** 是否由本组件注入了 `onBeforeCompile`（dispose 时还原）。 */
   private injectedParent = false;
+
+  /** Set up override mode: inject wireframe into parent material. */
+  private setupOverrideMode(): void {
+    const parentGeo = this.mesh.geometry;
+    if (parentGeo && !parentGeo.getAttribute('barycentric')) {
+      applyBarycentric(parentGeo);
+    }
+    if (this.mesh.material) {
+      const mats = Array.isArray(this.mesh.material)
+        ? this.mesh.material : [this.mesh.material];
+      for (const m of mats) {
+        applyWireframeOverride(m, this.material.uniforms);
+      }
+      this.injectedParent = true;
+    }
+  }
+
+  /** Set up standalone mode: create child wireframe mesh. */
+  private setupStandaloneMode(renderOrder: number): void {
+    const parentGeo = this.mesh.geometry;
+    if (parentGeo) {
+      this.wireGeometry = parentGeo.clone();
+      if (!this.wireGeometry.getAttribute('barycentric')) {
+        applyBarycentric(this.wireGeometry);
+      }
+      const wireMesh = new THREE.Mesh(this.wireGeometry, this.material);
+      wireMesh.renderOrder = renderOrder;
+      this.add(wireMesh);
+    }
+  }
 
   /**
    * @param options - 配置对象。`mesh` 必填，其余可选。
@@ -381,42 +445,44 @@ export class Wireframe extends THREE.Group implements IDisposable {
   constructor(options: WireframeOptions) {
     super();
 
-    if (options.name) this.name = options.name;
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
+    if (options.name) {
+      this.name = options.name;
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
 
     this.mesh = options.mesh;
     this.override = options.overrideMaterial ?? false;
     this.material = createWireframeMaterial();
 
     if (this.override) {
-      // 覆盖模式：把 barycentric 写到父级几何体，并把线框逻辑注入父级材质。
-      const parentGeo = this.mesh.geometry;
-      if (parentGeo && !parentGeo.getAttribute('barycentric')) {
-        applyBarycentric(parentGeo);
-      }
-      if (this.mesh.material) {
-        const materials = Array.isArray(this.mesh.material) ? this.mesh.material : [this.mesh.material];
-        for (const m of materials) applyWireframeOverride(m, this.material.uniforms);
-        this.injectedParent = true;
-      }
+      this.setupOverrideMode();
     } else {
-      // 独立模式：复制一份父级几何体并补上 barycentric，挂为子 Mesh。
-      const parentGeo = this.mesh.geometry;
-      if (parentGeo) {
-        this.wireGeometry = parentGeo.clone();
-        if (!this.wireGeometry.getAttribute('barycentric')) applyBarycentric(this.wireGeometry);
-        const wireMesh = new THREE.Mesh(this.wireGeometry, this.material);
-        wireMesh.renderOrder = options.renderOrder ?? 0;
-        this.add(wireMesh);
-      }
+      this.setupStandaloneMode(options.renderOrder ?? 0);
     }
 
     // 应用一遍 uniform / 材质属性。
     this.applyOptions(options);
 
     if (options.children) {
-      for (const child of options.children) this.add(child);
+      for (const child of options.children) {
+        this.add(child);
+      }
+    }
+  }
+
+  /** Apply a scalar uniform if the option is defined. */
+  private applyScalarUniform(
+    u: Record<string, THREE.IUniform>,
+    key: string,
+    value: unknown,
+  ): void {
+    if (value !== undefined) {
+      u[key].value = value;
     }
   }
 
@@ -425,22 +491,30 @@ export class Wireframe extends THREE.Group implements IDisposable {
    */
   private applyOptions(options: WireframeOptions): void {
     const u = this.material.uniforms;
-    if (options.strokeOpacity !== undefined) u.strokeOpacity.value = options.strokeOpacity;
-    if (options.fillOpacity !== undefined) u.fillOpacity.value = options.fillOpacity;
-    if (options.fillMix !== undefined) u.fillMix.value = options.fillMix;
-    if (options.thickness !== undefined) u.thickness.value = options.thickness;
-    if (options.colorBackfaces !== undefined) u.colorBackfaces.value = options.colorBackfaces;
-    if (options.dash !== undefined) u.dash.value = options.dash;
-    if (options.dashInvert !== undefined) u.dashInvert.value = options.dashInvert;
-    if (options.dashRepeats !== undefined) u.dashRepeats.value = options.dashRepeats;
-    if (options.dashLength !== undefined) u.dashLength.value = options.dashLength;
-    if (options.squeeze !== undefined) u.squeeze.value = options.squeeze;
-    if (options.squeezeMin !== undefined) u.squeezeMin.value = options.squeezeMin;
-    if (options.squeezeMax !== undefined) u.squeezeMax.value = options.squeezeMax;
-    if (options.stroke !== undefined) (u.stroke.value as THREE.Color).set(options.stroke);
-    if (options.backfaceStroke !== undefined) (u.backfaceStroke.value as THREE.Color).set(options.backfaceStroke);
-    if (options.fill !== undefined) (u.fill.value as THREE.Color).set(options.fill);
-    if (options.toneMapped !== undefined) this.material.toneMapped = options.toneMapped;
+    this.applyScalarUniform(u, 'strokeOpacity', options.strokeOpacity);
+    this.applyScalarUniform(u, 'fillOpacity', options.fillOpacity);
+    this.applyScalarUniform(u, 'fillMix', options.fillMix);
+    this.applyScalarUniform(u, 'thickness', options.thickness);
+    this.applyScalarUniform(u, 'colorBackfaces', options.colorBackfaces);
+    this.applyScalarUniform(u, 'dash', options.dash);
+    this.applyScalarUniform(u, 'dashInvert', options.dashInvert);
+    this.applyScalarUniform(u, 'dashRepeats', options.dashRepeats);
+    this.applyScalarUniform(u, 'dashLength', options.dashLength);
+    this.applyScalarUniform(u, 'squeeze', options.squeeze);
+    this.applyScalarUniform(u, 'squeezeMin', options.squeezeMin);
+    this.applyScalarUniform(u, 'squeezeMax', options.squeezeMax);
+    if (options.stroke !== undefined) {
+      (u.stroke.value as THREE.Color).set(options.stroke);
+    }
+    if (options.backfaceStroke !== undefined) {
+      (u.backfaceStroke.value as THREE.Color).set(options.backfaceStroke);
+    }
+    if (options.fill !== undefined) {
+      (u.fill.value as THREE.Color).set(options.fill);
+    }
+    if (options.toneMapped !== undefined) {
+      this.material.toneMapped = options.toneMapped;
+    }
   }
 
   /**
@@ -460,7 +534,7 @@ export class Wireframe extends THREE.Group implements IDisposable {
     if (key in colorKeys) {
       (u[colorKeys[key]].value as THREE.Color).set(value as THREE.ColorRepresentation);
     } else if (key in u) {
-      (u[key as string] as THREE.IUniform).value = value;
+      (u[key as string]).value = value;
     }
     return this;
   }

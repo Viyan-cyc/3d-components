@@ -170,10 +170,10 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): () => vo
       currentAnim = animate(dodec)
         .parallel([
           (g) => g
-            .to({ position: { x: 2 } }, { duration: 0.5, ease: 'easeOut', onUpdate: (progress) => console.log(`移动进度: ${(progress * 100).toFixed(0)}%`) })
-            .to({ position: { y: 2 } }, { duration: 0.5, ease: 'easeOut', onUpdate: (progress) => console.log(`上升进度: ${(progress * 100).toFixed(0)}%`) }),
+            .to({ position: { x: 2 } }, { duration: 0.5, ease: 'easeOut' })
+            .to({ position: { y: 2 } }, { duration: 0.5, ease: 'easeOut' }),
           (g) => g
-            .to({ rotation: { y: Math.PI * 2 } }, { duration: 0.8, ease: 'easeInOut', onUpdate: (progress) => console.log(`旋转进度: ${(progress * 100).toFixed(0)}%`) }),
+            .to({ rotation: { y: Math.PI * 2 } }, { duration: 0.8, ease: 'easeInOut' }),
         ])
       ;
       currentAnim.play();

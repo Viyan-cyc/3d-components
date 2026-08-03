@@ -1,77 +1,134 @@
-// @ts-nocheck
 /**
  * @internal Raycasting feature module.
  */
 
-import { Matrix4, Mesh, Ray, Raycaster, Sphere, Vector3 } from 'three';
-import type { Intersection } from 'three';
+import {
+  type BufferGeometry,
+  type Intersection,
+  type Material,
+  Matrix4,
+  Mesh,
+  type Object3DEventMap,
+  Ray,
+  type Raycaster,
+  Sphere,
+  Vector3,
+} from 'three';
 import type { InstancedMesh2 } from '../InstancedMesh2';
 
-const _intersections: Intersection[] = [];
-const _mesh = new Mesh();
-const _ray = new Ray();
-const _direction = new Vector3();
-const _worldScale = new Vector3();
-const _invMatrixWorld = new Matrix4();
-const _sphere = new Sphere();
+const intersectionsLocal: Intersection[] = [];
+const meshLocal = new Mesh();
+const rayLocal = new Ray();
+const directionLocal = new Vector3();
+const worldScaleLocal = new Vector3();
+const invMatrixWorldLocal = new Matrix4();
+const sphereLocal = new Sphere();
 
-export function raycast(this: InstancedMesh2, raycaster: Raycaster, result: Intersection[]): void {
-    if (this._parentLOD || !this.material || this._instancesArrayCount === 0 || !this.instanceIndex) return;
+const checkObjectIntersection = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  raycaster: Raycaster,
+  objectIndex: number,
+  result: Intersection[],
+): void {
+  if (
+    objectIndex > this._instancesArrayCount
+    || !this.getActiveAndVisibilityAt(objectIndex)
+  ) {
+    return;
+  }
 
-    _mesh.geometry = this._geometry;
-    _mesh.material = this.material;
+  this.getMatrixAt(objectIndex, meshLocal.matrixWorld);
+  meshLocal.raycast(raycaster, intersectionsLocal);
 
-    const originalRay = raycaster.ray;
-    const originalNear = raycaster.near;
-    const originalFar = raycaster.far;
+  for (const intersect of intersectionsLocal) {
+    intersect.instanceId = objectIndex;
+    intersect.object = this;
+    result.push(intersect);
+  }
 
-    _invMatrixWorld.copy(this.matrixWorld).invert();
+  intersectionsLocal.length = 0;
+};
 
-    _worldScale.setFromMatrixScale(this.matrixWorld);
-    _direction.copy(raycaster.ray.direction).multiply(_worldScale);
-    const scaleFactor = _direction.length();
-
-    raycaster.ray = _ray.copy(raycaster.ray).applyMatrix4(_invMatrixWorld);
-    raycaster.near /= scaleFactor;
-    raycaster.far /= scaleFactor;
-
-    raycastInstances.call(this, raycaster, result);
-
-    raycaster.ray = originalRay;
-    raycaster.near = originalNear;
-    raycaster.far = originalFar;
-}
-
-function raycastInstances(this: InstancedMesh2, raycaster: Raycaster, result: Intersection[]): void {
-    if (this.bvh) {
-        this.bvh.raycast(raycaster, (instanceId) => checkObjectIntersection.call(this, raycaster, instanceId, result));
-    } else {
-        if (this.boundingSphere === null) this.computeBoundingSphere();
-        _sphere.copy(this.boundingSphere);
-        if (!raycaster.ray.intersectsSphere(_sphere)) return;
-
-        const instancesToCheck = this.instanceIndex.array;
-        const raycastFrustum = this.raycastOnlyFrustum && this._perObjectFrustumCulled;
-        const checkCount = raycastFrustum ? this.count : this._instancesArrayCount;
-
-        for (let i = 0; i < checkCount; i++) {
-            checkObjectIntersection.call(this, raycaster, instancesToCheck[i], result);
-        }
+const raycastInstances = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  raycaster: Raycaster,
+  result: Intersection[],
+): void {
+  if (this.bvh) {
+    this.bvh.raycast(raycaster, (instanceId: number) => {
+      checkObjectIntersection.call(this, raycaster, instanceId, result);
+    });
+  } else {
+    if (this.boundingSphere === null) {
+      this.computeBoundingSphere();
     }
-}
-
-function checkObjectIntersection(this: InstancedMesh2, raycaster: Raycaster, objectIndex: number, result: Intersection[]): void {
-    if (objectIndex > this._instancesArrayCount || !this.getActiveAndVisibilityAt(objectIndex)) return;
-
-    this.getMatrixAt(objectIndex, _mesh.matrixWorld);
-
-    _mesh.raycast(raycaster, _intersections);
-
-    for (const intersect of _intersections) {
-        intersect.instanceId = objectIndex;
-        intersect.object = this;
-        result.push(intersect);
+    sphereLocal.copy(this.boundingSphere!);
+    if (!raycaster.ray.intersectsSphere(sphereLocal)) {
+      return;
     }
 
-    _intersections.length = 0;
-}
+    const instancesToCheck = this.instanceIndex!.array;
+    const raycastFrustum = this.raycastOnlyFrustum
+      && this._perObjectFrustumCulled;
+    const checkCount = raycastFrustum
+      ? this.count
+      : this._instancesArrayCount;
+
+    for (let i = 0; i < checkCount; i++) {
+      checkObjectIntersection.call(this, raycaster, instancesToCheck[i], result);
+    }
+  }
+};
+
+export const raycast = function <
+  TData,
+  TGeometry extends BufferGeometry,
+  TMaterial extends Material | Material[],
+  TEventMap extends Object3DEventMap
+>(
+  this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+  raycaster: Raycaster,
+  result: Intersection[],
+): void {
+  if (
+    this._parentLOD
+    || !this.material
+    || this._instancesArrayCount === 0
+    || !this.instanceIndex
+  ) {
+    return;
+  }
+
+  meshLocal.geometry = this._geometry;
+  meshLocal.material = this.material;
+
+  const originalRay = raycaster.ray;
+  const originalNear = raycaster.near;
+  const originalFar = raycaster.far;
+
+  invMatrixWorldLocal.copy(this.matrixWorld).invert();
+
+  worldScaleLocal.setFromMatrixScale(this.matrixWorld);
+  directionLocal.copy(raycaster.ray.direction).multiply(worldScaleLocal);
+  const scaleFactor = directionLocal.length();
+
+  raycaster.ray = rayLocal.copy(raycaster.ray).applyMatrix4(invMatrixWorldLocal);
+  raycaster.near /= scaleFactor;
+  raycaster.far /= scaleFactor;
+
+  raycastInstances.call(this, raycaster, result);
+
+  raycaster.ray = originalRay;
+  raycaster.near = originalNear;
+  raycaster.far = originalFar;
+};

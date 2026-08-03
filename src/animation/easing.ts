@@ -7,14 +7,97 @@
  * @module animation/easing
  */
 
-import gsap from 'gsap';
 import type { EasingInput } from './types';
+import gsap from 'gsap';
 
 // ─── 数学工具 ───────────────────────────────────────────
 
-function clamp(v: number, min: number, max: number): number {
-  return v < min ? min : v > max ? max : v;
-}
+const clamp = (v: number, min: number, max: number): number => {
+  if (v < min) {
+    return min;
+  }
+  if (v > max) {
+    return max;
+  }
+  return v;
+};
+
+// ─── 缓动函数常量 ────────────────────────────────────────
+
+/** easeInOut 阈值 */
+const FACTOR_0_5 = 0.5;
+
+/** easeInOut 偏移量 */
+const OFFSET_NEG_2 = -2;
+
+/** 三次方指数 */
+const POWER_3 = 3;
+
+/** 四次方指数 */
+const POWER_4 = 4;
+
+/** 四次方入出乘数 */
+const FACTOR_8 = 8;
+
+/** 五次方指数 */
+const POWER_5 = 5;
+
+/** 五次方入出乘数 */
+const FACTOR_16 = 16;
+
+/** 指数缓动乘数 */
+const FACTOR_10 = 10;
+
+/** 指数缓动负乘数 */
+const FACTOR_NEG_10 = -10;
+
+/** 指数入出正乘数 */
+const FACTOR_20 = 20;
+
+/** 指数入出负乘数 */
+const FACTOR_NEG_20 = -20;
+
+/** 过冲入出系数因子 */
+const BACK_C2_FACTOR = 1.525;
+
+/** 弹性入出周期除数 */
+const ELASTIC_C5_DIVISOR = 4.5;
+
+/** 弹性入出偏移 */
+const ELASTIC_OFFSET = 11.125;
+
+/** 弹性入相位偏移 */
+const ELASTIC_PHASE_IN = 10.75;
+
+/** 弹性出相位偏移 */
+const ELASTIC_PHASE_OUT = 0.75;
+
+/** 弹跳常量 n1 */
+const BOUNCE_N1 = 7.5625;
+
+/** 弹跳常量 d1 */
+const BOUNCE_D1 = 2.75;
+
+/** 弹跳偏移1 */
+const BOUNCE_OFFSET_1 = 1.5;
+
+/** 弹跳阈值2 */
+const BOUNCE_THRESHOLD_2 = 2.5;
+
+/** 弹跳偏移2 */
+const BOUNCE_OFFSET_2 = 2.25;
+
+/** 弹跳偏移3 */
+const BOUNCE_OFFSET_3 = 2.625;
+
+/** 弹跳阶段1值 */
+const BOUNCE_PHASE_1 = 0.75;
+
+/** 弹跳阶段2值 */
+const BOUNCE_PHASE_2 = 0.9375;
+
+/** 弹跳阶段3值 */
+const BOUNCE_PHASE_3 = 0.984375;
 
 // ─── 缓动函数实现 ────────────────────────────────────────
 
@@ -28,38 +111,54 @@ const easeInQuad = (t: number): number => t * t;
 const easeOutQuad = (t: number): number => 1 - (1 - t) * (1 - t);
 
 /** 二次方入出 */
-const easeInOutQuad = (t: number): number =>
-  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const easeInOutQuad = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return 2 * t * t;
+  }
+  return 1 - Math.pow(OFFSET_NEG_2 * t + 2, 2) / OFFSET_NEG_2;
+};
 
 /** 三次方入（= easeIn） */
 const easeInCubic = (t: number): number => t * t * t;
 
 /** 三次方出（= easeOut） */
-const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, POWER_3);
 
 /** 三次方入出（= easeInOut） */
-const easeInOutCubic = (t: number): number =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeInOutCubic = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return POWER_4 * t * t * t;
+  }
+  return 1 - Math.pow(OFFSET_NEG_2 * t + 2, POWER_3) / OFFSET_NEG_2;
+};
 
 /** 四次方入 */
 const easeInQuart = (t: number): number => t * t * t * t;
 
 /** 四次方出 */
-const easeOutQuart = (t: number): number => 1 - Math.pow(1 - t, 4);
+const easeOutQuart = (t: number): number => 1 - Math.pow(1 - t, POWER_4);
 
 /** 四次方入出 */
-const easeInOutQuart = (t: number): number =>
-  t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+const easeInOutQuart = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return FACTOR_8 * t * t * t * t;
+  }
+  return 1 - Math.pow(OFFSET_NEG_2 * t + 2, POWER_4) / OFFSET_NEG_2;
+};
 
 /** 五次方入 */
 const easeInQuint = (t: number): number => t * t * t * t * t;
 
 /** 五次方出 */
-const easeOutQuint = (t: number): number => 1 - Math.pow(1 - t, 5);
+const easeOutQuint = (t: number): number => 1 - Math.pow(1 - t, POWER_5);
 
 /** 五次方入出 */
-const easeInOutQuint = (t: number): number =>
-  t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+const easeInOutQuint = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return FACTOR_16 * t * t * t * t * t;
+  }
+  return 1 - Math.pow(OFFSET_NEG_2 * t + 2, POWER_5) / OFFSET_NEG_2;
+};
 
 /** 正弦入 */
 const easeInSine = (t: number): number => 1 - Math.cos((t * Math.PI) / 2);
@@ -68,19 +167,37 @@ const easeInSine = (t: number): number => 1 - Math.cos((t * Math.PI) / 2);
 const easeOutSine = (t: number): number => Math.sin((t * Math.PI) / 2);
 
 /** 正弦入出 */
-const easeInOutSine = (t: number): number => -(Math.cos(Math.PI * t) - 1) / 2;
+const easeInOutSine = (t: number): number => -(Math.cos(Math.PI * t) - 1) / OFFSET_NEG_2;
 
 /** 指数入 */
-const easeInExpo = (t: number): number => (t === 0 ? 0 : Math.pow(2, 10 * t - 10));
+const easeInExpo = (t: number): number => {
+  if (t === 0) {
+    return 0;
+  }
+  return Math.pow(2, FACTOR_10 * t - FACTOR_10);
+};
 
 /** 指数出 */
-const easeOutExpo = (t: number): number => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+const easeOutExpo = (t: number): number => {
+  if (t === 1) {
+    return 1;
+  }
+  return 1 - Math.pow(2, FACTOR_NEG_10 * t);
+};
 
 /** 指数入出 */
-const easeInOutExpo = (t: number): number =>
-  t === 0 ? 0 : t === 1 ? 1
-    : t < 0.5 ? Math.pow(2, 20 * t - 10) / 2
-    : (2 - Math.pow(2, -20 * t + 10)) / 2;
+const easeInOutExpo = (t: number): number => {
+  if (t === 0) {
+    return 0;
+  }
+  if (t === 1) {
+    return 1;
+  }
+  if (t < FACTOR_0_5) {
+    return Math.pow(2, FACTOR_20 * t - FACTOR_10) / OFFSET_NEG_2;
+  }
+  return (2 - Math.pow(2, FACTOR_NEG_20 * t + FACTOR_10)) / OFFSET_NEG_2;
+};
 
 /** 圆形入 */
 const easeInCirc = (t: number): number => 1 - Math.sqrt(1 - t * t);
@@ -89,10 +206,12 @@ const easeInCirc = (t: number): number => 1 - Math.sqrt(1 - t * t);
 const easeOutCirc = (t: number): number => Math.sqrt(1 - (t - 1) * (t - 1));
 
 /** 圆形入出 */
-const easeInOutCirc = (t: number): number =>
-  t < 0.5
-    ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
-    : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+const easeInOutCirc = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / OFFSET_NEG_2;
+  }
+  return (Math.sqrt(1 - Math.pow(OFFSET_NEG_2 * t + 2, 2)) + 1) / OFFSET_NEG_2;
+};
 
 /** 过冲入 */
 const easeInBack = (t: number): number => {
@@ -105,59 +224,80 @@ const easeInBack = (t: number): number => {
 const easeOutBack = (t: number): number => {
   const c1 = 1.70158;
   const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  return 1 + c3 * Math.pow(t - 1, POWER_3) + c1 * Math.pow(t - 1, 2);
 };
 
 /** 过冲入出 */
 const easeInOutBack = (t: number): number => {
   const c1 = 1.70158;
-  const c2 = c1 * 1.525;
-  return t < 0.5
-    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
-    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+  const c2 = c1 * BACK_C2_FACTOR;
+  if (t < FACTOR_0_5) {
+    return (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / OFFSET_NEG_2;
+  }
+  const backPart = Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2;
+  return backPart / OFFSET_NEG_2;
 };
 
 /** 弹性入 */
 const easeInElastic = (t: number): number => {
-  if (t === 0 || t === 1) return t;
-  const c4 = (2 * Math.PI) / 3;
-  return -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
+  if (t === 0 || t === 1) {
+    return t;
+  }
+  const c4 = (2 * Math.PI) / POWER_3;
+  return -Math.pow(2, FACTOR_10 * t - FACTOR_10) * Math.sin((t * FACTOR_10 - ELASTIC_PHASE_IN) * c4);
 };
 
 /** 弹性出 */
 const easeOutElastic = (t: number): number => {
-  if (t === 0 || t === 1) return t;
-  const c4 = (2 * Math.PI) / 3;
-  return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  if (t === 0 || t === 1) {
+    return t;
+  }
+  const c4 = (2 * Math.PI) / POWER_3;
+  return Math.pow(2, FACTOR_NEG_10 * t) * Math.sin((t * FACTOR_10 - ELASTIC_PHASE_OUT) * c4) + 1;
 };
 
 /** 弹性入出 */
 const easeInOutElastic = (t: number): number => {
-  if (t === 0 || t === 1) return t;
-  const c5 = (2 * Math.PI) / 4.5;
-  return t < 0.5
-    ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
-    : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
+  if (t === 0 || t === 1) {
+    return t;
+  }
+  const c5 = (2 * Math.PI) / ELASTIC_C5_DIVISOR;
+  if (t < FACTOR_0_5) {
+    const pow = Math.pow(2, FACTOR_20 * t - FACTOR_10);
+    return -(pow * Math.sin((FACTOR_20 * t - ELASTIC_OFFSET) * c5)) / OFFSET_NEG_2;
+  }
+  const pow = Math.pow(2, FACTOR_NEG_20 * t + FACTOR_10);
+  return (pow * Math.sin((FACTOR_20 * t - ELASTIC_OFFSET) * c5)) / OFFSET_NEG_2 + 1;
 };
 
 /** 弹跳出 */
 const easeOutBounce = (t: number): number => {
-  const n1 = 7.5625;
-  const d1 = 2.75;
-  if (t < 1 / d1) return n1 * t * t;
-  if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
-  if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
-  return n1 * (t -= 2.625 / d1) * t + 0.984375;
+  let tt = t;
+  if (tt < 1 / BOUNCE_D1) {
+    return BOUNCE_N1 * tt * tt;
+  }
+  if (tt < 2 / BOUNCE_D1) {
+    tt -= BOUNCE_OFFSET_1 / BOUNCE_D1;
+    return BOUNCE_N1 * tt * tt + BOUNCE_PHASE_1;
+  }
+  if (tt < BOUNCE_THRESHOLD_2 / BOUNCE_D1) {
+    tt -= BOUNCE_OFFSET_2 / BOUNCE_D1;
+    return BOUNCE_N1 * tt * tt + BOUNCE_PHASE_2;
+  }
+  tt -= BOUNCE_OFFSET_3 / BOUNCE_D1;
+  return BOUNCE_N1 * tt * tt + BOUNCE_PHASE_3;
 };
 
 /** 弹跳入 */
 const easeInBounce = (t: number): number => 1 - easeOutBounce(1 - t);
 
 /** 弹跳入出 */
-const easeInOutBounce = (t: number): number =>
-  t < 0.5
-    ? (1 - easeOutBounce(1 - 2 * t)) / 2
-    : (1 + easeOutBounce(2 * t - 1)) / 2;
+const easeInOutBounce = (t: number): number => {
+  if (t < FACTOR_0_5) {
+    return (1 - easeOutBounce(1 - 2 * t)) / OFFSET_NEG_2;
+  }
+  return (1 + easeOutBounce(2 * t - 1)) / OFFSET_NEG_2;
+};
 
 // ─── 缓动注册表 ─────────────────────────────────────────
 
@@ -241,12 +381,15 @@ export const easingRegistry = new Map<string, (t: number) => number>([
  *
  * @internal
  */
-export function resolveEase(ease: EasingInput): (t: number) => number {
+const resolveEase = (ease: EasingInput): (t: number) => number => {
   if (typeof ease === 'function') {
     const fn = ease;
     return (t: number): number => {
       const v = fn(t);
-      if (typeof v !== 'number' || !isFinite(v)) return t; // 降级为线性
+      if (typeof v !== 'number' || !isFinite(v)) {
+        // 降级为线性
+        return t;
+      }
       return clamp(v, 0, 1);
     };
   }
@@ -257,7 +400,7 @@ export function resolveEase(ease: EasingInput): (t: number) => number {
     throw new Error(`未知的缓动 "${ease}"。可用: ${available}`);
   }
   return fn;
-}
+};
 
 // ─── 公开 API ───────────────────────────────────────────
 
@@ -279,7 +422,7 @@ export function resolveEase(ease: EasingInput): (t: number) => number {
  * animate(mesh, { to: { position: { x: 2 } }, ease: 'myBounce' }).play();
  * ```
  */
-export function registerEasing(name: string, fn: (t: number) => number): void {
+const registerEasing = (name: string, fn: (t: number) => number): void => {
   if (typeof name !== 'string' || !name) {
     throw new TypeError('缓动名称必须是非空字符串');
   }
@@ -289,4 +432,6 @@ export function registerEasing(name: string, fn: (t: number) => number): void {
   easingRegistry.set(name, fn);
   // 同时注册到 GSAP 内部，保持一致性
   gsap.registerEase(name, fn);
-}
+};
+
+export { resolveEase, registerEasing };

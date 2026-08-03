@@ -4,11 +4,14 @@
  * **通用组件 (General Components)**
  *
  * Foundation classes for building 3D group-based composites.
- * All components in this module extend {@link https://threejs.org/docs/#api/en/core/Object3D | THREE.Object3D} subclasses.
+ * All components in this module extend {@link https://threejs.org/docs/#api/en/core/Object3D | THREE.Object3D}
+ * subclasses.
  */
 
 export { Wall } from './Wall';
-export type { WallOptions, WallData, WallHole, Vec3Tuple } from './Wall';
+export type {
+  WallOptions, WallData, WallHole, Vec3Tuple,
+} from './Wall';
 
 export { Shape } from './Shape';
 export type { ShapeOptions, ShapeData } from './Shape';
@@ -25,10 +28,16 @@ export { Wireframe } from './Wireframe';
 export type { WireframeOptions } from './Wireframe';
 
 export { BitmapText } from './BitmapText';
-export type { BitmapTextOptions, TextMode, TextAlign, BitmapType } from './BitmapText';
+export type {
+  BitmapTextOptions, TextMode, TextAlign, BitmapType,
+} from './BitmapText';
 
 export { InstancedMesh2 } from './InstancedMesh2';
-export type { InstancedMesh2Params, BVHParams, Entity, UpdateEntityCallback, LODInfo, LODLevel, LODRenderList, CustomSortCallback, OnFrustumEnterCallback, UniformType, UniformValue, UniformValueObj } from './InstancedMesh2';
+export type {
+  InstancedMesh2Params, BVHParams, Entity, UpdateEntityCallback,
+  LODInfo, LODLevel, LODRenderList, CustomSortCallback,
+  OnFrustumEnterCallback, UniformType, UniformValue, UniformValueObj,
+} from './InstancedMesh2';
 export { InstancedEntity } from './InstancedMesh2';
 export { InstancedMeshBVH } from './InstancedMesh2';
 export { Html } from './Html';

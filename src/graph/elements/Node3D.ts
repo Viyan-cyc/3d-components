@@ -14,11 +14,20 @@
  */
 
 import * as THREE from 'three';
-import type { GroupComponentOptions, IUpdatable, IDisposable } from '../../types';
+import type { GroupComponentOptions, IDisposable, IUpdatable } from '../../types';
 import type { NodeData, NodeId } from '../types';
 
+/** 默认节点尺寸。 */
+const DEFAULT_NODE_SIZE = 0.3;
+
+/** 球体经线分段数。 */
+const SPHERE_WIDTH_SEGMENTS = 32;
+
+/** 球体纬线分段数。 */
+const SPHERE_HEIGHT_SEGMENTS = 32;
+
 // 复用临时对象，避免每帧分配。
-const _box = /* @__PURE__ */ new THREE.Box3();
+const sharedBox = /* @__PURE__ */ new THREE.Box3();
 
 /**
  * {@link Node3D} 构造参数。
@@ -33,19 +42,23 @@ const _box = /* @__PURE__ */ new THREE.Box3();
  * ```
  */
 export interface Node3DOptions extends GroupComponentOptions {
+
   /** **必填**。该节点对应的输入数据（至少需含 `id`）。 */
   data: NodeData;
+
   /**
    * 节点默认尺寸（球体半径）。当 `data.size` 未指定时使用。
    * @default 0.3
    */
   defaultSize?: number;
+
   /**
    * 节点材质**模板**。每个节点构造时会 `clone()` 一份独立实例，故各节点
    * 状态变更（改色/高亮等）互不影响；不传则用内置默认 `MeshStandardMaterial`
    * 作模板。`dispose()` 释放各节点自己 clone 的实例（模板本身不被释放）。
    */
   material?: THREE.MeshStandardMaterial;
+
   /**
    * 节点几何体**工厂**。传入则用其返回值替代默认的 `SphereGeometry`，
    * 可实现自定义节点形状（如六边形瓦片、立方体等）。工厂接收节点尺寸 `size`
@@ -54,6 +67,7 @@ export interface Node3DOptions extends GroupComponentOptions {
    * {@link Node3D.setGeometryFactory} 切换。
    */
   geometryFactory?: (size: number) => THREE.BufferGeometry;
+
   /**
    * 整体缩放。 @default 1
    */
@@ -81,18 +95,25 @@ export interface Node3DOptions extends GroupComponentOptions {
 export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 该节点对应的输入数据（只读视图）。 */
   readonly data: NodeData;
+
   /** 该节点 id（便捷访问，等价于 `this.data.id`）。 */
   readonly nodeId: NodeId;
+
   /** 内部 mesh。 */
   private readonly mesh: THREE.Mesh;
+
   /** 当前几何体引用（setSize / setGeometryFactory 时会被替换，dispose 时释放当前实例）。 */
   private geometry: THREE.BufferGeometry;
+
   /** 节点解析后的尺寸（球体半径量级）；setGeometryFactory 重建时沿用。 */
   private readonly size: number;
+
   /** 节点几何工厂（可选）；缺省时 buildGeometry 回退 `SphereGeometry`。 */
   private geometryFactory?: (size: number) => THREE.BufferGeometry;
+
   /** 该节点独立持有的材质实例（由模板 clone 而来，状态变更互不影响）。 */
   readonly material: THREE.MeshStandardMaterial;
+
   /**
    * label 槽位。第二步未填充（本次不实现 sprite/html 节点形态）；
    * 后续步骤将以此挂载 `core/Html`（DOM 标签投影）或 `core/BitmapText`（SDF 文字）。
@@ -106,15 +127,23 @@ export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
   constructor(options: Node3DOptions) {
     super();
     this.name = options.name ?? `node-${options.data.id}`;
-    if (options.visible !== undefined) this.visible = options.visible;
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
     this.userData = { ...options.userData, nodeId: options.data.id };
-    if (options.scale !== undefined) this.scale.setScalar(options.scale);
-    if (options.children) { for (const c of options.children) this.add(c); }
+    if (options.scale !== undefined) {
+      this.scale.setScalar(options.scale);
+    }
+    if (options.children) {
+      for (const c of options.children) {
+        this.add(c);
+      }
+    }
 
     this.data = options.data;
     this.nodeId = options.data.id;
 
-    const size = options.data.size ?? options.defaultSize ?? 0.3;
+    const size = options.data.size ?? options.defaultSize ?? DEFAULT_NODE_SIZE;
     this.size = size;
     this.geometryFactory = options.geometryFactory;
     this.geometry = this.buildGeometry(size);
@@ -159,10 +188,12 @@ export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
    * @returns 节点尺寸（半径量级）。
    */
   getSize(): number {
-    if (this.data.size !== undefined) return this.data.size;
-    _box.setFromObject(this);
+    if (this.data.size !== undefined) {
+      return this.data.size;
+    }
+    sharedBox.setFromObject(this);
     const size = new THREE.Vector3();
-    _box.getSize(size);
+    sharedBox.getSize(size);
     return size.length() / 2;
   }
 
@@ -170,7 +201,9 @@ export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
    * 按当前工厂（或缺省球体）构建一份新几何体。供构造、setSize、setGeometryFactory 复用。
    */
   private buildGeometry(size: number): THREE.BufferGeometry {
-    return this.geometryFactory ? this.geometryFactory(size) : new THREE.SphereGeometry(size, 32, 32);
+    return this.geometryFactory
+      ? this.geometryFactory(size)
+      : new THREE.SphereGeometry(size, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS);
   }
 
   /**
@@ -210,15 +243,18 @@ export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
   }
 
   /**
+   * 每帧由渲染循环调用。当前 no-op，子类可覆写。
+   */
+  update(_delta: number): void { // eslint-disable-line @typescript-eslint/no-unused-vars
+    // no-op — override in subclasses if needed
+  }
+
+  /**
    * 释放节点持有的几何体与材质（均为本节点 clone 出的独立实例，始终释放）。
    *
    * 先手动释放 geometry/material 与 label，再 `this.clear()` 移除子级。
    * 预先释放 `label`（若已挂载，第二步以 `core/Html` 实现）。
    */
-  update(_delta: number): void {
-    // no-op — override in subclasses if needed
-  }
-
   dispose(): void {
     if (this.label) {
       const l = this.label as unknown as { dispose?: () => void };
@@ -228,6 +264,7 @@ export class Node3D extends THREE.Group implements IUpdatable, IDisposable {
     }
     this.geometry.dispose();
     this.material.dispose();
-    this.clear(); // 移除内部 mesh 等子级
+    // 移除内部 mesh 等子级
+    this.clear();
   }
 }

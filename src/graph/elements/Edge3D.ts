@@ -17,12 +17,18 @@
  */
 
 import * as THREE from 'three';
-import type { GroupComponentOptions, IUpdatable, IDisposable } from '../../types';
-import { Path } from '../../core/Path';
+import type { GroupComponentOptions, IDisposable, IUpdatable } from '../../types';
 import type { NodeId, NodePos3D } from '../types';
+import { Path } from '../../core/Path';
 
 /** 边形态类型。 */
 export type EdgeType = 'line' | 'path';
+
+/** 默认管道半径。 */
+const DEFAULT_PATH_RADIUS = 0.05;
+
+/** 顶点分量数（x, y, z）。 */
+const VERT_COMPONENTS = 3;
 
 /**
  * {@link Edge3D} 构造参数。
@@ -40,12 +46,16 @@ export type EdgeType = 'line' | 'path';
  * ```
  */
 export interface Edge3DOptions extends GroupComponentOptions {
+
   /** 边 id。 */
   id?: NodeId;
+
   /** 起点坐标。 */
   source: NodePos3D;
+
   /** 终点坐标。 */
   target: NodePos3D;
+
   /**
    * 边形态。
    * - `'line'`（默认）：`LineSegments` 直线段，材质为 `LineBasicMaterial`。
@@ -53,16 +63,19 @@ export interface Edge3DOptions extends GroupComponentOptions {
    * @default 'line'
    */
   type?: EdgeType;
+
   /**
    * `'path'` 形态的管道半径。仅 `type:'path'` 生效。
    * @default 0.05
    */
   pathRadius?: number;
+
   /**
    * `'path'` 形态是否在末端生成箭头（有向边）。仅 `type:'path'` 生效。
    * @default false
    */
   arrow?: boolean;
+
   /**
    * 边材质**模板**。按 {@link Edge3DOptions.type} 决定材质类型：
    * - `'line'`：`LineBasicMaterial`；
@@ -73,6 +86,7 @@ export interface Edge3DOptions extends GroupComponentOptions {
    * 实例（模板本身不被释放）。
    */
   material?: THREE.LineBasicMaterial | THREE.MeshStandardMaterial;
+
   /**
    * 整体缩放。 @default 1
    */
@@ -98,22 +112,29 @@ export interface Edge3DOptions extends GroupComponentOptions {
 export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
   /** 边 id（便捷访问）。 */
   readonly edgeId: NodeId;
+
   /** 起点 id。 */
   readonly sourceId: NodeId;
+
   /** 终点 id。 */
   readonly targetId: NodeId;
+
   /** 边形态。 */
   readonly type: EdgeType;
+
   /** `'path'` 形态的管道半径。 */
   private readonly pathRadius: number;
+
   /** `'path'` 形态是否带箭头。 */
   private readonly arrow: boolean;
 
   // ---- 'line' 形态字段 ----
   /** 内部 line（两顶点）。`'line'` 形态用。 */
   private line: THREE.LineSegments | null = null;
+
   /** 几何体（dispose 用）。`'line'` 形态用。 */
   private geometry: THREE.BufferGeometry | null = null;
+
   /** 顶点 position 属性（updateEnds 时原地写入）。`'line'` 形态用。 */
   private positionAttr: THREE.BufferAttribute | null = null;
 
@@ -132,48 +153,88 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
    */
   constructor(options: Edge3DOptions) {
     super();
+    this.applyBaseOptions(options);
+    this.edgeId = options.id ?? `${options.source.id}->${options.target.id}`;
+    this.sourceId = options.source.id;
+    this.targetId = options.target.id;
+    this.type = options.type ?? 'line';
+    this.pathRadius = options.pathRadius ?? DEFAULT_PATH_RADIUS;
+    this.arrow = options.arrow ?? false;
+    this.material = this.cloneMaterial(options);
+    this.buildGeometryByType(options);
+  }
+
+  /**
+   * 应用基础选项（name/visible/userData/scale/children）。
+   */
+  private applyBaseOptions(options: Edge3DOptions): void {
     this.name = options.name ?? `edge-${options.id ?? `${options.source.id}->${options.target.id}`}`;
-    if (options.visible !== undefined) this.visible = options.visible;
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
     this.userData = {
       ...options.userData,
       edgeId: options.id,
       sourceId: options.source.id,
       targetId: options.target.id,
     };
-    if (options.scale !== undefined) this.scale.setScalar(options.scale);
-    if (options.children) { for (const c of options.children) this.add(c); }
+    if (options.scale !== undefined) {
+      this.scale.setScalar(options.scale);
+    }
+    if (options.children) {
+      for (const c of options.children) {
+        this.add(c);
+      }
+    }
+  }
 
-    this.edgeId = options.id ?? `${options.source.id}->${options.target.id}`;
-    this.sourceId = options.source.id;
-    this.targetId = options.target.id;
-    this.type = options.type ?? 'line';
-    this.pathRadius = options.pathRadius ?? 0.05;
-    this.arrow = options.arrow ?? false;
-
-    // 按形态 clone 独立材质 —— 交互时改色/高亮互不影响。
+  /**
+   * 按形态 clone 独立材质 —— 交互时改色/高亮互不影响。
+   */
+  private cloneMaterial(options: Edge3DOptions): THREE.LineBasicMaterial | THREE.MeshStandardMaterial {
     if (this.type === 'path') {
-      // 'path' 形态用 MeshStandardMaterial（与 core/Path 默认材质一致）。
-      const template =
-        options.material instanceof THREE.MeshStandardMaterial
-          ? options.material
-          : new THREE.MeshStandardMaterial({
-              color: 0x9aa7b8,
-              roughness: 0.6,
-              metalness: 0.1,
-            });
-      this.material = template.clone();
+      return this.clonePathMaterial(options);
+    }
+    return this.cloneLineMaterial(options);
+  }
+
+  /**
+   * Clone line 形态材质。
+   */
+  private cloneLineMaterial(options: Edge3DOptions): THREE.LineBasicMaterial {
+    const template =
+      options.material instanceof THREE.LineBasicMaterial
+        ? options.material
+        : new THREE.LineBasicMaterial({
+          color: 0x9aa7b8,
+          transparent: true,
+          opacity: 0.85,
+        });
+    return template.clone();
+  }
+
+  /**
+   * Clone path 形态材质。
+   */
+  private clonePathMaterial(options: Edge3DOptions): THREE.MeshStandardMaterial {
+    const template =
+      options.material instanceof THREE.MeshStandardMaterial
+        ? options.material
+        : new THREE.MeshStandardMaterial({
+          color: 0x9aa7b8,
+          roughness: 0.6,
+          metalness: 0.1,
+        });
+    return template.clone();
+  }
+
+  /**
+   * 按形态构建几何体。
+   */
+  private buildGeometryByType(options: Edge3DOptions): void {
+    if (this.type === 'path') {
       this.buildPath(options.source, options.target);
     } else {
-      // 'line' 形态用 LineBasicMaterial。
-      const template =
-        options.material instanceof THREE.LineBasicMaterial
-          ? options.material
-          : new THREE.LineBasicMaterial({
-              color: 0x9aa7b8,
-              transparent: true,
-              opacity: 0.85,
-            });
-      this.material = template.clone();
       this.buildLine(options.source, options.target);
     }
   }
@@ -188,7 +249,7 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
         source.x, source.y, source.z,
         target.x, target.y, target.z,
       ]),
-      3,
+      VERT_COMPONENTS,
     );
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', this.positionAttr);
@@ -220,7 +281,7 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
         },
       ],
       // 复用本边 clone 出的独立材质实例；ownsMaterial=false，由本边负责释放。
-      material: this.material as THREE.MeshStandardMaterial,
+      material: this.material,
     });
     // Path 内部 mesh 也带上 edgeId，供 Raycaster 拾取后回查边身份。
     this.path.traverse((child) => {
@@ -234,7 +295,9 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
    * Path.dispose 在 ownsMaterial=false 时只释放几何，符合预期。
    */
   private disposePath(): void {
-    if (!this.path) return;
+    if (!this.path) {
+      return;
+    }
     this.path.dispose();
     this.remove(this.path);
     this.path = null;
@@ -266,7 +329,9 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
       this.buildPath(source, target);
       return;
     }
-    if (!this.positionAttr) return;
+    if (!this.positionAttr) {
+      return;
+    }
     const arr = this.positionAttr.array as Float32Array;
     arr[0] = source.x; arr[1] = source.y; arr[2] = source.z;
     arr[3] = target.x; arr[4] = target.y; arr[5] = target.z;
@@ -285,6 +350,13 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
   }
 
   /**
+   * 每帧由渲染循环调用。当前 no-op，子类可覆写。
+   */
+  update(_delta: number): void { // eslint-disable-line @typescript-eslint/no-unused-vars
+    // no-op — override in subclasses if needed
+  }
+
+  /**
    * 释放几何体与材质（均为本边 clone 出的独立实例，始终释放）。
    *
    * - `'line'`：释放 BufferGeometry + LineBasicMaterial。
@@ -296,10 +368,6 @@ export class Edge3D extends THREE.Group implements IUpdatable, IDisposable {
    * 但材质是共享 clone 实例（ownsMaterial=false 的 Path 不释放它），故也在此统一释放。
    * 提前 `clear()` 移除子级，语义与 {@link Node3D.dispose} 保持一致。
    */
-  update(_delta: number): void {
-    // no-op — override in subclasses if needed
-  }
-
   dispose(): void {
     this.disposeLine();
     this.disposePath();

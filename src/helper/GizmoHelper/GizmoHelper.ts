@@ -1,5 +1,6 @@
+
 import * as THREE from 'three';
-import type { IUpdatable, IDisposable } from '../../types';
+import type { IDisposable, IUpdatable } from '../../types';
 
 /**
  * Gizmo 在屏幕上的对齐位置（九宫格）。
@@ -25,10 +26,13 @@ export type GizmoAlignment =
  * 也兼容任意遵循该形状的自定义控制器。所有字段均为可选。
  */
 export interface GizmoControlsLike {
+
   /** 轨道中心点 —— gizmo 围绕该点旋转相机。 */
   target?: THREE.Vector3;
+
   /** 每个动画步调用，用于把控制器同步到新的相机位姿。 */
   update?(delta?: number): void;
+
   /** 为 false 时控制器忽略输入（gizmo 点击时临时禁用以抑制轨道拖拽）。 */
   enabled?: boolean;
 }
@@ -44,8 +48,10 @@ export interface GizmoControlsLike {
  * 悬停的对象会被打上 `userData.gizmoHover = true` 标记（见 hover）。
  */
 export interface GizmoContent extends THREE.Object3D {
+
   /** 可被射线拾取的子对象列表（轴头 / 立方体面等）。 */
   readonly pickables?: THREE.Object3D[];
+
   /** 可选逐帧回调（GizmoHelper.update 中、镜像相机朝向后调用）。 */
   update?(delta: number): void;
 }
@@ -66,6 +72,7 @@ export interface GizmoContent extends THREE.Object3D {
  * ```
  */
 export interface GizmoHelperOptions {
+
   /** 主场景相机：gizmo 镜像其朝向，点击轴时围绕目标点旋转它。 */
   camera: THREE.Camera;
 
@@ -100,6 +107,26 @@ export interface GizmoHelperOptions {
 // ===================== internals =====================
 // 旋转速率：弧度 / 秒（2π 即每秒一圈）。
 const TURN_RATE = 2 * Math.PI;
+const MARGIN_X = 16;
+const MARGIN_Y = 16;
+const DEFAULT_MARGIN: [number, number] = [MARGIN_X, MARGIN_Y];
+const DEFAULT_SIZE = 120;
+const NEAR_CLIP = 0.1;
+const FAR_CLIP = 1000;
+const CAMERA_Z = 10;
+const FRUSTUM_HALF = 1.4;
+const ANGLE_THRESHOLD = 0.01;
+
+/** 释放单个材质及其贴图。 */
+const disposeMaterial = (mat: THREE.Material): void => {
+  const anyMat = mat as unknown as { map?: THREE.Texture };
+  anyMat.map?.dispose();
+  mat.dispose();
+};
+
+/** 判定对象是否具备 `dispose()` 方法。 */
+const hasDispose = (obj: unknown): obj is { dispose: () => void } =>
+  typeof (obj as { dispose?: unknown }).dispose === 'function';
 
 /**
  * GizmoHelper —— 视口导航 Gizmo（Viewport Gizmo）容器。
@@ -152,8 +179,10 @@ const TURN_RATE = 2 * Math.PI;
 export class GizmoHelper implements IUpdatable, IDisposable {
   /** 主场景相机。 */
   readonly camera: THREE.Camera;
+
   /** 用于绘制叠层的渲染器。 */
   readonly renderer: THREE.WebGLRenderer;
+
   /** 相机控制器（可能为空）。 */
   readonly controls?: GizmoControlsLike;
 
@@ -166,6 +195,7 @@ export class GizmoHelper implements IUpdatable, IDisposable {
 
   /** 独立虚拟场景，gizmo 内容渲染于此。 */
   readonly virtualScene: THREE.Scene;
+
   /** 正交相机，固定从 +Z 俯视原点。 */
   readonly virtualCamera: THREE.OrthographicCamera;
 
@@ -186,6 +216,7 @@ export class GizmoHelper implements IUpdatable, IDisposable {
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _ndc = new THREE.Vector2();
   private readonly _prevViewport = new THREE.Vector4();
+
   /** 当前悬停的可拾取对象（其 userData.gizmoHover = true）。 */
   private _hovered: THREE.Object3D | null = null;
 
@@ -200,23 +231,31 @@ export class GizmoHelper implements IUpdatable, IDisposable {
     this._onUpdate = options.onUpdate;
 
     this._alignment = options.alignment ?? 'bottom-right';
-    this._margin = options.margin ?? [16, 16];
-    this._size = options.size ?? 120;
+    this._margin = options.margin ?? DEFAULT_MARGIN;
+    this._size = options.size ?? DEFAULT_SIZE;
     this._disabled = options.disabled ?? false;
 
     // 虚拟场景 + 正交相机（方形视锥，正对方形叠层区域）。
-    const d = 1.4; // 半视锥尺寸，刚好框住单位 gizmo
+    // 半视锥尺寸，刚好框住单位 gizmo
+    const d = FRUSTUM_HALF;
     this.virtualScene = new THREE.Scene();
-    this.virtualCamera = new THREE.OrthographicCamera(-d, d, d, -d, 0.1, 1000);
-    this.virtualCamera.position.set(0, 0, 10);
+    this.virtualCamera = new THREE.OrthographicCamera(-d, d, d, -d, NEAR_CLIP, FAR_CLIP);
+    this.virtualCamera.position.set(0, 0, CAMERA_Z);
     this.virtualCamera.lookAt(0, 0, 0);
     this.virtualCamera.updateProjectionMatrix();
 
     // 记录相机 up，OrbitControls 动画结束后需还原。
     this._defaultUp.copy(this.camera.up);
 
-    if (options.content) this.setContent(options.content);
+    if (options.content) {
+      this.setContent(options.content);
+    }
 
+    this._attachListeners();
+  }
+
+  /** 绑定指针事件监听器。 */
+  private _attachListeners(): void {
     // 拾取监听（捕获阶段，尽早拦截，避免同时触发轨道拖拽）。
     this.renderer.domElement.addEventListener('pointerdown', this._onPointerDown, true);
     // 悬停高亮（非捕获，不干扰 OrbitControls 的拖拽）。
@@ -230,7 +269,9 @@ export class GizmoHelper implements IUpdatable, IDisposable {
    * @returns this，支持链式调用。
    */
   setContent(content: GizmoContent): this {
-    if (this._content) this.virtualScene.remove(this._content);
+    if (this._content) {
+      this.virtualScene.remove(this._content);
+    }
     this._content = content;
     this.virtualScene.add(content);
     return this;
@@ -290,19 +331,26 @@ export class GizmoHelper implements IUpdatable, IDisposable {
    * @param delta - 距上一帧的秒数（建议像其它组件一样封顶 0.1s）。
    */
   update(delta: number): void {
-    if (this._disabled || !this._content) return;
+    if (this._disabled || !this._content) {
+      return;
+    }
 
-    if (this._animating) this._stepAnimation(delta);
+    if (this._animating) {
+      this._stepAnimation(delta);
+    }
 
     // tween 刚改过相机位姿，先刷新 world 矩阵，确保镜像与当前帧一致。
     this.camera.updateMatrixWorld();
 
     // 镜像主相机朝向：内容根节点四元数 = 相机世界矩阵的逆。
-    this._content.quaternion.setFromRotationMatrix(this._matrix.copy(this.camera.matrixWorld).invert());
+    const inverted = this._matrix.copy(this.camera.matrixWorld).invert();
+    this._content.quaternion.setFromRotationMatrix(inverted);
 
     // 内容自带的逐帧逻辑（如 GizmoViewport 的深度着色 / hover 高亮）。
     // 在设置好四元数之后调用，使内容可基于当前朝向计算。
-    if (typeof this._content.update === 'function') this._content.update(delta);
+    if (typeof this._content.update === 'function') {
+      this._content.update(delta);
+    }
   }
 
   /**
@@ -312,25 +360,33 @@ export class GizmoHelper implements IUpdatable, IDisposable {
    * 否则主渲染会清掉 gizmo 画面。
    */
   renderOverlay(): void {
-    if (this._disabled || !this._content) return;
+    if (this._disabled || !this._content) {
+      return;
+    }
 
     const gl = this.renderer;
-    const { x, y, width, height } = this._computeRegion();
+    const region = this._computeRegion();
 
     // 注意：three 的 setViewport / setScissor 接收的是 **CSS 像素**，
     // 内部会乘以 pixelRatio 换算到设备像素。因此区域一律用 CSS 像素计算。
     const prevAutoClear = gl.autoClear;
-    gl.getViewport(this._prevViewport); // 保存主场景视口，结束后还原
+    // 保存主场景视口，结束后还原
+    gl.getViewport(this._prevViewport);
     gl.autoClear = false;
     gl.setScissorTest(true);
-    gl.setViewport(x, y, width, height);
-    gl.setScissor(x, y, width, height);
+    gl.setViewport(region.x, region.y, region.width, region.height);
+    gl.setScissor(region.x, region.y, region.width, region.height);
     // 仅清深度，使 gizmo 不被主场景深度遮挡；保留主场景颜色作为背景。
     gl.clearDepth();
     gl.render(this.virtualScene, this.virtualCamera);
 
     gl.setScissorTest(false);
-    gl.setViewport(this._prevViewport.x, this._prevViewport.y, this._prevViewport.z, this._prevViewport.w);
+    gl.setViewport(
+      this._prevViewport.x,
+      this._prevViewport.y,
+      this._prevViewport.z,
+      this._prevViewport.w,
+    );
     gl.autoClear = prevAutoClear;
   }
 
@@ -345,12 +401,7 @@ export class GizmoHelper implements IUpdatable, IDisposable {
    */
   tweenCamera(direction: THREE.Vector3): this {
     this._animating = true;
-
-    // 目标点（轨道中心）
-    if (this._onTarget) this._focusPoint.copy(this._onTarget());
-    else if (this.controls?.target) this._focusPoint.copy(this.controls.target);
-    else this._focusPoint.set(0, 0, 0);
-
+    this._resolveFocusPoint();
     this._radius = this.camera.position.distanceTo(this._focusPoint) || 1;
 
     // 起点：当前相机朝向
@@ -366,14 +417,25 @@ export class GizmoHelper implements IUpdatable, IDisposable {
     return this;
   }
 
+  /** 解析轨道焦点。 */
+  private _resolveFocusPoint(): void {
+    if (this._onTarget) {
+      this._focusPoint.copy(this._onTarget());
+    } else if (this.controls?.target) {
+      this._focusPoint.copy(this.controls.target);
+    } else {
+      this._focusPoint.set(0, 0, 0);
+    }
+  }
+
   /** 推进相机动画一步。 */
   private _stepAnimation(delta: number): void {
-    const camera = this.camera;
+    const cam = this.camera;
 
-    if (this._q1.angleTo(this._q2) < 0.01) {
+    if (this._q1.angleTo(this._q2) < ANGLE_THRESHOLD) {
       this._animating = false;
       // OrbitControls 以 up 向量为轨道轴，动画结束后需还原
-      camera.up.copy(this._defaultUp);
+      cam.up.copy(this._defaultUp);
       return;
     }
 
@@ -381,12 +443,19 @@ export class GizmoHelper implements IUpdatable, IDisposable {
     this._q1.rotateTowards(this._q2, step);
 
     // 沿单位球插值位置，并同步朝向与 up
-    camera.position.set(0, 0, 1).applyQuaternion(this._q1).multiplyScalar(this._radius).add(this._focusPoint);
-    camera.up.set(0, 1, 0).applyQuaternion(this._q1).normalize();
-    camera.quaternion.copy(this._q1);
+    cam.position
+      .set(0, 0, 1)
+      .applyQuaternion(this._q1)
+      .multiplyScalar(this._radius)
+      .add(this._focusPoint);
+    cam.up.set(0, 1, 0).applyQuaternion(this._q1).normalize();
+    cam.quaternion.copy(this._q1);
 
-    if (this._onUpdate) this._onUpdate();
-    else this.controls?.update?.(delta);
+    if (this._onUpdate) {
+      this._onUpdate();
+    } else {
+      this.controls?.update?.(delta);
+    }
   }
 
   /**
@@ -402,29 +471,53 @@ export class GizmoHelper implements IUpdatable, IDisposable {
     const mx = this._margin[0];
     const my = this._margin[1];
 
-    let x: number;
-    let y: number;
+    const x = this._computeRegionX(dw, s, mx);
+    const y = this._computeRegionY(dh, s, my);
 
-    if (this._alignment.endsWith('center')) x = (dw - s) / 2;
-    else if (this._alignment.endsWith('left')) x = mx;
-    else x = dw - mx - s; // *-right
-
-    if (this._alignment.startsWith('center')) y = (dh - s) / 2;
-    else if (this._alignment.startsWith('bottom')) y = my;
-    else y = dh - my - s; // top-*
-
-    return { x, y, width: s, height: s };
+    return {
+      x,
+      y,
+      width: s,
+      height: s,
+    };
   }
 
-  /** 指针按下：若落在 gizmo 区域并命中可拾取对象，触发其 onPick。 */
+  /** 计算叠层区域 X 坐标。 */
+  private _computeRegionX(dw: number, s: number, mx: number): number {
+    if (this._alignment.endsWith('center')) {
+      return (dw - s) / 2;
+    }
+    if (this._alignment.endsWith('left')) {
+      return mx;
+    }
+    // *-right
+    return dw - mx - s;
+  }
+
+  /** 计算叠层区域 Y 坐标。 */
+  private _computeRegionY(dh: number, s: number, my: number): number {
+    if (this._alignment.startsWith('center')) {
+      return (dh - s) / 2;
+    }
+    if (this._alignment.startsWith('bottom')) {
+      return my;
+    }
+    // top-*
+    return dh - my - s;
+  }
+
   /**
    * 把指针事件映射到 gizmo 正交相机并射线拾取，返回命中的可拾取对象（或 null）。
    * 区域外或未命中返回 null。
    */
   private _pickAt(e: PointerEvent): THREE.Object3D | null {
-    if (!this._content) return null;
+    if (!this._content) {
+      return null;
+    }
     const pickables = this._content.pickables;
-    if (!pickables || pickables.length === 0) return null;
+    if (!pickables || pickables.length === 0) {
+      return null;
+    }
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     // 指针 → CSS 像素坐标（y 翻转为 WebGL 左下原点）
@@ -432,9 +525,14 @@ export class GizmoHelper implements IUpdatable, IDisposable {
     const py = rect.height - (e.clientY - rect.top);
 
     const r = this._computeRegion();
-    if (px < r.x || px > r.x + r.width || py < r.y || py > r.y + r.height) return null; // 区域外
+    if (px < r.x || px > r.x + r.width || py < r.y || py > r.y + r.height) {
+      // 区域外
+      return null;
+    }
 
-    this._ndc.set(((px - r.x) / r.width) * 2 - 1, ((py - r.y) / r.height) * 2 - 1);
+    const ndcX = ((px - r.x) / r.width) * 2 - 1;
+    const ndcY = ((py - r.y) / r.height) * 2 - 1;
+    this._ndc.set(ndcX, ndcY);
     this._raycaster.setFromCamera(this._ndc, this.virtualCamera);
     const hits = this._raycaster.intersectObjects(pickables, false);
     return hits.length ? hits[0].object : null;
@@ -442,10 +540,16 @@ export class GizmoHelper implements IUpdatable, IDisposable {
 
   /** 设置当前悬停对象（打上 userData.gizmoHover 标记，供内容逐帧高亮）。 */
   private _setHover(obj: THREE.Object3D | null): void {
-    if (obj === this._hovered) return;
-    if (this._hovered) this._hovered.userData.gizmoHover = false;
+    if (obj === this._hovered) {
+      return;
+    }
+    if (this._hovered) {
+      this._hovered.userData.gizmoHover = false;
+    }
     this._hovered = obj;
-    if (obj) obj.userData.gizmoHover = true;
+    if (obj) {
+      obj.userData.gizmoHover = true;
+    }
   }
 
   /** 指针是否落在 gizmo 叠层区域内（用于 helper 整体悬停态）。 */
@@ -458,7 +562,9 @@ export class GizmoHelper implements IUpdatable, IDisposable {
   }
 
   private _onPointerMove = (e: PointerEvent): void => {
-    if (this._disabled || !this._content) return;
+    if (this._disabled || !this._content) {
+      return;
+    }
     const inRegion = this._isInRegion(e);
     // helper 整体悬停态（内容可据此显示底色等）
     this._content.userData.helperHover = inRegion;
@@ -466,36 +572,53 @@ export class GizmoHelper implements IUpdatable, IDisposable {
   };
 
   private _onPointerLeave = (): void => {
-    if (!this._content) return;
+    if (!this._content) {
+      return;
+    }
     this._content.userData.helperHover = false;
     this._setHover(null);
   };
 
   private _onPointerDown = (e: PointerEvent): void => {
-    if (this._disabled || !this._content) return;
+    if (this._disabled || !this._content) {
+      return;
+    }
     const hit = this._pickAt(e);
-    if (!hit) return;
+    if (!hit) {
+      return;
+    }
 
     const onPick = hit.userData.onPick as (() => void) | undefined;
-    if (!onPick) return;
+    if (!onPick) {
+      return;
+    }
 
     e.preventDefault();
     e.stopPropagation();
 
     // 临时禁用控制器，抑制这次手势的轨道拖拽
-    const controls = this.controls;
-    if (controls && 'enabled' in controls) {
-      const wasEnabled = controls.enabled !== false;
-      if (wasEnabled) controls.enabled = false;
-      const restore = (): void => {
-        if (wasEnabled) controls.enabled = true;
-        window.removeEventListener('pointerup', restore);
-      };
-      window.addEventListener('pointerup', restore);
-    }
-
+    this._suppressControlsDuringGesture();
     onPick();
   };
+
+  /** 在 pointerup 之前临时禁用控制器，抑制轨道拖拽。 */
+  private _suppressControlsDuringGesture(): void {
+    const ctrl = this.controls;
+    if (!ctrl || !('enabled' in ctrl)) {
+      return;
+    }
+    const wasEnabled = ctrl.enabled !== false;
+    if (wasEnabled) {
+      ctrl.enabled = false;
+    }
+    const restore = (): void => {
+      if (wasEnabled) {
+        ctrl.enabled = true;
+      }
+      window.removeEventListener('pointerup', restore);
+    };
+    window.addEventListener('pointerup', restore);
+  }
 
   /**
    * 释放资源：移除监听、释放内容与虚拟场景中的几何体 / 材质 / 纹理。
@@ -509,28 +632,23 @@ export class GizmoHelper implements IUpdatable, IDisposable {
 
     // 内容自带 dispose 则优先调用；否则遍历释放
     const content = this._content;
-    if (content && hasDispose(content)) content.dispose();
+    if (content && hasDispose(content)) {
+      content.dispose();
+    }
 
     this.virtualScene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
       const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((m) => disposeMaterial(m));
-      else if (mat) disposeMaterial(mat);
+      if (Array.isArray(mat)) {
+        mat.forEach((m) => disposeMaterial(m));
+      } else if (mat) {
+        disposeMaterial(mat);
+      }
     });
     this.virtualScene.clear();
     this._content = null;
   }
-}
-
-/** 释放单个材质及其贴图。 */
-function disposeMaterial(mat: THREE.Material): void {
-  const anyMat = mat as unknown as { map?: THREE.Texture };
-  anyMat.map?.dispose();
-  mat.dispose();
-}
-
-/** 判定对象是否具备 `dispose()` 方法。 */
-function hasDispose(obj: unknown): obj is { dispose: () => void } {
-  return typeof (obj as { dispose?: unknown }).dispose === 'function';
 }

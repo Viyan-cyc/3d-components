@@ -22,8 +22,8 @@
  */
 
 import type { NodeData, NodeId, NodePos3D } from '../types';
-import type { HexLayoutConfig } from './types';
 import { mapToPlane2D, resolveDepth, resolvePlane } from './util';
+import type { HexLayoutConfig } from './types';
 
 /** 轴向坐标六邻居方向（RedBlob 标准；orientation 无关，仅像素换算分平顶/尖顶）。 */
 const AXIAL_DIRS = [
@@ -35,8 +35,18 @@ const AXIAL_DIRS = [
   { q: 0, r: 1 },
 ] as const;
 
+/** 六邻居方向数量。 */
+const NUM_DIRS = 6;
+
 /** `Math.sqrt(3)`，hex-to-pixel 换算的常量。 */
+
 const SQRT3 = Math.sqrt(3);
+
+/** 三维维度常量（hex-to-pixel 公式中 3/2 系数的分子）。 */
+const HEX_FACTOR = 3;
+
+/** 轴向环方向数量（6 边）。 */
+const RING_SIDES = 6;
 
 /**
  * 生成第 `radius` 环的轴向坐标序列（不含中心）。RedBlob `cube_ring` 的轴向版。
@@ -46,13 +56,15 @@ const SQRT3 = Math.sqrt(3);
  * @param radius - 环序号（≥1）。
  * @returns 该环所有格子的轴向坐标（共 `6·radius` 个）。
  */
-function axialRing(radius: number): Array<{ q: number; r: number }> {
-  if (radius <= 0) return [];
+const axialRing = function (radius: number): Array<{ q: number; r: number }> {
+  if (radius <= 0) {
+    return [];
+  }
   const out: Array<{ q: number; r: number }> = [];
   // 起点：中心 + radius * dirs[4]（dirs[4] = (-1, +1)）。
   let q = -radius;
   let r = radius;
-  for (let side = 0; side < 6; side++) {
+  for (let side = 0; side < RING_SIDES; side++) {
     const d = AXIAL_DIRS[side];
     for (let step = 0; step < radius; step++) {
       out.push({ q, r });
@@ -61,7 +73,7 @@ function axialRing(radius: number): Array<{ q: number; r: number }> {
     }
   }
   return out;
-}
+};
 
 /**
  * 轴向坐标 `(q, r)` → 2D 世界坐标，按 orientation 选用 RedBlob hex-to-pixel 公式。
@@ -71,7 +83,7 @@ function axialRing(radius: number): Array<{ q: number; r: number }> {
  *
  * @returns `{ x2, y2 }`（再统一经 `mapToPlane2D` 映射三维）。
  */
-function hexToPixel(
+const hexToPixel = function (
   q: number,
   r: number,
   size: number,
@@ -79,16 +91,16 @@ function hexToPixel(
 ): { x2: number; y2: number } {
   if (orientation === 'pointy') {
     return {
-      x2: size * (SQRT3 * q + (SQRT3 / 2) * r),
-      y2: size * (3 / 2) * r,
+      x2: size * (SQRT3 * q + (SQRT3 / NUM_DIRS) * r),
+      y2: size * (HEX_FACTOR / NUM_DIRS) * r,
     };
   }
   // flat-top
   return {
-    x2: size * (3 / 2) * q,
-    y2: size * ((SQRT3 / 2) * q + SQRT3 * r),
+    x2: size * (HEX_FACTOR / NUM_DIRS) * q,
+    y2: size * ((SQRT3 / NUM_DIRS) * q + SQRT3 * r),
   };
-}
+};
 
 /**
  * 把一组节点铺成**一张蜂巢切片**（单层），从中心向外逐环螺旋填充。
@@ -99,7 +111,7 @@ function hexToPixel(
  * @param layerIndex - 本层在被忽略轴上的层级索引。
  * @param cfg - 配置（取 plane 与分层参数）。
  */
-function honeycombLayer(
+const honeycombLayer = function (
   group: NodeData[],
   size: number,
   orientation: 'flat' | 'pointy',
@@ -107,7 +119,9 @@ function honeycombLayer(
   cfg: HexLayoutConfig,
 ): NodePos3D[] {
   const n = group.length;
-  if (n === 0) return [];
+  if (n === 0) {
+    return [];
+  }
   const plane = resolvePlane(cfg);
   const depth = resolveDepth(cfg, layerIndex);
 
@@ -117,7 +131,9 @@ function honeycombLayer(
   let ring = 1;
   while (coords.length < n) {
     const layer = axialRing(ring);
-    for (let i = 0; i < layer.length; i++) coords.push(layer[i]);
+    for (const c of layer) {
+      coords.push(c);
+    }
     ring++;
   }
 
@@ -129,7 +145,58 @@ function honeycombLayer(
     out[i] = { id: group[i].id, ...p };
   }
   return out;
-}
+};
+
+/**
+ * 按分组字段分桶，每组一个深度层，组内各铺一张蜂巢。
+ */
+const buildGroupedLayers = function (
+  nodes: NodeData[],
+  size: number,
+  orientation: 'flat' | 'pointy',
+  groupBy: string,
+  cfg: HexLayoutConfig,
+): NodePos3D[] {
+  const groupOrder: NodeId[] = [];
+  const buckets = new Map<unknown, NodeData[]>();
+  for (const nd of nodes) {
+    const key = (nd as Record<string, unknown>)[groupBy];
+    if (buckets.has(key) === false) {
+      buckets.set(key, []);
+      groupOrder.push(key as NodeId);
+    }
+    buckets.get(key)!.push(nd);
+  }
+  const result: NodePos3D[] = [];
+  groupOrder.forEach((key, layerIndex) => {
+    result.push(...honeycombLayer(buckets.get(key)!, size, orientation, layerIndex, cfg));
+  });
+  return result;
+};
+
+/**
+ * 按 index 轮询均分到各层，每层一张蜂巢。
+ */
+const buildStackedLayers = function (
+  nodes: NodeData[],
+  size: number,
+  orientation: 'flat' | 'pointy',
+  layers: number,
+  cfg: HexLayoutConfig,
+): NodePos3D[] {
+  const perLayerBuckets: NodeData[][] = Array.from({ length: layers }, () => []);
+  for (let i = 0; i < nodes.length; i++) {
+    perLayerBuckets[i % layers].push(nodes[i]);
+  }
+  const result: NodePos3D[] = [];
+  for (let layer = 0; layer < layers; layer++) {
+    const group = perLayerBuckets[layer];
+    if (group.length > 0) {
+      result.push(...honeycombLayer(group, size, orientation, layer, cfg));
+    }
+  }
+  return result;
+};
 
 /**
  * 六边形蜂巢布局。
@@ -147,7 +214,7 @@ function honeycombLayer(
  * Layouts.hex(nodes, { radius: 1.2, layers: 3, layerSpacing: 2.4 });
  * ```
  */
-export function hex(nodes: NodeData[], config?: HexLayoutConfig): NodePos3D[] {
+export const hex = function (nodes: NodeData[], config?: HexLayoutConfig): NodePos3D[] {
   const cfg = config ?? {};
   const size = cfg.radius ?? 1;
   const orientation = cfg.orientation ?? 'flat';
@@ -156,38 +223,14 @@ export function hex(nodes: NodeData[], config?: HexLayoutConfig): NodePos3D[] {
 
   // 1) 分组分层：groupBy 命中时，按字段值去重分桶（保留首次出现顺序），每组一个深度层。
   if (groupBy) {
-    const groupOrder: NodeId[] = [];
-    const buckets = new Map<unknown, NodeData[]>();
-    for (const nd of nodes) {
-      const key = (nd as Record<string, unknown>)[groupBy];
-      if (!buckets.has(key)) {
-        buckets.set(key, []);
-        groupOrder.push(key as NodeId);
-      }
-      buckets.get(key)!.push(nd);
-    }
-    const result: NodePos3D[] = [];
-    groupOrder.forEach((key, layerIndex) => {
-      result.push(...honeycombLayer(buckets.get(key)!, size, orientation, layerIndex, cfg));
-    });
-    return result;
+    return buildGroupedLayers(nodes, size, orientation, groupBy, cfg);
   }
 
   // 2) 多层堆叠：groupBy 缺省且 layers>1 —— 按 index 轮询均分到各层，每层一张蜂巢。
   if (layers > 1) {
-    const perLayerBuckets: NodeData[][] = Array.from({ length: layers }, () => []);
-    for (let i = 0; i < nodes.length; i++) {
-      perLayerBuckets[i % layers].push(nodes[i]);
-    }
-    const result: NodePos3D[] = [];
-    for (let layer = 0; layer < layers; layer++) {
-      const group = perLayerBuckets[layer];
-      if (group.length === 0) continue;
-      result.push(...honeycombLayer(group, size, orientation, layer, cfg));
-    }
-    return result;
+    return buildStackedLayers(nodes, size, orientation, layers, cfg);
   }
 
   // 3) 单层蜂巢：最常见。
   return honeycombLayer(nodes, size, orientation, 0, cfg);
-}
+};

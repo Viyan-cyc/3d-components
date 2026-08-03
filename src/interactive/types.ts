@@ -1,3 +1,4 @@
+
 import type * as THREE from 'three';
 
 // ─── Event Types ──────────────────────────────────────────────
@@ -58,20 +59,28 @@ export type PointerEventType =
  * intersections list and processed sequentially.
  */
 export interface Intersection {
+
   /** The actual Three.js object that the ray intersected. */
   object: THREE.Object3D;
+
   /** The registered Object3D that owns the handler (may be an ancestor of `object`). */
   eventObject: THREE.Object3D;
+
   /** Distance from camera to intersection point. */
   distance: number;
+
   /** Intersection point in world space. */
   point: THREE.Vector3;
+
   /** Face at intersection, if available. */
   face?: THREE.Face | null;
+
   /** Index into the geometry's index buffer (THREE.Intersection.index). Used in composite hover key. */
   index?: number;
+
   /** Instance ID (for InstancedMesh), if available. Used in composite hover key. */
   instanceId?: number | null;
+
   /** UV coordinates at intersection, if available. */
   uv?: THREE.Vector2;
 }
@@ -86,46 +95,65 @@ export interface Intersection {
  * (stopped mechanism).
  */
 export interface IntersectionEvent {
+
   /** The actual Three.js object that the ray intersected. */
   object: THREE.Object3D;
+
   /** The registered Object3D that this handler is bound to. */
   eventObject: THREE.Object3D;
+
   /** Distance from camera to intersection point. */
   distance: number;
+
   /** Intersection point in world space. */
   point: THREE.Vector3;
+
   /** Face at intersection, if available. */
   face?: THREE.Face | null;
+
   /** Index into the geometry's index buffer (THREE.Intersection.index). */
   index?: number;
+
   /** Instance ID (for InstancedMesh), if available. */
   instanceId?: number | null;
+
   /** UV coordinates at intersection, if available. */
   uv?: THREE.Vector2;
+
   /** The ray used for intersection (world space). */
   ray: THREE.Ray;
+
   /** The camera used for raycasting. */
   camera: THREE.Camera;
+
   /** Normalized pointer position in NDC (−1 to +1). */
   pointer: THREE.Vector2;
+
   /** All intersections from this raycast (sorted by distance). */
   intersections: Intersection[];
+
   /** Delta from pointerdown position in CSS pixels. Available on click/up events. */
   delta: number;
+
   /** The native DOM PointerEvent / WheelEvent that triggered this. */
   nativeEvent: PointerEvent | WheelEvent;
+
   /** Call to stop the flat intersection iteration. */
   stopPropagation: () => void;
+
   /** Whether propagation has been stopped. */
   stopped: boolean;
+
   /** Unprojected point: pointer NDC unprojected onto the camera plane. */
   unprojectedPoint: THREE.Vector3;
+
   /** Pointer capture API on the event target. */
   target: {
     hasPointerCapture: (id: number) => boolean;
     setPointerCapture: (id: number) => void;
     releasePointerCapture: (id: number) => void;
   };
+
   /** Same as target (for currentTarget semantics). */
   currentTarget: {
     hasPointerCapture: (id: number) => boolean;
@@ -152,32 +180,46 @@ export interface IntersectionEvent {
  * ```
  */
 export interface EventHandlers {
+
   /** ✅ 冒泡 — 左键单击（down→up 距离≤阈值，且在 initialHits 中） */
   onClick?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 左键双击（替代第二次 click 触发） */
   onDoubleClick?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 任意鼠标键按下 */
   onPointerDown?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 任意鼠标键抬起 */
   onPointerUp?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 指针在已悬停对象上移动 */
   onPointerMove?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 指针进入对象（与 enter 同时触发，在 move 的 handleIntersects 回调中派发） */
   onPointerOver?: (event: IntersectionEvent) => void;
+
   /** ❌ 不冒泡 — 指针离开对象（与 leave 同时触发，由 cancelPointer 直接 per-object 派发） */
   onPointerOut?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 指针进入对象（与 over 同时触发，在 move 的 handleIntersects 回调中派发） */
   onPointerEnter?: (event: IntersectionEvent) => void;
+
   /** ❌ 不冒泡 — 指针离开对象（与 out 同时触发，由 cancelPointer 直接 per-object 派发） */
   onPointerLeave?: (event: IntersectionEvent) => void;
+
   /** ❌ 不冒泡 — 指针取消（触发 cancelPointer 清除所有悬停） */
   onPointerCancel?: (event: IntersectionEvent) => void;
+
   /** ❌ 不冒泡 — 指针捕获丢失（由 DOM 事件触发） */
   onLostPointerCapture?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 鼠标滚轮 */
   onWheel?: (event: IntersectionEvent) => void;
+
   /** ✅ 冒泡 — 右键菜单 */
   onContextMenu?: (event: IntersectionEvent) => void;
+
   /** ❌ 不冒泡 — 点击空白区域（直接 per-object 派发） */
   onPointerMissed?: (event: IntersectionEvent) => void;
 }
@@ -231,6 +273,7 @@ export type FilterIntersectionsFn = (
  * Options for constructing an {@link InteractiveManager}.
  */
 export interface InteractiveManagerOptions {
+
   /** The camera used for raycasting. Updated externally (e.g. by OrbitControls). */
   camera: THREE.Camera;
 

@@ -1,8 +1,78 @@
-// @ts-nocheck
-import { Color, Euler, Matrix4, Object3D, Quaternion, Vector3 } from 'three';
-import type { ColorRepresentation } from 'three';
-import type { InstancedMesh2 } from './InstancedMesh2';
+import {
+  type Color,
+  type ColorRepresentation,
+  Euler,
+  type Matrix4,
+  type Object3D,
+  Quaternion,
+  Vector3,
+} from 'three';
 import type { UniformValue, UniformValueObj } from './utils/SquareDataTexture';
+import type { InstancedMesh2 } from './InstancedMesh2';
+
+// owner references the owning mesh regardless of its generic instantiation
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyInstancedMesh2 = InstancedMesh2<any, any, any, any>;
+
+const MATRIX_ELEMENTS = 16;
+const W_OFFSET = 3;
+const COL1_BASE = 4;
+const COL2_BASE = 8;
+const COL3_BASE = 12;
+
+const tempQuat = new Quaternion();
+const tempVec3 = new Vector3();
+const tempXAxis = new Vector3(1, 0, 0);
+const tempYAxis = new Vector3(0, 1, 0);
+const tempZAxis = new Vector3(0, 0, 1);
+
+const writeMatrixFromTransform = (
+  te: Float32Array,
+  offset: number,
+  quaternion: Quaternion,
+  scale: Vector3,
+  position: Vector3,
+): void => {
+  const x = quaternion.x;
+  const y = quaternion.y;
+  const z = quaternion.z;
+  const w = quaternion.w;
+  const x2 = x + x;
+  const y2 = y + y;
+  const z2 = z + z;
+  const xx = x * x2;
+  const xy = x * y2;
+  const xz = x * z2;
+  const yy = y * y2;
+  const yz = y * z2;
+  const zz = z * z2;
+  const wx = w * x2;
+  const wy = w * y2;
+  const wz = w * z2;
+  const sx = scale.x;
+  const sy = scale.y;
+  const sz = scale.z;
+
+  te[offset] = (1 - (yy + zz)) * sx;
+  te[offset + 1] = (xy + wz) * sx;
+  te[offset + 2] = (xz - wy) * sx;
+  te[offset + W_OFFSET] = 0;
+
+  te[offset + COL1_BASE] = (xy - wz) * sy;
+  te[offset + COL1_BASE + 1] = (1 - (xx + zz)) * sy;
+  te[offset + COL1_BASE + 2] = (yz + wx) * sy;
+  te[offset + COL1_BASE + W_OFFSET] = 0;
+
+  te[offset + COL2_BASE] = (xz + wy) * sz;
+  te[offset + COL2_BASE + 1] = (yz - wx) * sz;
+  te[offset + COL2_BASE + 2] = (1 - (xx + yy)) * sz;
+  te[offset + COL2_BASE + W_OFFSET] = 0;
+
+  te[offset + COL3_BASE] = position.x;
+  te[offset + COL3_BASE + 1] = position.y;
+  te[offset + COL3_BASE + 2] = position.z;
+  te[offset + COL3_BASE + W_OFFSET] = 1;
+};
 
 /**
  * Represents an individual instance in an `InstancedMesh2`.
@@ -10,193 +80,211 @@ import type { UniformValue, UniformValueObj } from './utils/SquareDataTexture';
  * This class is instantiated automatically when `createEntities` is `true` in constructor params.
  */
 export class InstancedEntity {
-    public readonly isInstanceEntity = true;
-    /** The unique identifier for this instance. */
-    public readonly id: number;
-    /** The `InstancedMesh2` that owns this instance. */
-    public readonly owner: InstancedMesh2;
-    /** The local position. */
-    public position = new Vector3();
-    /** The local scale. */
-    public scale = new Vector3(1, 1, 1);
-    /** The local rotation as `Quaternion`. */
-    public quaternion = new Quaternion();
-    /** The local rotation as `Euler` (only if `allowsEuler` is `true`). */
-    public rotation: Euler;
+  public readonly isInstanceEntity = true;
 
-    public get visible(): boolean { return this.owner.getVisibilityAt(this.id); }
-    public set visible(value: boolean) { this.owner.setVisibilityAt(this.id, value); }
+  /** The unique identifier for this instance. */
+  public readonly id: number;
 
-    public get active(): boolean { return this.owner.getActiveAt(this.id); }
-    public set active(value: boolean) { this.owner.setActiveAt(this.id, value); }
+  /** The `InstancedMesh2` that owns this instance. */
+  public readonly owner: AnyInstancedMesh2;
 
-    public get color(): Color { return this.owner.getColorAt(this.id); }
-    public set color(value: ColorRepresentation) { this.owner.setColorAt(this.id, value); }
+  /** The local position. */
+  public position = new Vector3();
 
-    public get opacity(): number { return this.owner.getOpacityAt(this.id); }
-    public set opacity(value: number) { this.owner.setOpacityAt(this.id, value); }
+  /** The local scale. */
+  public scale = new Vector3(1, 1, 1);
 
-    public get matrix(): Matrix4 { return this.owner.getMatrixAt(this.id); }
+  /** The local rotation as `Quaternion`. */
+  public quaternion = new Quaternion();
 
-    public get matrixWorld(): Matrix4 { return this.matrix.premultiply(this.owner.matrixWorld); }
+  /** The local rotation as `Euler` (only if `allowsEuler` is `true`). */
+  public rotation: Euler | undefined;
 
-    constructor(owner: InstancedMesh2, id: number, useEuler: boolean) {
-        this.id = id;
-        this.owner = owner;
+  public get visible(): boolean {
+    return this.owner.getVisibilityAt(this.id);
+  }
 
-        if (useEuler) {
-            const quaternion = this.quaternion;
-            const rotation = this.rotation = new Euler();
+  public set visible(value: boolean) {
+    this.owner.setVisibilityAt(this.id, value);
+  }
 
-            rotation._onChange(() => quaternion.setFromEuler(rotation, false));
-            quaternion._onChange(() => rotation.setFromQuaternion(quaternion, undefined, false));
-        }
+  public get active(): boolean {
+    return this.owner.getActiveAt(this.id);
+  }
+
+  public set active(value: boolean) {
+    this.owner.setActiveAt(this.id, value);
+  }
+
+  public get color(): Color {
+    return this.owner.getColorAt(this.id);
+  }
+
+  public set color(value: ColorRepresentation) {
+    this.owner.setColorAt(this.id, value);
+  }
+
+  public get opacity(): number {
+    return this.owner.getOpacityAt(this.id);
+  }
+
+  public set opacity(value: number) {
+    this.owner.setOpacityAt(this.id, value);
+  }
+
+  public get matrix(): Matrix4 {
+    return this.owner.getMatrixAt(this.id);
+  }
+
+  public get matrixWorld(): Matrix4 {
+    return this.matrix.premultiply(this.owner.matrixWorld);
+  }
+
+  constructor(owner: AnyInstancedMesh2, id: number, useEuler: boolean) {
+    this.id = id;
+    this.owner = owner;
+
+    if (useEuler) {
+      const quaternion = this.quaternion;
+      const rotation = new Euler();
+      this.rotation = rotation;
+
+      rotation._onChange(() => quaternion.setFromEuler(rotation, false));
+      quaternion._onChange(() => rotation.setFromQuaternion(quaternion, undefined, false));
     }
+  }
 
-    /** @internal Resets matrix to identity. */
-    public setMatrixIdentity(): void {
-        const owner = this.owner;
-        const te = owner.matricesTexture._data;
-        const id = this.id;
-        const offset = id * 16;
+  /** @internal Resets matrix to identity. */
+  public setMatrixIdentity(): void {
+    const owner = this.owner;
+    const te = owner.matricesTexture._data;
+    const id = this.id;
+    const offset = id * MATRIX_ELEMENTS;
 
-        te[offset + 0] = 1; te[offset + 1] = 0; te[offset + 2] = 0; te[offset + 3] = 0;
-        te[offset + 4] = 0; te[offset + 5] = 1; te[offset + 6] = 0; te[offset + 7] = 0;
-        te[offset + 8] = 0; te[offset + 9] = 0; te[offset + 10] = 1; te[offset + 11] = 0;
-        te[offset + 12] = 0; te[offset + 13] = 0; te[offset + 14] = 0; te[offset + 15] = 1;
+    te.fill(0, offset, offset + MATRIX_ELEMENTS);
+    te[offset] = 1;
+    te[offset + COL1_BASE + 1] = 1;
+    te[offset + COL2_BASE + 2] = 1;
+    te[offset + COL3_BASE + W_OFFSET] = 1;
 
-        owner.matricesTexture.enqueueUpdate(id);
+    owner.matricesTexture.enqueueUpdate(id);
+  }
+
+  /** Updates the transformation matrix from current position, quaternion, and scale. */
+  public updateMatrix(): void {
+    const owner = this.owner;
+    const position = this.position;
+    const quaternion = this.quaternion;
+    const scale = this.scale;
+    const te = owner.matricesTexture._data;
+    const id = this.id;
+    const offset = id * MATRIX_ELEMENTS;
+
+    writeMatrixFromTransform(te as Float32Array, offset, quaternion, scale, position);
+
+    owner.matricesTexture.enqueueUpdate(id);
+
+    if (owner.bvh && owner.autoUpdateBVH) {
+      owner.bvh.move(id);
     }
+  }
 
-    /** Updates the transformation matrix from current position, quaternion, and scale. */
-    public updateMatrix(): void {
-        const owner = this.owner;
-        const position = this.position;
-        const quaternion = this.quaternion as any;
-        const scale = this.scale;
-        const te = owner.matricesTexture._data;
-        const id = this.id;
-        const offset = id * 16;
+  /** Updates only the position component of the transformation matrix. */
+  public updateMatrixPosition(): void {
+    const owner = this.owner;
+    const position = this.position;
+    const te = owner.matricesTexture._data;
+    const id = this.id;
+    const offset = id * MATRIX_ELEMENTS;
 
-        const x = quaternion._x, y = quaternion._y, z = quaternion._z, w = quaternion._w;
-        const x2 = x + x, y2 = y + y, z2 = z + z;
-        const xx = x * x2, xy = x * y2, xz = x * z2;
-        const yy = y * y2, yz = y * z2, zz = z * z2;
-        const wx = w * x2, wy = w * y2, wz = w * z2;
+    te[offset + COL3_BASE] = position.x;
+    te[offset + COL3_BASE + 1] = position.y;
+    te[offset + COL3_BASE + 2] = position.z;
 
-        const sx = scale.x, sy = scale.y, sz = scale.z;
+    owner.matricesTexture.enqueueUpdate(id);
 
-        te[offset + 0] = (1 - (yy + zz)) * sx;
-        te[offset + 1] = (xy + wz) * sx;
-        te[offset + 2] = (xz - wy) * sx;
-        te[offset + 3] = 0;
-
-        te[offset + 4] = (xy - wz) * sy;
-        te[offset + 5] = (1 - (xx + zz)) * sy;
-        te[offset + 6] = (yz + wx) * sy;
-        te[offset + 7] = 0;
-
-        te[offset + 8] = (xz + wy) * sz;
-        te[offset + 9] = (yz - wx) * sz;
-        te[offset + 10] = (1 - (xx + yy)) * sz;
-        te[offset + 11] = 0;
-
-        te[offset + 12] = position.x;
-        te[offset + 13] = position.y;
-        te[offset + 14] = position.z;
-        te[offset + 15] = 1;
-
-        owner.matricesTexture.enqueueUpdate(id);
-
-        if (owner.bvh && owner.autoUpdateBVH) {
-            owner.bvh.move(id);
-        }
+    if (owner.bvh && owner.autoUpdateBVH) {
+      owner.bvh.move(id);
     }
+  }
 
-    /** Updates only the position component of the transformation matrix. */
-    public updateMatrixPosition(): void {
-        const owner = this.owner;
-        const position = this.position;
-        const te = owner.matricesTexture._data;
-        const id = this.id;
-        const offset = id * 16;
+  public getUniform(name: string, target?: UniformValueObj): UniformValue {
+    return this.owner.getUniformAt(this.id, name, target);
+  }
 
-        te[offset + 12] = position.x;
-        te[offset + 13] = position.y;
-        te[offset + 14] = position.z;
+  public setUniform(name: string, value: UniformValue): void {
+    this.owner.setUniformAt(this.id, name, value);
+  }
 
-        owner.matricesTexture.enqueueUpdate(id);
+  public updateBones(updateBonesMatrices = true, excludeBonesSet?: Set<string>): void {
+    this.owner.setBonesAt(this.id, updateBonesMatrices, excludeBonesSet);
+  }
 
-        if (owner.bvh && owner.autoUpdateBVH) {
-            owner.bvh.move(id);
-        }
+  /** Copies transformation to an Object3D. */
+  public copyTo(target: Object3D): void {
+    target.position.copy(this.position);
+    target.scale.copy(this.scale);
+    target.quaternion.copy(this.quaternion);
+    if (this.rotation) {
+      target.rotation.copy(this.rotation);
     }
+  }
 
-    public getUniform(name: string, target?: UniformValueObj): UniformValue {
-        return this.owner.getUniformAt(this.id, name, target);
-    }
+  public applyMatrix4(m: Matrix4): this {
+    this.matrix.premultiply(m).decompose(this.position, this.quaternion, this.scale);
+    return this;
+  }
 
-    public setUniform(name: string, value: UniformValue): void {
-        this.owner.setUniformAt(this.id, name, value);
-    }
+  public applyQuaternion(q: Quaternion): this {
+    this.quaternion.premultiply(q);
+    return this;
+  }
 
-    public updateBones(updateBonesMatrices = true, excludeBonesSet?: Set<string>): void {
-        this.owner.setBonesAt(this.id, updateBonesMatrices, excludeBonesSet);
-    }
+  public rotateOnAxis(axis: Vector3, angle: number): this {
+    tempQuat.setFromAxisAngle(axis, angle);
+    this.quaternion.multiply(tempQuat);
+    return this;
+  }
 
-    /** Copies transformation to an Object3D. */
-    public copyTo(target: Object3D): void {
-        target.position.copy(this.position);
-        target.scale.copy(this.scale);
-        target.quaternion.copy(this.quaternion);
-        if (this.rotation) target.rotation.copy(this.rotation);
-    }
+  public rotateOnWorldAxis(axis: Vector3, angle: number): this {
+    tempQuat.setFromAxisAngle(axis, angle);
+    this.quaternion.premultiply(tempQuat);
+    return this;
+  }
 
-    public applyMatrix4(m: Matrix4): this {
-        this.matrix.premultiply(m).decompose(this.position, this.quaternion, this.scale);
-        return this;
-    }
+  public rotateX(angle: number): this {
+    return this.rotateOnAxis(tempXAxis, angle);
+  }
 
-    public applyQuaternion(q: Quaternion): this {
-        this.quaternion.premultiply(q);
-        return this;
-    }
+  public rotateY(angle: number): this {
+    return this.rotateOnAxis(tempYAxis, angle);
+  }
 
-    public rotateOnAxis(axis: Vector3, angle: number): this {
-        _quat.setFromAxisAngle(axis, angle);
-        this.quaternion.multiply(_quat);
-        return this;
-    }
+  public rotateZ(angle: number): this {
+    return this.rotateOnAxis(tempZAxis, angle);
+  }
 
-    public rotateOnWorldAxis(axis: Vector3, angle: number): this {
-        _quat.setFromAxisAngle(axis, angle);
-        this.quaternion.premultiply(_quat);
-        return this;
-    }
+  public translateOnAxis(axis: Vector3, distance: number): this {
+    tempVec3.copy(axis).applyQuaternion(this.quaternion);
+    this.position.add(tempVec3.multiplyScalar(distance));
+    return this;
+  }
 
-    public rotateX(angle: number): this { return this.rotateOnAxis(_xAxis, angle); }
-    public rotateY(angle: number): this { return this.rotateOnAxis(_yAxis, angle); }
-    public rotateZ(angle: number): this { return this.rotateOnAxis(_zAxis, angle); }
+  public translateX(distance: number): this {
+    return this.translateOnAxis(tempXAxis, distance);
+  }
 
-    public translateOnAxis(axis: Vector3, distance: number): this {
-        _vec3.copy(axis).applyQuaternion(this.quaternion);
-        this.position.add(_vec3.multiplyScalar(distance));
-        return this;
-    }
+  public translateY(distance: number): this {
+    return this.translateOnAxis(tempYAxis, distance);
+  }
 
-    public translateX(distance: number): this { return this.translateOnAxis(_xAxis, distance); }
-    public translateY(distance: number): this { return this.translateOnAxis(_yAxis, distance); }
-    public translateZ(distance: number): this { return this.translateOnAxis(_zAxis, distance); }
+  public translateZ(distance: number): this {
+    return this.translateOnAxis(tempZAxis, distance);
+  }
 
-    /** Removes this entity from its owner instance. */
-    public remove(): this {
-        this.owner.removeInstances(this.id);
-        return this;
-    }
+  /** Removes this entity from its owner instance. */
+  public remove(): this {
+    this.owner.removeInstances(this.id);
+    return this;
+  }
 }
-
-const _quat = new Quaternion();
-const _vec3 = new Vector3();
-const _xAxis = new Vector3(1, 0, 0);
-const _yAxis = new Vector3(0, 1, 0);
-const _zAxis = new Vector3(0, 0, 1);

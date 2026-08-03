@@ -13,273 +13,331 @@
 
 import { DistanceTransform } from './distanceTransform';
 
+// ────────────────────────────── Constants ──────────────────────────────────
+
+/** Default font size in pixels. */
+const DEFAULT_FONT_SIZE = 72;
+
+/** Default atlas width in pixels. */
+const DEFAULT_ATLAS_WIDTH = 2048;
+
+/** Default atlas height in pixels. */
+const DEFAULT_ATLAS_HEIGHT = 2048;
+
+/** SDF cutoff value. */
+const SDF_CUTOFF = 0.25;
+
+/** Number of RGBA channels. */
+const RGBA_CHANNELS = 4;
+
+/** Scaler for 'j' character to avoid zero-width artifacts. */
+const J_SCALER = 0.00001;
+
+/** Divisor for padding calculation from font size. */
+const PADDING_DIVISOR = 24;
+
+/** Multiplier for padding calculation. */
+const PADDING_MULTIPLIER = 3;
+
+/** Scale factor for padding in canvas size calculation. */
+const PADDING_SCALE = 4;
+
+/** Divisor for SDF radius calculation from font size. */
+const SDF_RADIUS_DIVISOR = 24;
+
+/** Multiplier for SDF radius calculation. */
+const SDF_RADIUS_MULTIPLIER = 8;
+
 // ────────────────────────────── Public Types ──────────────────────────────
 
 /** Character metrics stored per glyph in the font data. */
 export interface FontChar {
-	/** The character string. */
-	char: string;
-	/** Character code. */
-	id: number;
-	/** X position in atlas (pixels). */
-	x: number;
-	/** Y position in atlas (pixels). */
-	y: number;
-	/** Glyph bitmap width (pixels). */
-	width: number;
-	/** Glyph bitmap height (pixels). */
-	height: number;
-	/** Horizontal offset from pen position. */
-	xoffset: number;
-	/** Vertical offset from pen position (positive = up). */
-	yoffset: number;
-	/** Horizontal advance to next character. */
-	xadvance: number;
+
+  /** The character string. */
+  char: string;
+
+  /** Character code. */
+  id: number;
+
+  /** X position in atlas (pixels). */
+  x: number;
+
+  /** Y position in atlas (pixels). */
+  y: number;
+
+  /** Glyph bitmap width (pixels). */
+  width: number;
+
+  /** Glyph bitmap height (pixels). */
+  height: number;
+
+  /** Horizontal offset from pen position. */
+  xoffset: number;
+
+  /** Vertical offset from pen position (positive = up). */
+  yoffset: number;
+
+  /** Horizontal advance to next character. */
+  xadvance: number;
 }
 
 /** Font data structure consumed by BitmapTextGeometry. */
 export interface FontKerning {
-	first: number;
-	second: number;
-	amount: number;
+  first: number;
+  second: number;
+  amount: number;
 }
 
 export interface FontData {
-	common: {
-		scaleW: number;
-		scaleH: number;
-	};
-	info: {
-		size: number;
-	};
-	chars: FontChar[];
-	kernings?: FontKerning[];
+  common: {
+    scaleW: number;
+    scaleH: number;
+  };
+  info: {
+    size: number;
+  };
+  chars: FontChar[];
+  kernings?: FontKerning[];
 }
 
 /** Options for {@link DynamicFont} constructor. */
 export interface DynamicFontOptions {
-	/** Font size in pixels. @default 72 */
-	fontSize?: number;
-	/** Atlas width. @default 2048 */
-	width?: number;
-	/** Atlas height. @default 2048 */
-	height?: number;
-	/** CSS font-family. @default 'sans-serif' */
-	fontFamily?: string;
-	/** CSS font-weight. @default 'normal' */
-	fontWeight?: string;
-	/** CSS font-style. @default 'normal' */
-	fontStyle?: string;
-	/** Whether to generate SDF. @default true */
-	sdf?: boolean;
+
+  /** Font size in pixels. @default 72 */
+  fontSize?: number;
+
+  /** Atlas width. @default 2048 */
+  width?: number;
+
+  /** Atlas height. @default 2048 */
+  height?: number;
+
+  /** CSS font-family. @default 'sans-serif' */
+  fontFamily?: string;
+
+  /** CSS font-weight. @default 'normal' */
+  fontWeight?: string;
+
+  /** CSS font-style. @default 'normal' */
+  fontStyle?: string;
+
+  /** Whether to generate SDF. @default true */
+  sdf?: boolean;
 }
 
 // ────────────────────────────── IndexManager ──────────────────────────────
 
 class IndexManager {
-	private _available: number[];
+  private available: number[];
 
-	constructor(max: number) {
-		this._available = [];
-		this.reset(max);
-	}
+  constructor(max: number) {
+    this.available = [];
+    this.reset(max);
+  }
 
-	canAllocate(): boolean {
-		return this._available.length > 0;
-	}
+  canAllocate(): boolean {
+    return this.available.length > 0;
+  }
 
-	allocate(): number {
-		return this._available.pop()!;
-	}
+  allocate(): number {
+    return this.available.pop()!;
+  }
 
-	free(index: number): void {
-		this._available.push(index);
-	}
+  free(index: number): void {
+    this.available.push(index);
+  }
 
-	reset(max: number): void {
-		this._available = Array.from({ length: max }, (_, i) => i).reverse();
-	}
+  reset(max: number): void {
+    this.available = Array.from({ length: max }, (_, i) => i).reverse();
+  }
 }
 
 // ────────────────────────────── FontAtlas ─────────────────────────────────
 
 class FontAtlas {
-	readonly width: number;
-	readonly height: number;
+  readonly width: number;
+  readonly height: number;
 
-	private _charSize: number;
-	private _maxCol: number;
-	private _indexManager: IndexManager;
-	private _fontMap: Map<string, { i: number; x: number; y: number; w: number; h: number }>;
-	private _buffer: Uint8ClampedArray;
-	private _sdf: boolean;
+  private charSize: number;
+  private maxCol: number;
+  private indexManager: IndexManager;
+  private fontMap: Map<string, { i: number; x: number; y: number; w: number; h: number }>;
+  private buffer: Uint8ClampedArray;
+  private sdf: boolean;
 
-	constructor(width: number, height: number, charSize: number, sdf: boolean) {
-		this.width = width;
-		this.height = height;
-		this._charSize = charSize;
-		this._maxCol = Math.floor(width / charSize);
-		this._indexManager = new IndexManager(Math.floor(width / charSize) * Math.floor(height / charSize));
-		this._fontMap = new Map();
-		this._buffer = new Uint8ClampedArray(width * height * (sdf ? 1 : 4));
-		this._sdf = sdf;
-	}
+  constructor(width: number, height: number, charSize: number, sdf: boolean) {
+    this.width = width;
+    this.height = height;
+    this.charSize = charSize;
+    this.maxCol = Math.floor(width / charSize);
+    this.indexManager = new IndexManager(Math.floor(width / charSize) * Math.floor(height / charSize));
+    this.fontMap = new Map();
+    this.buffer = new Uint8ClampedArray(width * height * (sdf ? 1 : RGBA_CHANNELS));
+    this.sdf = sdf;
+  }
 
-	addChar(
-		char: string,
-		origin: { buffer: Uint8ClampedArray; width: number; height: number },
-	): boolean {
-		if (!this._indexManager.canAllocate()) return false;
+  addChar(
+    char: string,
+    origin: { buffer: Uint8ClampedArray; width: number; height: number },
+  ): boolean {
+    if (!this.indexManager.canAllocate()) {
+      return false;
+    }
 
-		const writeIndex = this._indexManager.allocate();
-		const charInfo = {
-			i: writeIndex,
-			x: (writeIndex % this._maxCol) * this._charSize,
-			y: Math.floor(writeIndex / this._maxCol) * this._charSize,
-			w: origin.width,
-			h: origin.height,
-		};
-		this._fontMap.set(char, charInfo);
+    const writeIndex = this.indexManager.allocate();
+    const charInfo = {
+      i: writeIndex,
+      x: (writeIndex % this.maxCol) * this.charSize,
+      y: Math.floor(writeIndex / this.maxCol) * this.charSize,
+      w: origin.width,
+      h: origin.height,
+    };
+    this.fontMap.set(char, charInfo);
 
-		const { buffer, width, height } = origin;
-		const sdf = this._sdf;
+    const { buffer, width, height } = origin;
+    const sdf = this.sdf;
 
-		for (let y = 0; y < height; y++) {
-			for (let x = 0; x < width; x++) {
-				const targetIndex = (charInfo.x + x) + (charInfo.y + y) * this.width;
-				const sourceIndex = x + y * width;
-				if (sdf) {
-					// R2R: single-channel copy
-					this._buffer[targetIndex] = buffer[sourceIndex];
-				} else {
-					// RGBA2RGBA: 4-channel copy
-					const si4 = sourceIndex * 4;
-					const ti4 = targetIndex * 4;
-					this._buffer[ti4] = buffer[si4];
-					this._buffer[ti4 + 1] = buffer[si4 + 1];
-					this._buffer[ti4 + 2] = buffer[si4 + 2];
-					this._buffer[ti4 + 3] = buffer[si4 + 3];
-				}
-			}
-		}
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const targetIndex = (charInfo.x + x) + (charInfo.y + y) * this.width;
+        const sourceIndex = x + y * width;
+        if (sdf) {
+          // R2R: single-channel copy
+          this.buffer[targetIndex] = buffer[sourceIndex];
+        } else {
+          // RGBA2RGBA: 4-channel copy
+          const si4 = sourceIndex * RGBA_CHANNELS;
+          const ti4 = targetIndex * RGBA_CHANNELS;
+          this.buffer[ti4] = buffer[si4];
+          this.buffer[ti4 + 1] = buffer[si4 + 1];
+          this.buffer[ti4 + PADDING_MULTIPLIER] = buffer[si4 + PADDING_MULTIPLIER];
+          this.buffer[ti4 + RGBA_CHANNELS - 1] = buffer[si4 + RGBA_CHANNELS - 1];
+        }
+      }
+    }
 
-		return true;
-	}
+    return true;
+  }
 
-	hasChar(char: string): boolean {
-		return this._fontMap.has(char);
-	}
+  hasChar(char: string): boolean {
+    return this.fontMap.has(char);
+  }
 
-	getChar(char: string): { x: number; y: number; w: number; h: number } | undefined {
-		return this._fontMap.get(char);
-	}
+  getChar(char: string): { x: number; y: number; w: number; h: number } | undefined {
+    return this.fontMap.get(char);
+  }
 
-	clear(): void {
-		this._fontMap.clear();
-		this._indexManager.reset(
-			Math.floor(this.width / this._charSize) * Math.floor(this.height / this._charSize),
-		);
-		this._buffer.fill(0);
-	}
+  clear(): void {
+    this.fontMap.clear();
+    this.indexManager.reset(Math.floor(this.width / this.charSize) * Math.floor(this.height / this.charSize));
+    this.buffer.fill(0);
+  }
 
-	get buffer(): Uint8ClampedArray {
-		return this._buffer;
-	}
+  get bufferData(): Uint8ClampedArray {
+    return this.buffer;
+  }
 }
 
 // ────────────────────────────── CharacterCanvas ───────────────────────────
 
 class CharacterCanvas {
-	readonly size: number;
-	readonly padding: number;
+  readonly size: number;
+  readonly padding: number;
 
-	private _distanceRadius: number;
-	private _distanceCutoff: number;
-	private _ctx: CanvasRenderingContext2D;
-	private _dt: DistanceTransform | null;
+  private distanceRadius: number;
+  private distanceCutoff: number;
+  private context: CanvasRenderingContext2D;
+  private distanceTransformer: DistanceTransform | null;
 
-	constructor(options: {
-		fontSize: number;
-		fontFamily: string;
-		fontWeight: string;
-		fontStyle: string;
-		sdf: boolean;
-	}) {
-		const { fontSize, fontFamily, fontWeight, fontStyle, sdf } = options;
+  constructor(options: {
+    fontSize: number;
+    fontFamily: string;
+    fontWeight: string;
+    fontStyle: string;
+    sdf: boolean;
+  }) {
+    const {
+      fontSize, fontFamily, fontWeight, fontStyle, sdf,
+    } = options;
 
-		const padding = Math.floor((fontSize / 24) * 3);
-		const size = fontSize + padding * 4;
+    const padding = Math.floor((fontSize / PADDING_DIVISOR) * PADDING_MULTIPLIER);
+    const size = fontSize + padding * PADDING_SCALE;
 
-		const canvas = document.createElement('canvas');
-		canvas.width = canvas.height = size;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
 
-		const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-		ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
-		ctx.textBaseline = 'alphabetic';
-		ctx.textAlign = 'left';
-		ctx.fillStyle = sdf ? 'black' : 'white';
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = sdf ? 'black' : 'white';
 
-		this.size = size;
-		this.padding = padding;
-		this._distanceRadius = Math.floor((fontSize / 24) * 8);
-		this._distanceCutoff = 0.25;
-		this._ctx = ctx;
-		this._dt = sdf ? new DistanceTransform(size * size, size) : null;
-	}
+    this.size = size;
+    this.padding = padding;
+    this.distanceRadius = Math.floor((fontSize / SDF_RADIUS_DIVISOR) * SDF_RADIUS_MULTIPLIER);
+    this.distanceCutoff = SDF_CUTOFF;
+    this.context = ctx;
+    this.distanceTransformer = sdf ? new DistanceTransform(size * size, size) : null;
+  }
 
-	draw(char: string): {
-		buffer: Uint8ClampedArray;
-		width: number;
-		height: number;
-		padding: number;
-		glyphTop: number;
-	} {
-		const { size, padding, _distanceRadius, _distanceCutoff, _ctx, _dt } = this;
+  draw(char: string): {
+    buffer: Uint8ClampedArray;
+    width: number;
+    height: number;
+    padding: number;
+    glyphTop: number;
+  } {
+    const {
+      size, padding, distanceRadius, distanceCutoff, context, distanceTransformer,
+    } = this;
 
-		const metrics = _ctx.measureText(char);
-		const actualBoundingBoxAscent = metrics.actualBoundingBoxAscent;
-		const actualBoundingBoxDescent = metrics.actualBoundingBoxDescent;
-		const actualBoundingBoxLeft = metrics.actualBoundingBoxLeft;
-		const actualBoundingBoxRight = metrics.actualBoundingBoxRight;
+    const metrics = context.measureText(char);
+    const actualBoundingBoxAscent = metrics.actualBoundingBoxAscent;
+    const actualBoundingBoxDescent = metrics.actualBoundingBoxDescent;
+    const actualBoundingBoxLeft = metrics.actualBoundingBoxLeft;
+    const actualBoundingBoxRight = metrics.actualBoundingBoxRight;
 
-		let glyphTop = Math.ceil(actualBoundingBoxAscent);
-		let glyphWidth = Math.max(
-			0,
-			Math.min(size - padding, Math.ceil(actualBoundingBoxRight - actualBoundingBoxLeft)),
-		);
-		let glyphHeight = Math.min(size - padding, glyphTop + Math.ceil(actualBoundingBoxDescent));
+    let glyphTop = Math.ceil(actualBoundingBoxAscent);
+    let glyphWidth = Math.max(
+      0,
+      Math.min(size - padding, Math.ceil(actualBoundingBoxRight - actualBoundingBoxLeft)),
+    );
+    let glyphHeight = Math.min(size - padding, glyphTop + Math.ceil(actualBoundingBoxDescent));
 
-		if (glyphWidth === 0 || glyphHeight === 0) {
-			glyphTop = 0;
-			glyphWidth = Math.floor(size / 2 - padding * 2);
-			glyphHeight = 0;
-		}
+    if (glyphWidth === 0 || glyphHeight === 0) {
+      glyphTop = 0;
+      glyphWidth = Math.floor(size / PADDING_MULTIPLIER - padding * PADDING_SCALE);
+      glyphHeight = 0;
+    }
 
-		const width = Math.min(glyphWidth + 2 * padding, size);
-		const height = Math.min(glyphHeight + 2 * padding, size);
+    const width = Math.min(glyphWidth + PADDING_SCALE * padding, size);
+    const height = Math.min(glyphHeight + PADDING_SCALE * padding, size);
 
-		_ctx.clearRect(0, 0, width, height);
-		_ctx.fillText(char, padding, padding + glyphTop);
+    context.clearRect(0, 0, width, height);
+    context.fillText(char, padding, padding + glyphTop);
 
-		const imageData = _ctx.getImageData(0, 0, width, height);
+    const imageData = context.getImageData(0, 0, width, height);
 
-		let buffer: Uint8ClampedArray;
-		if (_dt) {
-			const result = _dt.transform(imageData, {
-				radius: _distanceRadius,
-				cutoff: _distanceCutoff,
-			});
-			if (!result) {
-				buffer = new Uint8ClampedArray(imageData.data);
-			} else {
-				buffer = new Uint8ClampedArray(result);
-			}
-		} else {
-			buffer = new Uint8ClampedArray(imageData.data);
-		}
+    let buffer: Uint8ClampedArray;
+    if (distanceTransformer) {
+      const result = distanceTransformer.transform(imageData, {
+        radius: distanceRadius,
+        cutoff: distanceCutoff,
+      });
+      if (result) {
+        buffer = new Uint8ClampedArray(result);
+      } else {
+        buffer = new Uint8ClampedArray(imageData.data);
+      }
+    } else {
+      buffer = new Uint8ClampedArray(imageData.data);
+    }
 
-		return { buffer, width, height, padding, glyphTop };
-	}
+    return {
+      buffer, width, height, padding, glyphTop,
+    };
+  }
 }
 
 // ────────────────────────────── DynamicFont ───────────────────────────────
@@ -306,115 +364,119 @@ class CharacterCanvas {
  * ```
  */
 export class DynamicFont {
-	private _charCanvas: CharacterCanvas;
-	private _fontAtlas: FontAtlas;
-	private _font: FontData;
+  private charCanvas: CharacterCanvas;
+  private fontAtlas: FontAtlas;
+  private font: FontData;
 
-	/**
-	 * @param options - Configuration options, all optional.
-	 */
-	constructor(options: DynamicFontOptions = {}) {
-		const {
-			fontSize = 72,
-			width = 2048,
-			height = 2048,
-			fontFamily = 'sans-serif',
-			fontWeight = 'normal',
-			fontStyle = 'normal',
-			sdf = true,
-		} = options;
+  /**
+   * @param options - Configuration options, all optional.
+   */
+  constructor(options: DynamicFontOptions = {}) {
+    const {
+      fontSize = DEFAULT_FONT_SIZE,
+      width = DEFAULT_ATLAS_WIDTH,
+      height = DEFAULT_ATLAS_HEIGHT,
+      fontFamily = 'sans-serif',
+      fontWeight = 'normal',
+      fontStyle = 'normal',
+      sdf = true,
+    } = options;
 
-		this._charCanvas = new CharacterCanvas({
-			fontSize,
-			fontFamily,
-			fontWeight,
-			fontStyle,
-			sdf,
-		});
+    this.charCanvas = new CharacterCanvas({
+      fontSize,
+      fontFamily,
+      fontWeight,
+      fontStyle,
+      sdf,
+    });
 
-		this._fontAtlas = new FontAtlas(
-			width,
-			height,
-			this._charCanvas.size,
-			sdf,
-		);
+    this.fontAtlas = new FontAtlas(
+      width,
+      height,
+      this.charCanvas.size,
+      sdf,
+    );
 
-		this._font = {
-			common: { scaleW: width, scaleH: height },
-			info: { size: fontSize },
-			chars: [],
-		};
-	}
+    this.font = {
+      common: { scaleW: width, scaleH: height },
+      info: { size: fontSize },
+      chars: [],
+    };
+  }
 
-	/** Font metrics data (atlas dimensions, glyph positions, etc.). */
-	get fontData(): FontData {
-		return this._font;
-	}
+  /** Font metrics data (atlas dimensions, glyph positions, etc.). */
+  get fontData(): FontData {
+    return this.font;
+  }
 
-	/** Single-channel (SDF) or RGBA (bitmap) atlas pixel buffer. */
-	get atlasBuffer(): Uint8ClampedArray {
-		return this._fontAtlas.buffer;
-	}
+  /** Single-channel (SDF) or RGBA (bitmap) atlas pixel buffer. */
+  get atlasBuffer(): Uint8ClampedArray {
+    return this.fontAtlas.bufferData;
+  }
 
-	/**
-	 * Add characters to the font atlas.
-	 *
-	 * Characters already present in the atlas are skipped.
-	 * Returns `true` if the atlas texture was modified (new glyphs were added).
-	 *
-	 * @param chars - String of characters to add.
-	 * @returns Whether the atlas was modified.
-	 */
-	addChars(chars: string): boolean {
-		let modified = false;
+  /**
+   * Add characters to the font atlas.
+   *
+   * Characters already present in the atlas are skipped.
+   * Returns `true` if the atlas texture was modified (new glyphs were added).
+   *
+   * @param chars - String of characters to add.
+   * @returns Whether the atlas was modified.
+   */
+  addChars(chars: string): boolean {
+    let modified = false;
 
-		for (let i = 0; i < chars.length; i++) {
-			const char = chars[i];
-			if (!this._fontAtlas.hasChar(char)) {
-				if (this._addChar(char)) {
-					modified = true;
-				} else {
-					console.warn(`DynamicFont: Failed to add char '${char}', the atlas is full.`);
-				}
-			}
-		}
+    for (const char of chars) {
+      if (!this.fontAtlas.hasChar(char)) {
+        if (this.addCharInternal(char)) {
+          modified = true;
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(`DynamicFont: Failed to add char '${char}', the atlas is full.`);
+        }
+      }
+    }
 
-		return modified;
-	}
+    return modified;
+  }
 
-	/**
-	 * Release all atlas data and character entries.
-	 */
-	dispose(): void {
-		this._fontAtlas.clear();
-		this._font.chars.length = 0;
-	}
+  /**
+   * Release all atlas data and character entries.
+   */
+  dispose(): void {
+    this.fontAtlas.clear();
+    this.font.chars.length = 0;
+  }
 
-	private _addChar(char: string): boolean {
-		const { _charCanvas, _fontAtlas, _font } = this;
+  private addCharInternal(char: string): boolean {
+    const { charCanvas, fontAtlas, font } = this;
 
-		const { buffer, width, height, padding, glyphTop } = _charCanvas.draw(char);
+    const {
+      buffer, width, height, padding, glyphTop,
+    } = charCanvas.draw(char);
 
-		const succeeded = _fontAtlas.addChar(char, { buffer, width, height });
-		if (!succeeded) return false;
+    const succeeded = fontAtlas.addChar(char, { buffer, width, height });
+    if (!succeeded) {
+      return false;
+    }
 
-		const charInfo = _fontAtlas.getChar(char)!;
+    const charInfo = fontAtlas.getChar(char)!;
 
-		// 'j' scaler to avoid zero-width artifacts
-		const scaler = char === 'j' ? 0.00001 : 1;
+    // 'j' scaler to avoid zero-width artifacts
+    const scaler = char === 'j' ? J_SCALER : 1;
 
-		_font.chars.push({
-			char,
-			id: char.charCodeAt(0),
-			x: charInfo.x + padding * scaler,
-			y: charInfo.y + padding * scaler,
-			width: charInfo.w - padding * 2 * scaler,
-			height: charInfo.h - padding * 2 * scaler,
-			xoffset: 0,
-			yoffset: -glyphTop,
-			xadvance: charInfo.w - padding * 2 * scaler,
-		});
+    font.chars.push({
+      char,
+      id: char.charCodeAt(0),
+      x: charInfo.x + padding * scaler,
+      y: charInfo.y + padding * scaler,
+      width: charInfo.w - padding * PADDING_SCALE * scaler,
+      height: charInfo.h - padding * PADDING_SCALE * scaler,
+      xoffset: 0,
+      yoffset: -glyphTop,
+      xadvance: charInfo.w - padding * PADDING_SCALE * scaler,
+    });
 
-		return true;
-	}
+    return true;
+  }
 }

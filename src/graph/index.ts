@@ -51,7 +51,9 @@ export type {
 } from './types';
 
 // 数据适配层
-export { validate, normalize, buildIndex, prepare } from './adapter';
+export {
+  validate, normalize, buildIndex, prepare,
+} from './adapter';
 export type { ValidationResult, GraphIndex } from './adapter';
 
 // 元素
@@ -63,7 +65,9 @@ export type { Edge3DOptions, EdgeType } from './elements/Edge3D';
 // 交互
 export { PickController } from './interaction/PickController';
 export type { PickControllerOptions } from './interaction/PickController';
-export type { GraphEvent, GraphEventType, GraphEventHandler, GraphPickKind } from './interaction/types';
+export type {
+  GraphEvent, GraphEventType, GraphEventHandler, GraphPickKind,
+} from './interaction/types';
 
 // 布局（类型骨架）
 export * from './layouts';

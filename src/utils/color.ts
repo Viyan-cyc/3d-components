@@ -1,5 +1,42 @@
 import type { ColorRGBA } from '../types';
 
+// ─── Color constants ────────────────────────────────────────────────────────
+
+/** Bit shift for extracting the red channel from a 24-bit hex value. */
+const HEX_SHIFT_RED = 16;
+
+/** Bit shift for extracting the green channel from a 24-bit hex value. */
+const HEX_SHIFT_GREEN = 8;
+
+/** Maximum value of a single color channel (0–255 range). */
+const MAX_CHANNEL = 255;
+
+/** Number of hue segments in HSL color space. */
+const HUE_SEGMENTS = 6;
+
+/** Fraction: 1/6 — one hue segment width. */
+const HUE_SEGMENT_WIDTH = 1 / HUE_SEGMENTS;
+
+/** Fraction: 1/2 — midpoint threshold in hue-to-RGB conversion. */
+const HUE_MIDPOINT = 1 / 2;
+
+/** Fraction: 2/3 — upper threshold in hue-to-RGB conversion. */
+const HUE_UPPER_THRESHOLD = 2 / HUE_SEGMENTS;
+
+/** Fraction: 1/3 — hue offset for adjacent RGB channels. */
+const HUE_OFFSET = 1 / HUE_SEGMENTS;
+
+/** Hex shorthand length (e.g. "#f00"). */
+const SHORT_HEX_LENGTH = 3;
+
+/** Radix for parsing hexadecimal numbers. */
+const HEX_RADIX = 16;
+
+/** Minimum hex string length after padding. */
+const HEX_PAD_LENGTH = 2;
+
+// ─── Conversion functions ────────────────────────────────────────────────────
+
 /**
  * Convert a hex color string to an RGB(A) object with normalized channels (0–1).
  *
@@ -15,18 +52,18 @@ import type { ColorRGBA } from '../types';
  * Util.hexToRgb('3366ff');   // → { r: 0.2, g: 0.4, b: 1 }
  * ```
  */
-export function hexToRgb(hex: string): ColorRGBA {
+export const hexToRgb = (hex: string): ColorRGBA => {
   let h = hex.replace('#', '');
-  if (h.length === 3) {
+  if (h.length === SHORT_HEX_LENGTH) {
     h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
   }
-  const num = parseInt(h, 16);
+  const num = parseInt(h, HEX_RADIX);
   return {
-    r: ((num >> 16) & 255) / 255,
-    g: ((num >> 8) & 255) / 255,
-    b: (num & 255) / 255,
+    r: ((num >> HEX_SHIFT_RED) & MAX_CHANNEL) / MAX_CHANNEL,
+    g: ((num >> HEX_SHIFT_GREEN) & MAX_CHANNEL) / MAX_CHANNEL,
+    b: (num & MAX_CHANNEL) / MAX_CHANNEL,
   };
-}
+};
 
 /**
  * Convert RGB values (0–255) to a hex color string.
@@ -45,13 +82,13 @@ export function hexToRgb(hex: string): ColorRGBA {
  * Util.rgbToHex(0, 0, 0);        // → "#000000"
  * ```
  */
-export function rgbToHex(r: number, g: number, b: number): string {
+export const rgbToHex = (r: number, g: number, b: number): string => {
   const toHex = (n: number) => {
-    const clamped = Math.max(0, Math.min(255, Math.round(n)));
-    return clamped.toString(16).padStart(2, '0');
+    const clamped = Math.max(0, Math.min(MAX_CHANNEL, Math.round(n)));
+    return clamped.toString(HEX_RADIX).padStart(HEX_PAD_LENGTH, '0');
   };
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
+};
 
 /**
  * Convert an HSL color to an RGB(A) object with normalized channels (0–1).
@@ -70,32 +107,44 @@ export function rgbToHex(r: number, g: number, b: number): string {
  * Util.hslToRgb(0.6, 0.8, 0.6); // → light blue
  * ```
  */
-export function hslToRgb(h: number, s: number, l: number): ColorRGBA {
-  h = ((h % 1) + 1) % 1;
-  s = Math.max(0, Math.min(1, s));
-  l = Math.max(0, Math.min(1, l));
+export const hslToRgb = (h: number, s: number, l: number): ColorRGBA => {
+  let hn = ((h % 1) + 1) % 1;
+  let sn = Math.max(0, Math.min(1, s));
+  let ln = Math.max(0, Math.min(1, l));
 
-  if (s === 0) return { r: l, g: l, b: l };
+  if (sn === 0) {
+    return { r: ln, g: ln, b: ln };
+  }
 
   const hue2rgb = (p: number, q: number, t: number): number => {
     let tt = t;
-    if (tt < 0) tt += 1;
-    if (tt > 1) tt -= 1;
-    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
-    if (tt < 1 / 2) return q;
-    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    if (tt < 0) {
+      tt += 1;
+    }
+    if (tt > 1) {
+      tt -= 1;
+    }
+    if (tt < HUE_SEGMENT_WIDTH) {
+      return p + (q - p) * HUE_SEGMENTS * tt;
+    }
+    if (tt < HUE_MIDPOINT) {
+      return q;
+    }
+    if (tt < HUE_UPPER_THRESHOLD) {
+      return p + (q - p) * (HUE_UPPER_THRESHOLD - tt) * HUE_SEGMENTS;
+    }
     return p;
   };
 
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
+  const q = ln < HUE_MIDPOINT ? ln * (1 + sn) : ln + sn - ln * sn;
+  const p = 2 * ln - q;
 
   return {
-    r: hue2rgb(p, q, h + 1 / 3),
-    g: hue2rgb(p, q, h),
-    b: hue2rgb(p, q, h - 1 / 3),
+    r: hue2rgb(p, q, hn + HUE_OFFSET),
+    g: hue2rgb(p, q, hn),
+    b: hue2rgb(p, q, hn - HUE_OFFSET),
   };
-}
+};
 
 /**
  * Blend (lerp) between two RGBA colors by a factor `t`.
@@ -115,7 +164,7 @@ export function hslToRgb(h: number, s: number, l: number): ColorRGBA {
  * Util.blendColors(red, blue, 0.5);  // → { r: 0.5, g: 0, b: 0.5, a: 1 }
  * ```
  */
-export function blendColors(a: ColorRGBA, b: ColorRGBA, t: number): ColorRGBA {
+export const blendColors = (a: ColorRGBA, b: ColorRGBA, t: number): ColorRGBA => {
   const u = Math.max(0, Math.min(1, t));
   return {
     r: a.r + (b.r - a.r) * u,
@@ -123,4 +172,4 @@ export function blendColors(a: ColorRGBA, b: ColorRGBA, t: number): ColorRGBA {
     b: a.b + (b.b - a.b) * u,
     a: (a.a ?? 1) + ((b.a ?? 1) - (a.a ?? 1)) * u,
   };
-}
+};

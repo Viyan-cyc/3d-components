@@ -1,23 +1,38 @@
+
 import * as THREE from 'three';
-import type { IDisposable } from '../types';
-import {
-  type Intersection,
-  type IntersectionEvent,
-  type EventHandlers,
-  type ControlsLike,
-  type InteractiveManagerOptions,
-  type ComputeNDCFn,
-  type FilterIntersectionsFn,
-  type PointerEventType,
-  type PointerCaptureTarget,
+import type {
+  ComputeNDCFn,
+  ControlsLike,
+  EventHandlers,
+  FilterIntersectionsFn,
+  InteractiveManagerOptions,
+  Intersection,
+  IntersectionEvent,
+  PointerCaptureTarget,
 } from './types';
 import {
   type RegistrationEntry,
   computeNDC,
-  makeIntersectionId,
   hasPointerHandlers,
-  handlerKey,
+  makeIntersectionId,
 } from './utils';
+import type { IDisposable } from '../types';
+
+/** Pixel distance threshold for click-vs-drag discrimination. */
+const CLICK_THRESHOLD = 2;
+
+/** Maximum time (ms) between pointerdown and pointerup to count as a click. */
+const CLICK_TIME_MS = 300;
+
+/** Maximum time (ms) between two clicks for a doubleclick. */
+const DOUBLE_CLICK_TIME_MS = 300;
+
+/** Pointer capture API surface exposed on IntersectionEvent target/currentTarget. */
+type PointerCaptureApi = {
+  hasPointerCapture: (id: number) => boolean;
+  setPointerCapture: (id: number) => void;
+  releasePointerCapture: (id: number) => void;
+};
 
 /**
  * Centralized raycaster-based interaction system.
@@ -133,9 +148,10 @@ export class InteractiveManager implements IDisposable {
     this._domElement = options.domElement;
     this._scene = options.scene;
     this._controls = options.controls;
-    this._clickThreshold = options.clickThreshold ?? 2;
-    this._clickTimeThreshold = options.clickTimeThreshold ?? 300;
-    this._doubleClickTimeThreshold = options.doubleClickTimeThreshold ?? 300;
+    this._clickThreshold = options.clickThreshold ?? CLICK_THRESHOLD;
+    this._clickTimeThreshold = options.clickTimeThreshold ?? CLICK_TIME_MS;
+    this._doubleClickTimeThreshold =
+      options.doubleClickTimeThreshold ?? DOUBLE_CLICK_TIME_MS;
     this._recursive = options.recursive ?? true;
     this._computeNDC = options.computeNDC;
     this._filterIntersections = options.filterIntersections;
@@ -188,7 +204,9 @@ export class InteractiveManager implements IDisposable {
    */
   remove(object: THREE.Object3D): void {
     const entry = this._registry.get(object);
-    if (!entry) return;
+    if (!entry) {
+      return;
+    }
 
     // Clear hover entries for this eventObject
     for (const [id, hoverEntry] of this._hovered) {
@@ -209,7 +227,9 @@ export class InteractiveManager implements IDisposable {
 
     this._registry.delete(object);
     const idx = this._interaction.indexOf(object);
-    if (idx !== -1) this._interaction.splice(idx, 1);
+    if (idx !== -1) {
+      this._interaction.splice(idx, 1);
+    }
   }
 
   /**
@@ -218,7 +238,7 @@ export class InteractiveManager implements IDisposable {
    * Useful after camera animation where objects under the cursor may
    * have changed without a `pointermove` event.
    */
-  update(_delta?: number): void {
+  update(_delta?: number): void { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (this._lastPointerMoveEvent) {
       this._handlePointerMove(this._lastPointerMoveEvent);
     }
@@ -260,55 +280,36 @@ export class InteractiveManager implements IDisposable {
   // ─── Intersection Pipeline ───────────────
 
   /**
-   * Perform raycast → dedup → filter → expand to registered ancestors
-   * → inject captures.
-   *
-   * 
+   * Perform raycast and return raw Three.js intersections.
    */
-  private _intersect(
-    event: PointerEvent | WheelEvent,
-    filter?: (objects: THREE.Object3D[]) => THREE.Object3D[],
-  ): Intersection[] {
-    // 1. NDC conversion
-    const rect = this._domElement.getBoundingClientRect();
-    if (this._computeNDC) {
-      this._computeNDC(event, rect, this._ndc);
-    } else {
-      computeNDC(event, rect, this._ndc);
-    }
-    this._raycaster.setFromCamera(this._ndc, this._camera);
-
-    // 2. Determine which objects to raycast
-    const eventObjects = filter ? filter(this._interaction) : this._interaction;
-
-    // 3. Raycast each object individually 
-    const duplicates = new Set<string>();
-    let rawHits: THREE.Intersection[];
-
+  private _raycastObjects(eventObjects: THREE.Object3D[]): THREE.Intersection[] {
     if (this._scene) {
-      // Scene mode: one raycast, then filter to registered objects
-      rawHits = this._raycaster.intersectObject(this._scene, true);
-    } else {
-      // Per-object raycast 
-      rawHits = eventObjects
-        .flatMap((obj) => this._raycaster.intersectObject(obj, this._recursive))
-        .sort((a, b) => a.distance - b.distance);
+      return this._raycaster.intersectObject(this._scene, true);
     }
+    return eventObjects
+      .flatMap((obj) => this._raycaster.intersectObject(obj, this._recursive))
+      .sort((a, b) => a.distance - b.distance);
+  }
 
-    // 4. Dedup by makeId-style key (using index + instanceId, )
-    rawHits = rawHits.filter((item) => {
-      const id = item.object.uuid + '/' + (item.index ?? '') + (item.instanceId ?? '');
-      if (duplicates.has(id)) return false;
+  /**
+   * Deduplicate raw hits by object uuid / index / instanceId.
+   */
+  private _dedupRawHits(rawHits: THREE.Intersection[], duplicates: Set<string>): THREE.Intersection[] {
+    return rawHits.filter((item) => {
+      const id = `${item.object.uuid}/${item.index ?? ''}${item.instanceId ?? ''}`;
+      if (duplicates.has(id)) {
+        return false;
+      }
       duplicates.add(id);
       return true;
     });
+  }
 
-    // 5. Custom filter on raw Three.js intersections (before ancestor expansion)
-    if (this._filterIntersections) {
-      rawHits = this._filterIntersections(rawHits);
-    }
-
-    // 6. Expand: bubble up to find registered ancestors 
+  /**
+   * Expand raw hits into Intersection entries by walking the
+   * parent chain to find registered ancestors.
+   */
+  private _expandToRegisteredAncestors(rawHits: THREE.Intersection[]): Intersection[] {
     const intersections: Intersection[] = [];
     for (const hit of rawHits) {
       let eventObject: THREE.Object3D | null = hit.object;
@@ -329,31 +330,164 @@ export class InteractiveManager implements IDisposable {
         eventObject = eventObject.parent;
       }
     }
+    return intersections;
+  }
 
-    // 7. Inject pointer captures 
-    if ('pointerId' in event) {
-      const capturedForPointer = this._capturedMap.get((event as PointerEvent).pointerId);
-      if (capturedForPointer) {
-        for (const captureData of capturedForPointer.values()) {
-          const capId = makeIntersectionId(captureData.intersection);
-          if (!duplicates.has(capId)) {
-            intersections.push(captureData.intersection);
-            duplicates.add(capId);
-          }
-        }
+  /**
+   * Inject pointer captures into the intersection list.
+   */
+  private _injectPointerCaptures(
+    event: PointerEvent | WheelEvent,
+    intersections: Intersection[],
+    duplicates: Set<string>,
+  ): void {
+    if (!('pointerId' in event)) {
+      return;
+    }
+    const capturedForPointer = this._capturedMap.get((event).pointerId);
+    if (!capturedForPointer) {
+      return;
+    }
+    for (const captureData of capturedForPointer.values()) {
+      const capId = makeIntersectionId(captureData.intersection);
+      if (!duplicates.has(capId)) {
+        intersections.push(captureData.intersection);
+        duplicates.add(capId);
       }
     }
+  }
+
+  /**
+   * Perform raycast → dedup → filter → expand to registered ancestors
+   * → inject captures.
+   */
+  private _intersect(
+    event: PointerEvent | WheelEvent,
+    filter?: (objects: THREE.Object3D[]) => THREE.Object3D[],
+  ): Intersection[] {
+    const rect = this._domElement.getBoundingClientRect();
+    if (this._computeNDC) {
+      this._computeNDC(event, rect, this._ndc);
+    } else {
+      computeNDC(event, rect, this._ndc);
+    }
+    this._raycaster.setFromCamera(this._ndc, this._camera);
+
+    const eventObjects = filter ? filter(this._interaction) : this._interaction;
+    const duplicates = new Set<string>();
+    let rawHits = this._raycastObjects(eventObjects);
+
+    rawHits = this._dedupRawHits(rawHits, duplicates);
+
+    if (this._filterIntersections) {
+      rawHits = this._filterIntersections(rawHits);
+    }
+
+    const intersections = this._expandToRegisteredAncestors(rawHits);
+    this._injectPointerCaptures(event, intersections, duplicates);
 
     return intersections;
   }
 
   // ─── handleIntersects ─────────────
 
+  /** Capture API surface exposed on IntersectionEvent.target. */
+  private _buildCaptureTarget(hit: Intersection): PointerCaptureApi {
+    const hasPointerCapture = (id: number): boolean =>
+      this._capturedMap.get(id)?.has(hit.eventObject) ?? false;
+
+    const setPointerCapture = (id: number): void => {
+      const captureData: PointerCaptureTarget = {
+        intersection: hit,
+        target: this._domElement,
+      };
+      if (this._capturedMap.has(id)) {
+        this._capturedMap.get(id)!.set(hit.eventObject, captureData);
+      } else {
+        this._capturedMap.set(id, new Map([[hit.eventObject, captureData]]));
+      }
+      try {
+        this._domElement.setPointerCapture(id);
+      } catch { /* ignore */ }
+    };
+
+    const releasePointerCapture = (id: number): void => {
+      const captures = this._capturedMap.get(id);
+      if (captures) {
+        this._releaseInternalPointerCapture(hit.eventObject, captures, id);
+      }
+    };
+
+    return { hasPointerCapture, setPointerCapture, releasePointerCapture };
+  }
+
+  /** Build the stopPropagation closure for an intersection event. */
+  private _makeStopPropagation(
+    hit: Intersection,
+    intersections: Intersection[],
+    event: PointerEvent | WheelEvent,
+    ctx: { stopped: boolean },
+    raycastEvent: IntersectionEvent,
+  ): () => void {
+    return () => {
+      const capturesForPointer =
+        'pointerId' in event && this._capturedMap.get((event).pointerId);
+      if (!capturesForPointer || capturesForPointer.has(hit.eventObject)) {
+        ctx.stopped = true;
+        raycastEvent.stopped = true;
+        if (
+          this._hovered.size &&
+          Array.from(this._hovered.values())
+            .find((i) => i.intersection.eventObject === hit.eventObject)
+        ) {
+          const higher = intersections.slice(0, intersections.indexOf(hit));
+          this._cancelPointer([...higher, hit]);
+        }
+      }
+    };
+  }
+
+  /** Build an IntersectionEvent for a given hit and dispatch context. */
+  private _buildIntersectionEvent(
+    hit: Intersection,
+    intersections: Intersection[],
+    event: PointerEvent | WheelEvent,
+    delta: number,
+    ctx: { stopped: boolean; captureTarget: PointerCaptureApi },
+  ): IntersectionEvent {
+    const pointer = this._ndc.clone();
+    const unprojectedPoint = new THREE.Vector3(pointer.x, pointer.y, 0)
+      .unproject(this._camera);
+
+    const raycastEvent: IntersectionEvent = {
+      object: hit.object,
+      eventObject: hit.eventObject,
+      distance: hit.distance,
+      point: hit.point,
+      face: hit.face,
+      index: hit.index,
+      instanceId: hit.instanceId,
+      uv: hit.uv,
+      intersections,
+      stopped: ctx.stopped,
+      delta,
+      unprojectedPoint,
+      ray: this._raycaster.ray,
+      camera: this._camera,
+      pointer,
+      nativeEvent: event,
+      stopPropagation: () => {},
+      target: ctx.captureTarget,
+      currentTarget: ctx.captureTarget,
+    };
+    raycastEvent.stopPropagation = this._makeStopPropagation(hit, intersections, event, ctx, raycastEvent);
+
+    return raycastEvent;
+  }
+
   /**
    * Walk the flat intersection list, calling the callback for each.
    * `stopPropagation()` sets `localState.stopped = true` and breaks the loop.
-   *
-   * 
    */
   private _handleIntersects(
     intersections: Intersection[],
@@ -361,91 +495,28 @@ export class InteractiveManager implements IDisposable {
     delta: number,
     callback: (ev: IntersectionEvent) => void,
   ): Intersection[] {
-    if (intersections.length === 0) return intersections;
+    if (intersections.length === 0) {
+      return intersections;
+    }
 
     const localState = { stopped: false };
 
     for (const hit of intersections) {
       const entry = this._registry.get(hit.eventObject);
-      if (!entry || !entry.eventCount) continue;
+      if (!entry || !entry.eventCount) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
 
-      const pointer = this._ndc.clone();
-      const unprojectedPoint = new THREE.Vector3(pointer.x, pointer.y, 0).unproject(this._camera);
-
-      // Pointer capture API on this eventObject
-      const hasPointerCapture = (id: number): boolean => {
-        return this._capturedMap.get(id)?.has(hit.eventObject) ?? false;
-      };
-
-      const setPointerCapture = (id: number): void => {
-        const captureData: PointerCaptureTarget = {
-          intersection: hit,
-          target: this._domElement,
-        };
-        if (this._capturedMap.has(id)) {
-          this._capturedMap.get(id)!.set(hit.eventObject, captureData);
-        } else {
-          this._capturedMap.set(id, new Map([[hit.eventObject, captureData]]));
-        }
-        try { this._domElement.setPointerCapture(id); } catch { /* ignore */ }
-      };
-
-      const releasePointerCapture = (id: number): void => {
-        const captures = this._capturedMap.get(id);
-        if (captures) {
-          this._releaseInternalPointerCapture(hit.eventObject, captures, id);
-        }
-      };
-
-      const captureTarget = { hasPointerCapture, setPointerCapture, releasePointerCapture };
-
-      const raycastEvent: IntersectionEvent = {
-        object: hit.object,
-        eventObject: hit.eventObject,
-        distance: hit.distance,
-        point: hit.point,
-        face: hit.face,
-        index: hit.index,
-        instanceId: hit.instanceId,
-        uv: hit.uv,
-        intersections,
-        stopped: localState.stopped,
-        delta,
-        unprojectedPoint,
-        ray: this._raycaster.ray,
-        camera: this._camera,
-        pointer,
-        nativeEvent: event as PointerEvent,
-        stopPropagation: () => {
-          // Only allow stopPropagation if pointer is not captured,
-          // or if this eventObject is capturing the pointer
-          const capturesForPointer =
-            'pointerId' in event && this._capturedMap.get((event as PointerEvent).pointerId);
-          if (
-            !capturesForPointer ||
-            capturesForPointer.has(hit.eventObject)
-          ) {
-            raycastEvent.stopped = localState.stopped = true;
-            // If this object is currently hovered, flush higher-up objects
-            if (
-              this._hovered.size &&
-              Array.from(this._hovered.values()).find(
-                (i) => i.intersection.eventObject === hit.eventObject,
-              )
-            ) {
-              const higher = intersections.slice(0, intersections.indexOf(hit));
-              this._cancelPointer([...higher, hit]);
-            }
-          }
-        },
-        target: captureTarget,
-        currentTarget: captureTarget,
-      };
+      const captureTarget = this._buildCaptureTarget(hit);
+      const ctx = { stopped: localState.stopped, captureTarget };
+      const raycastEvent = this._buildIntersectionEvent(hit, intersections, event, delta, ctx);
 
       callback(raycastEvent);
 
-      // If propagation was stopped, break the loop
-      if (localState.stopped === true) break;
+      if (localState.stopped === true) {
+        break;
+      }
     }
 
     return intersections;
@@ -457,18 +528,16 @@ export class InteractiveManager implements IDisposable {
    * Fire `onPointerOut` + `onPointerLeave` on all hovered objects
    * that are NOT in the provided intersection list.
    *
-   * 
+   *
    */
   private _cancelPointer(intersections: Intersection[]): void {
     for (const [id, hoverEntry] of this._hovered) {
       const hoveredObj = hoverEntry.intersection;
       // Check if this hovered object is still under the cursor
-      const stillHovered = intersections.find(
-        (hit) =>
-          hit.object === hoveredObj.object &&
+      const stillHovered = intersections.find((hit) =>
+        hit.object === hoveredObj.object &&
           (hit.index ?? '') === (hoveredObj.index ?? '') &&
-          (hit.instanceId ?? '') === (hoveredObj.instanceId ?? ''),
-      );
+          (hit.instanceId ?? '') === (hoveredObj.instanceId ?? ''));
 
       if (!stillHovered) {
         const entry = this._registry.get(hoveredObj.eventObject);
@@ -486,7 +555,7 @@ export class InteractiveManager implements IDisposable {
 
   /**
    * Fire `onPointerMissed` on the specified objects.
-   * 
+   *
    */
   private _pointerMissed(event: PointerEvent, objects: THREE.Object3D[]): void {
     for (const obj of objects) {
@@ -504,7 +573,9 @@ export class InteractiveManager implements IDisposable {
           delta: 0,
           nativeEvent: event,
           stopped: false,
-          stopPropagation() { this.stopped = true; },
+          stopPropagation() {
+            this.stopped = true;
+          },
           unprojectedPoint: new THREE.Vector3(),
           target: {
             hasPointerCapture: () => false,
@@ -524,11 +595,54 @@ export class InteractiveManager implements IDisposable {
 
   // ─── DOM Event Handlers ────────────────────────────────────
 
+  /**
+   * Dispatch hover tracking and pointermove for a single intersection.
+   */
+  private _dispatchPointerMove(data: IntersectionEvent): void {
+    const entry = this._registry.get(data.eventObject);
+    if (!entry || !entry.eventCount) {
+      return;
+    }
+    const handlers = entry.handlers;
+
+    if (
+      handlers.onPointerOver ||
+      handlers.onPointerEnter ||
+      handlers.onPointerOut ||
+      handlers.onPointerLeave
+    ) {
+      const id = makeIntersectionId(data);
+      const hoveredItem = this._hovered.get(id);
+      if (!hoveredItem) {
+        this._hovered.set(id, {
+          intersection: {
+            object: data.object,
+            eventObject: data.eventObject,
+            distance: data.distance,
+            point: data.point.clone(),
+            face: data.face,
+            index: data.index,
+            instanceId: data.instanceId,
+            uv: data.uv,
+          },
+          stopped: false,
+        });
+        handlers.onPointerOver?.(data);
+        handlers.onPointerEnter?.(data);
+      } else if (hoveredItem.stopped) {
+        data.stopPropagation();
+      }
+    }
+
+    handlers.onPointerMove?.(data);
+  }
+
   private _handlePointerMove(e: PointerEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      return;
+    }
     this._lastPointerMoveEvent = e;
 
-    // Filter to only objects with pointer move/over/out/leave handlers
     const filterFn = (objects: THREE.Object3D[]): THREE.Object3D[] =>
       objects.filter((obj) => {
         const entry = this._registry.get(obj);
@@ -536,54 +650,15 @@ export class InteractiveManager implements IDisposable {
       });
 
     const hits = this._intersect(e, filterFn);
-
-    // cancelPointer before dispatching new over/enter
     this._cancelPointer(hits);
 
-    this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
-      const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) return;
-      const handlers = entry.handlers;
-
-      // Hover tracking: over + enter
-      if (
-        handlers.onPointerOver ||
-        handlers.onPointerEnter ||
-        handlers.onPointerOut ||
-        handlers.onPointerLeave
-      ) {
-        const id = makeIntersectionId(data as unknown as Intersection);
-        const hoveredItem = this._hovered.get(id);
-        if (!hoveredItem) {
-          // New hover: record and fire over + enter
-          this._hovered.set(id, {
-            intersection: {
-              object: data.object,
-              eventObject: data.eventObject,
-              distance: data.distance,
-              point: data.point.clone(),
-              face: data.face,
-              index: data.index,
-              instanceId: data.instanceId,
-              uv: data.uv,
-            },
-            stopped: false,
-          });
-          handlers.onPointerOver?.(data);
-          handlers.onPointerEnter?.(data);
-        } else if (hoveredItem.stopped) {
-          // Previously stopped: propagate the stop
-          data.stopPropagation();
-        }
-      }
-
-      // Always fire pointermove
-      handlers.onPointerMove?.(data);
-    });
+    this._handleIntersects(hits, e, 0, (data) => this._dispatchPointerMove(data));
   }
 
   private _handlePointerDown(e: PointerEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      return;
+    }
 
     const hits = this._intersect(e);
 
@@ -601,7 +676,9 @@ export class InteractiveManager implements IDisposable {
 
     this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
       const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) return;
+      if (!entry || !entry.eventCount) {
+        return;
+      }
       entry.handlers.onPointerDown?.(data);
     });
 
@@ -611,67 +688,79 @@ export class InteractiveManager implements IDisposable {
     }
   }
 
+  /**
+   * Dispatch pointerup and click/double-click for a single intersection.
+   */
+  private _dispatchPointerUp(
+    data: IntersectionEvent,
+    isLeftButton: boolean,
+    delta: number,
+  ): void {
+    const entry = this._registry.get(data.eventObject);
+    if (!entry || !entry.eventCount) {
+      return;
+    }
+    const handlers = entry.handlers;
+
+    handlers.onPointerUp?.(data);
+
+    if (isLeftButton && delta <= this._clickThreshold) {
+      if (this._initialHits.includes(data.eventObject)) {
+        const now = Date.now();
+        const lastTime = this._lastClickTimes.get(data.eventObject) ?? 0;
+        if (now - lastTime <= this._doubleClickTimeThreshold && lastTime > 0) {
+          handlers.onDoubleClick?.(data);
+          this._lastClickTimes.delete(data.eventObject);
+        } else {
+          handlers.onClick?.(data);
+          this._lastClickTimes.set(data.eventObject, now);
+        }
+      }
+    }
+  }
+
+  /**
+   * Fire pointerMissed for non-initial-hit objects during click.
+   */
+  private _fireClickMissed(e: PointerEvent, hits: Intersection[], delta: number): void {
+    if (e.button !== 0 || delta > this._clickThreshold) {
+      return;
+    }
+    if (hits.length === 0) {
+      this._pointerMissed(e, this._interaction);
+    } else {
+      this._pointerMissed(
+        e,
+        this._interaction.filter((obj) => !this._initialHits.includes(obj)),
+      );
+    }
+  }
+
   private _handlePointerUp(e: PointerEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      return;
+    }
 
     const isLeftButton = e.button === 0;
-
-    // Calculate delta from initial click
     const dx = e.offsetX - this._initialClick[0];
     const dy = e.offsetY - this._initialClick[1];
     const delta = Math.round(Math.hypot(dx, dy));
 
     const hits = this._intersect(e);
 
-    this._handleIntersects(hits, e, delta, (data: IntersectionEvent) => {
-      const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) return;
-      const handlers = entry.handlers;
+    this._handleIntersects(hits, e, delta, (data) =>
+      this._dispatchPointerUp(data, isLeftButton, delta));
 
-      // Fire pointerup
-      handlers.onPointerUp?.(data);
+    this._fireClickMissed(e, hits, delta);
 
-      // Click validation 
-      if (isLeftButton && delta <= this._clickThreshold) {
-        // Only fire click on objects that were in initialHits
-        if (this._initialHits.includes(data.eventObject)) {
-          const now = Date.now();
-          const lastTime = this._lastClickTimes.get(data.eventObject) ?? 0;
-          if (now - lastTime <= this._doubleClickTimeThreshold && lastTime > 0) {
-            handlers.onDoubleClick?.(data);
-            this._lastClickTimes.delete(data.eventObject);
-          } else {
-            handlers.onClick?.(data);
-            this._lastClickTimes.set(data.eventObject, now);
-          }
-        }
-      }
-    });
-
-    // pointerMissed on non-initial-hit objects during click
-    if (isLeftButton && delta <= this._clickThreshold) {
-      if (hits.length === 0) {
-        this._pointerMissed(e, this._interaction);
-      } else {
-        // Fire missed on objects NOT in initialHits
-        this._pointerMissed(
-          e,
-          this._interaction.filter((obj) => !this._initialHits.includes(obj)),
-        );
-      }
-    }
-
-    // Capture cleanup: just delete the capturedMap entry
-    // (onLostPointerCapture is handled by DOM event)
     if ('pointerId' in e) {
-      const pointerId = (e as PointerEvent).pointerId;
+      const pointerId = (e).pointerId;
       const capturedSet = this._capturedMap.get(pointerId);
       if (capturedSet) {
         this._capturedMap.delete(pointerId);
       }
     }
 
-    // Restore camera controls
     if (this._controls && 'enabled' in this._controls && this._controlsWasEnabled) {
       this._controls.enabled = true;
     }
@@ -681,21 +770,26 @@ export class InteractiveManager implements IDisposable {
   }
 
   private _handleWheel(e: WheelEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      return;
+    }
 
     const hits = this._intersect(e);
 
     this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
       const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) return;
+      if (!entry || !entry.eventCount) {
+        return;
+      }
       entry.handlers.onWheel?.(data);
     });
   }
 
   private _handleContextMenu(e: PointerEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      return;
+    }
 
-    const isClickEvent = true;
     const dx = e.offsetX - this._initialClick[0];
     const dy = e.offsetY - this._initialClick[1];
     const delta = Math.round(Math.hypot(dx, dy));
@@ -704,7 +798,9 @@ export class InteractiveManager implements IDisposable {
 
     this._handleIntersects(hits, e, delta, (data: IntersectionEvent) => {
       const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) return;
+      if (!entry || !entry.eventCount) {
+        return;
+      }
       const handlers = entry.handlers;
 
       // Only fire contextMenu on initialHits
@@ -722,7 +818,7 @@ export class InteractiveManager implements IDisposable {
   // ─── Internal Helpers ──────────────────────────────────────
 
   /**
-   * Release a single pointer capture entry 
+   * Release a single pointer capture entry
    */
   private _releaseInternalPointerCapture(
     obj: THREE.Object3D,
@@ -734,18 +830,22 @@ export class InteractiveManager implements IDisposable {
       captures.delete(obj);
       if (captures.size === 0) {
         this._capturedMap.delete(pointerId);
-        try { this._domElement.releasePointerCapture(pointerId); } catch { /* ignore */ }
+        try {
+          this._domElement.releasePointerCapture(pointerId);
+        } catch { /* ignore */ }
       }
     }
   }
 
   /**
-   * Count non-undefined handlers for eventCount 
+   * Count non-undefined handlers for eventCount
    */
   private _countHandlers(handlers: EventHandlers): number {
     let count = 0;
     for (const key of Object.keys(handlers) as (keyof EventHandlers)[]) {
-      if (handlers[key] !== undefined) count++;
+      if (handlers[key] !== undefined) {
+        count++;
+      }
     }
     return count;
   }
@@ -778,7 +878,9 @@ export class InteractiveManager implements IDisposable {
       camera: this._camera,
       pointer,
       nativeEvent,
-      stopPropagation() { this.stopped = true; },
+      stopPropagation() {
+        this.stopped = true;
+      },
       target: {
         hasPointerCapture: () => false,
         setPointerCapture: () => {},

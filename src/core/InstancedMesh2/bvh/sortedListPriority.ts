@@ -1,32 +1,42 @@
-// @ts-nocheck
 /**
  * @internal Priority-sorted list for branch-and-bound BVH sibling search.
  * Only maintains the last ~6 elements to keep operations fast.
  */
 
-type ItemListType = { node: any; inheritedCost: number };
+import type { BVHNode } from './BVHNode';
 
-export class SortedListPriority {
-    public array: ItemListType[] = [];
+const SORTED_WINDOW_SIZE = 6;
+const MAX_INDEX_OFFSET = 7;
 
-    public clear(): void {
-        this.array = [];
+type ItemListType<N, L> = { node: BVHNode<N, L>; inheritedCost: number };
+
+export class SortedListPriority<N = Record<string, never>, L = Record<string, never>> {
+  public array: ItemListType<N, L>[] = [];
+
+  public clear(): void {
+    this.array = [];
+  }
+
+  public push(item: ItemListType<N, L>): void {
+    const array = this.array;
+    const cost = item.inheritedCost;
+    const end = array.length > SORTED_WINDOW_SIZE
+      ? array.length - SORTED_WINDOW_SIZE
+      : 0;
+    let i: number;
+
+    for (i = array.length - 1; i >= end; i--) {
+      if (cost <= array[i].inheritedCost) {
+        break;
+      }
     }
 
-    public push(node: ItemListType): void {
-        const array = this.array;
-        const cost = node.inheritedCost;
-        const end = array.length > 6 ? array.length - 6 : 0;
-        let i: number;
-
-        for (i = array.length - 1; i >= end; i--) {
-            if (cost <= array[i].inheritedCost) break;
-        }
-
-        if (i > array.length - 7) array.splice(i + 1, 0, node);
+    if (i > array.length - MAX_INDEX_OFFSET) {
+      array.splice(i + 1, 0, item);
     }
+  }
 
-    public pop(): ItemListType {
-        return this.array.pop();
-    }
+  public pop(): ItemListType<N, L> {
+    return this.array.pop()!;
+  }
 }

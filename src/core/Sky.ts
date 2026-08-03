@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 import type { ComponentOptions, IDisposable } from '../types';
 
@@ -16,6 +17,7 @@ import type { ComponentOptions, IDisposable } from '../types';
  * ```
  */
 export interface SkyOptions extends ComponentOptions {
+
   /**
    * 天空球半径（世界单位）。
    * 应足够大以包围整个场景，但不要超出相机远裁剪面。 @default 1000
@@ -50,6 +52,13 @@ export interface SkyOptions extends ComponentOptions {
 // ===================== shaders =====================
 // 原理：使用一个内翻（BackSide）的球体，顶点着色器计算世界坐标，
 // 片元着色器根据归一化后的 Y 分量做幂次渐变，从 bottomColor 过渡到 topColor。
+
+const DEFAULT_SKY_SIZE = 1000;
+const DEFAULT_TOP_COLOR = 0x109df4;
+const DEFAULT_BOTTOM_COLOR = 0xf5f5f5;
+const DEFAULT_EXPONENT = 0.6;
+const SKY_SEGMENTS_WIDTH = 32;
+const SKY_SEGMENTS_HEIGHT = 15;
 
 const vertexShader = /* glsl */ `
   varying vec3 vWorldPosition;
@@ -119,14 +128,14 @@ export class Sky extends THREE.Mesh implements IDisposable {
    */
   constructor(options: SkyOptions = {}) {
     const {
-      size = 1000,
-      topColor = 0x109df4,
-      bottomColor = 0xf5f5f5,
+      size = DEFAULT_SKY_SIZE,
+      topColor = DEFAULT_TOP_COLOR,
+      bottomColor = DEFAULT_BOTTOM_COLOR,
       offset = 0,
-      exponent = 0.6,
+      exponent = DEFAULT_EXPONENT,
     } = options;
 
-    const geometry = new THREE.SphereGeometry(size, 32, 15);
+    const geometry = new THREE.SphereGeometry(size, SKY_SEGMENTS_WIDTH, SKY_SEGMENTS_HEIGHT);
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
@@ -142,9 +151,15 @@ export class Sky extends THREE.Mesh implements IDisposable {
 
     super(geometry, material);
 
-    if (options.name) this.name = options.name;
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
+    if (options.name) {
+      this.name = options.name;
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
   }
 
   /** 强类型访问内部 ShaderMaterial。 */

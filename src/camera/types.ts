@@ -14,7 +14,7 @@ import type { ComponentOptions } from '../types';
  * @internal
  */
 export interface Ref {
-	value: number;
+  value: number;
 }
 
 // ─── MOUSE_BUTTON enum ──────────────────────────────────────────────────────
@@ -28,47 +28,50 @@ export interface Ref {
  * | `RIGHT` | `2`   |
  * | `MIDDLE`| `4`   |
  */
+
 export const MOUSE_BUTTON = {
-	LEFT: 1,
-	RIGHT: 2,
-	MIDDLE: 4,
+  LEFT: 1,
+  RIGHT: 2,
+  MIDDLE: 4,
 } as const;
 
 /** Union of {@link MOUSE_BUTTON} values. */
-export type MOUSE_BUTTON = ( typeof MOUSE_BUTTON )[ keyof typeof MOUSE_BUTTON ];
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export type MOUSE_BUTTON = (typeof MOUSE_BUTTON)[ keyof typeof MOUSE_BUTTON ];
 
 // ─── ACTION bitmask enum ────────────────────────────────────────────────────
 
 /**
  * Bitmask values identifying the current user interaction.
  *
- * Mouse actions occupy bits 0–5, touch actions bits 6–19.
+ * Mouse actions occupy bits 0-5, touch actions bits 6-19.
  * Combined touch actions (e.g. `TOUCH_DOLLY_TRUCK`) are **single** bitmask
- * values, not bitwise ORs — they represent a simultaneous gesture.
+ * values, not bitwise ORs - they represent a simultaneous gesture.
  */
-export const ACTION = Object.freeze( {
-	NONE:                   0b0,
-	ROTATE:                 0b1,
-	TRUCK:                  0b10,
-	SCREEN_PAN:             0b100,
-	OFFSET:                 0b1000,
-	DOLLY:                  0b10000,
-	ZOOM:                   0b100000,
-	TOUCH_ROTATE:           0b1000000,
-	TOUCH_TRUCK:            0b10000000,
-	TOUCH_SCREEN_PAN:       0b100000000,
-	TOUCH_OFFSET:           0b1000000000,
-	TOUCH_DOLLY:            0b10000000000,
-	TOUCH_ZOOM:             0b100000000000,
-	TOUCH_DOLLY_TRUCK:      0b1000000000000,
-	TOUCH_DOLLY_SCREEN_PAN: 0b10000000000000,
-	TOUCH_DOLLY_OFFSET:     0b100000000000000,
-	TOUCH_DOLLY_ROTATE:     0b1000000000000000,
-	TOUCH_ZOOM_TRUCK:       0b10000000000000000,
-	TOUCH_ZOOM_OFFSET:      0b100000000000000000,
-	TOUCH_ZOOM_SCREEN_PAN:  0b1000000000000000000,
-	TOUCH_ZOOM_ROTATE:      0b10000000000000000000,
-} as const );
+
+export const ACTION = Object.freeze({
+  NONE: 0b0,
+  ROTATE: 0b1,
+  TRUCK: 0b10,
+  SCREEN_PAN: 0b100,
+  OFFSET: 0b1000,
+  DOLLY: 0b10000,
+  ZOOM: 0b100000,
+  TOUCH_ROTATE: 0b1000000,
+  TOUCH_TRUCK: 0b10000000,
+  TOUCH_SCREEN_PAN: 0b100000000,
+  TOUCH_OFFSET: 0b1000000000,
+  TOUCH_DOLLY: 0b10000000000,
+  TOUCH_ZOOM: 0b100000000000,
+  TOUCH_DOLLY_TRUCK: 0b1000000000000,
+  TOUCH_DOLLY_SCREEN_PAN: 0b10000000000000,
+  TOUCH_DOLLY_OFFSET: 0b100000000000000,
+  TOUCH_DOLLY_ROTATE: 0b1000000000000000,
+  TOUCH_ZOOM_TRUCK: 0b10000000000000000,
+  TOUCH_ZOOM_OFFSET: 0b100000000000000000,
+  TOUCH_ZOOM_SCREEN_PAN: 0b1000000000000000000,
+  TOUCH_ZOOM_ROTATE: 0b10000000000000000000,
+} as const);
 
 /** Bitmask union of all {@link ACTION} values. */
 export type ACTION = number;
@@ -84,66 +87,68 @@ export type ACTION = number;
  * | `IN`    | Dolly inward  |
  * | `OUT`   | Dolly outward |
  */
+
 export const DOLLY_DIRECTION = {
-	NONE: 0,
-	IN: 1,
-	OUT: - 1,
+  NONE: 0,
+  IN: 1,
+  OUT: - 1,
 } as const;
 
 /** Union of {@link DOLLY_DIRECTION} values. */
-export type DOLLY_DIRECTION = ( typeof DOLLY_DIRECTION )[ keyof typeof DOLLY_DIRECTION ];
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export type DOLLY_DIRECTION = (typeof DOLLY_DIRECTION)[ keyof typeof DOLLY_DIRECTION ];
 
 // ─── Action type narrowing ──────────────────────────────────────────────────
 
 /** Valid {@link ACTION} values for mouse button assignments. */
-type mouseButtonAction =
-	| typeof ACTION.ROTATE
-	| typeof ACTION.TRUCK
-	| typeof ACTION.SCREEN_PAN
-	| typeof ACTION.OFFSET
-	| typeof ACTION.DOLLY
-	| typeof ACTION.ZOOM
-	| typeof ACTION.NONE;
+type MouseButtonAction =
+  | typeof ACTION.ROTATE
+  | typeof ACTION.TRUCK
+  | typeof ACTION.SCREEN_PAN
+  | typeof ACTION.OFFSET
+  | typeof ACTION.DOLLY
+  | typeof ACTION.ZOOM
+  | typeof ACTION.NONE;
 
 /** Valid {@link ACTION} values for mouse wheel assignment. */
-type mouseWheelAction = mouseButtonAction;
+type MouseWheelAction = MouseButtonAction;
 
 /** Valid {@link ACTION} values for single-touch assignment. */
-type singleTouchAction =
-	| typeof ACTION.TOUCH_ROTATE
-	| typeof ACTION.TOUCH_TRUCK
-	| typeof ACTION.TOUCH_SCREEN_PAN
-	| typeof ACTION.TOUCH_OFFSET
-	| typeof ACTION.DOLLY
-	| typeof ACTION.ZOOM
-	| typeof ACTION.NONE;
+type SingleTouchAction =
+  | typeof ACTION.TOUCH_ROTATE
+  | typeof ACTION.TOUCH_TRUCK
+  | typeof ACTION.TOUCH_SCREEN_PAN
+  | typeof ACTION.TOUCH_OFFSET
+  | typeof ACTION.DOLLY
+  | typeof ACTION.ZOOM
+  | typeof ACTION.NONE;
 
 /** Valid {@link ACTION} values for multi-touch assignment. */
-type multiTouchAction =
-	| typeof ACTION.TOUCH_DOLLY_ROTATE
-	| typeof ACTION.TOUCH_DOLLY_TRUCK
-	| typeof ACTION.TOUCH_DOLLY_OFFSET
-	| typeof ACTION.TOUCH_ZOOM_ROTATE
-	| typeof ACTION.TOUCH_ZOOM_TRUCK
-	| typeof ACTION.TOUCH_ZOOM_OFFSET
-	| typeof ACTION.TOUCH_DOLLY
-	| typeof ACTION.TOUCH_ZOOM
-	| typeof ACTION.TOUCH_ROTATE
-	| typeof ACTION.TOUCH_TRUCK
-	| typeof ACTION.TOUCH_SCREEN_PAN
-	| typeof ACTION.TOUCH_OFFSET
-	| typeof ACTION.NONE;
+type MultiTouchAction =
+  | typeof ACTION.TOUCH_DOLLY_ROTATE
+  | typeof ACTION.TOUCH_DOLLY_TRUCK
+  | typeof ACTION.TOUCH_DOLLY_OFFSET
+  | typeof ACTION.TOUCH_ZOOM_ROTATE
+  | typeof ACTION.TOUCH_ZOOM_TRUCK
+  | typeof ACTION.TOUCH_ZOOM_OFFSET
+  | typeof ACTION.TOUCH_DOLLY
+  | typeof ACTION.TOUCH_ZOOM
+  | typeof ACTION.TOUCH_ROTATE
+  | typeof ACTION.TOUCH_TRUCK
+  | typeof ACTION.TOUCH_SCREEN_PAN
+  | typeof ACTION.TOUCH_OFFSET
+  | typeof ACTION.NONE;
 
 // ─── Pointer input ──────────────────────────────────────────────────────────
 
 /** Internal representation of an active pointer. */
 export interface PointerInput {
-	pointerId: number;
-	clientX: number;
-	clientY: number;
-	deltaX: number;
-	deltaY: number;
-	mouseButton: MOUSE_BUTTON | null;
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  deltaX: number;
+  deltaY: number;
+  mouseButton: MOUSE_BUTTON | null;
 }
 
 // ─── Mouse / Touch configuration ────────────────────────────────────────────
@@ -159,10 +164,10 @@ export interface PointerInput {
  * | `wheel`   | `DOLLY`               | `ZOOM`                 |
  */
 export interface MouseButtons {
-	left: mouseButtonAction;
-	middle: mouseButtonAction;
-	right: mouseButtonAction;
-	wheel: mouseWheelAction;
+  left: MouseButtonAction;
+  middle: MouseButtonAction;
+  right: MouseButtonAction;
+  wheel: MouseWheelAction;
 }
 
 /**
@@ -175,39 +180,44 @@ export interface MouseButtons {
  * | `three`   | `TOUCH_TRUCK`         | `TOUCH_TRUCK`          |
  */
 export interface Touches {
-	one: singleTouchAction;
-	two: multiTouchAction;
-	three: multiTouchAction;
+  one: SingleTouchAction;
+  two: MultiTouchAction;
+  three: MultiTouchAction;
 }
 
 // ─── FitToOptions ───────────────────────────────────────────────────────────
 
 /** Options for {@link CameraControls.fitToBox}. */
 export interface FitToOptions {
-	/** `true` to fill the entire screen (cover), `false` to fit within (contain). @default false */
-	cover: boolean;
-	/** Left padding in world units. @default 0 */
-	paddingLeft: number;
-	/** Right padding in world units. @default 0 */
-	paddingRight: number;
-	/** Bottom padding in world units. @default 0 */
-	paddingBottom: number;
-	/** Top padding in world units. @default 0 */
-	paddingTop: number;
+
+  /** `true` to fill the entire screen (cover), `false` to fit within (contain). @default false */
+  cover: boolean;
+
+  /** Left padding in world units. @default 0 */
+  paddingLeft: number;
+
+  /** Right padding in world units. @default 0 */
+  paddingRight: number;
+
+  /** Bottom padding in world units. @default 0 */
+  paddingBottom: number;
+
+  /** Top padding in world units. @default 0 */
+  paddingTop: number;
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 /** Typed event map for {@link CameraControls}. */
 export interface CameraControlsEventMap {
-	update: { type: 'update' };
-	wake: { type: 'wake' };
-	rest: { type: 'rest' };
-	sleep: { type: 'sleep' };
-	transitionstart: { type: 'transitionstart' };
-	controlstart: { type: 'controlstart' };
-	control: { type: 'control' };
-	controlend: { type: 'controlend' };
+  update: { type: 'update' };
+  wake: { type: 'wake' };
+  rest: { type: 'rest' };
+  sleep: { type: 'sleep' };
+  transitionstart: { type: 'transitionstart' };
+  controlstart: { type: 'controlstart' };
+  control: { type: 'control' };
+  controlend: { type: 'controlend' };
 }
 
 /** Event type keys. */
@@ -215,8 +225,8 @@ export type CameraControlsEventType = keyof CameraControlsEventMap;
 
 /** Base event shape dispatched by {@link CameraControls}. */
 export interface CameraControlsEvent {
-	type: CameraControlsEventType;
-	target: unknown;
+  type: CameraControlsEventType;
+  target: unknown;
 }
 
 // ─── LerpState ──────────────────────────────────────────────────────────────
@@ -228,12 +238,12 @@ export interface CameraControlsEvent {
  * **positional** (absolute camera position), plus a target point.
  */
 export type CameraControlsLerpState = {
-	target: [ number, number, number ];
-} & ( {
-	spherical: Parameters<THREE.Spherical[ 'set' ]>;
+  target: [ number, number, number ];
+} & ({
+  spherical: Parameters<THREE.Spherical[ 'set' ]>;
 } | {
-	position: [ number, number, number ];
-} );
+  position: [ number, number, number ];
+});
 
 // ─── Constructor options ────────────────────────────────────────────────────
 
@@ -251,131 +261,132 @@ export type CameraControlsLerpState = {
  * ```
  */
 export interface CameraControlsOptions extends ComponentOptions {
-	/** The camera to control. Supports `PerspectiveCamera` and `OrthographicCamera`. */
-	camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
 
-	/** The DOM element to attach pointer events to (usually `renderer.domElement`). */
-	domElement?: HTMLElement;
+  /** The camera to control. Supports `PerspectiveCamera` and `OrthographicCamera`. */
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
 
-	// ── Angle limits ──────────────────────────────────────────────────────
+  /** The DOM element to attach pointer events to (usually `renderer.domElement`). */
+  domElement?: HTMLElement;
 
-	/** Minimum polar (vertical) angle in radians. @default 0 */
-	minPolarAngle?: number;
+  // ── Angle limits ──────────────────────────────────────────────────────
 
-	/** Maximum polar (vertical) angle in radians. @default Math.PI */
-	maxPolarAngle?: number;
+  /** Minimum polar (vertical) angle in radians. @default 0 */
+  minPolarAngle?: number;
 
-	/** Minimum azimuth (horizontal) angle in radians. @default -Infinity */
-	minAzimuthAngle?: number;
+  /** Maximum polar (vertical) angle in radians. @default Math.PI */
+  maxPolarAngle?: number;
 
-	/** Maximum azimuth (horizontal) angle in radians. @default Infinity */
-	maxAzimuthAngle?: number;
+  /** Minimum azimuth (horizontal) angle in radians. @default -Infinity */
+  minAzimuthAngle?: number;
 
-	// ── Distance / zoom limits ────────────────────────────────────────────
+  /** Maximum azimuth (horizontal) angle in radians. @default Infinity */
+  maxAzimuthAngle?: number;
 
-	/** Minimum distance from target (perspective). @default Number.EPSILON */
-	minDistance?: number;
+  // ── Distance / zoom limits ────────────────────────────────────────────
 
-	/** Maximum distance from target (perspective). @default Infinity */
-	maxDistance?: number;
+  /** Minimum distance from target (perspective). @default Number.EPSILON */
+  minDistance?: number;
 
-	/** Allow dolly past the target point. @default false */
-	infinityDolly?: boolean;
+  /** Maximum distance from target (perspective). @default Infinity */
+  maxDistance?: number;
 
-	/** Minimum zoom factor (orthographic). @default 0.01 */
-	minZoom?: number;
+  /** Allow dolly past the target point. @default false */
+  infinityDolly?: boolean;
 
-	/** Maximum zoom factor (orthographic). @default Infinity */
-	maxZoom?: number;
+  /** Minimum zoom factor (orthographic). @default 0.01 */
+  minZoom?: number;
 
-	// ── Smooth / speed ────────────────────────────────────────────────────
+  /** Maximum zoom factor (orthographic). @default Infinity */
+  maxZoom?: number;
 
-	/** Smooth time for programmatic transitions (seconds). @default 0.25 */
-	smoothTime?: number;
+  // ── Smooth / speed ────────────────────────────────────────────────────
 
-	/** Smooth time while the user is dragging (seconds). @default 0.125 */
-	draggingSmoothTime?: number;
+  /** Smooth time for programmatic transitions (seconds). @default 0.25 */
+  smoothTime?: number;
 
-	/** Maximum interpolation speed. @default Infinity */
-	maxSpeed?: number;
+  /** Smooth time while the user is dragging (seconds). @default 0.125 */
+  draggingSmoothTime?: number;
 
-	/** Horizontal rotation speed multiplier. @default 1.0 */
-	azimuthRotateSpeed?: number;
+  /** Maximum interpolation speed. @default Infinity */
+  maxSpeed?: number;
 
-	/** Vertical rotation speed multiplier. @default 1.0 */
-	polarRotateSpeed?: number;
+  /** Horizontal rotation speed multiplier. @default 1.0 */
+  azimuthRotateSpeed?: number;
 
-	/** Mouse-wheel dolly speed multiplier. @default 1.0 */
-	dollySpeed?: number;
+  /** Vertical rotation speed multiplier. @default 1.0 */
+  polarRotateSpeed?: number;
 
-	/** Invert drag direction when dollying / zooming. @default false */
-	dollyDragInverted?: boolean;
+  /** Mouse-wheel dolly speed multiplier. @default 1.0 */
+  dollySpeed?: number;
 
-	/** Truck / pedestal drag speed multiplier. @default 2.0 */
-	truckSpeed?: number;
+  /** Invert drag direction when dollying / zooming. @default false */
+  dollyDragInverted?: boolean;
 
-	// ── Behavior flags ────────────────────────────────────────────────────
+  /** Truck / pedestal drag speed multiplier. @default 2.0 */
+  truckSpeed?: number;
 
-	/** Whether the controls are enabled. @default true */
-	enabled?: boolean;
+  // ── Behavior flags ────────────────────────────────────────────────────
 
-	/** Dolly toward the mouse cursor instead of screen center. @default false */
-	dollyToCursor?: boolean;
+  /** Whether the controls are enabled. @default true */
+  enabled?: boolean;
 
-	/** Drag translates the focal offset instead of trucking. @default false */
-	dragToOffset?: boolean;
+  /** Dolly toward the mouse cursor instead of screen center. @default false */
+  dollyToCursor?: boolean;
 
-	/** Friction factor at boundary edges (0 = hard clamp, 1 = no friction). @default 0 */
-	boundaryFriction?: number;
+  /** Drag translates the focal offset instead of trucking. @default false */
+  dragToOffset?: boolean;
 
-	/** Threshold for considering the camera at rest. @default 0.01 */
-	restThreshold?: number;
+  /** Friction factor at boundary edges (0 = hard clamp, 1 = no friction). @default 0 */
+  boundaryFriction?: number;
 
-	/** When true, constrains the camera position (not just target) within boundary. @default false */
-	boundaryEnclosesCamera?: boolean;
+  /** Threshold for considering the camera at rest. @default 0.01 */
+  restThreshold?: number;
 
-	// ── Input mapping ─────────────────────────────────────────────────────
+  /** When true, constrains the camera position (not just target) within boundary. @default false */
+  boundaryEnclosesCamera?: boolean;
 
-	/** Mouse button → action mapping. */
-	mouseButtons?: MouseButtons;
+  // ── Input mapping ─────────────────────────────────────────────────────
 
-	/** Touch gesture → action mapping. */
-	touches?: Touches;
+  /** Mouse button → action mapping. */
+  mouseButtons?: MouseButtons;
 
-	// ── Boundary / viewport / collision ───────────────────────────────────
+  /** Touch gesture → action mapping. */
+  touches?: Touches;
 
-	/** Boundary box constraining the camera target or position. */
-	boundary?: THREE.Box3;
+  // ── Boundary / viewport / collision ───────────────────────────────────
 
-	/** Viewport scissor region for rendering into a sub-region. */
-	viewport?: { x: number; y: number; width: number; height: number };
+  /** Boundary box constraining the camera target or position. */
+  boundary?: THREE.Box3;
 
-	/** Meshes that the camera cannot pass through. */
-	colliderMeshes?: THREE.Object3D[];
+  /** Viewport scissor region for rendering into a sub-region. */
+  viewport?: { x: number; y: number; width: number; height: number };
 
-	// ── Event callbacks ───────────────────────────────────────────────────
+  /** Meshes that the camera cannot pass through. */
+  colliderMeshes?: THREE.Object3D[];
 
-	/** Fired every frame the camera updates. */
-	onUpdate?: () => void;
+  // ── Event callbacks ───────────────────────────────────────────────────
 
-	/** Fired when the camera starts moving. */
-	onWake?: () => void;
+  /** Fired every frame the camera updates. */
+  onUpdate?: () => void;
 
-	/** Fired when camera movement drops below `restThreshold`. */
-	onRest?: () => void;
+  /** Fired when the camera starts moving. */
+  onWake?: () => void;
 
-	/** Fired when the camera stops moving. */
-	onSleep?: () => void;
+  /** Fired when camera movement drops below `restThreshold`. */
+  onRest?: () => void;
 
-	/** Fired when any transition begins. */
-	onTransitionStart?: () => void;
+  /** Fired when the camera stops moving. */
+  onSleep?: () => void;
 
-	/** Fired when the user starts dragging. */
-	onControlStart?: () => void;
+  /** Fired when any transition begins. */
+  onTransitionStart?: () => void;
 
-	/** Fired while the user is dragging. */
-	onControl?: () => void;
+  /** Fired when the user starts dragging. */
+  onControlStart?: () => void;
 
-	/** Fired when the user stops dragging. */
-	onControlEnd?: () => void;
+  /** Fired while the user is dragging. */
+  onControl?: () => void;
+
+  /** Fired when the user stops dragging. */
+  onControlEnd?: () => void;
 }

@@ -60,74 +60,76 @@ const toString = Object.prototype.toString;
  * Falls back to `Object.create(Object.getPrototypeOf(source))` when
  * the constructor call with no arguments succeeds.
  */
-function initCloneObject<T extends object>(source: T): T {
-  const Ctor = source.constructor as new () => T;
+const initCloneObject = <T extends object>(source: T): T => {
+  const ctor = source.constructor as new () => T;
   try {
-    return new Ctor();
+    // eslint-disable-next-line new-cap
+    return new ctor();
   } catch {
     return Object.create(Object.getPrototypeOf(source)) as T;
   }
-}
+};
 
 /**
  * Clone an ArrayBuffer by copying its byte content.
  */
-function cloneArrayBuffer(buffer: ArrayBuffer): ArrayBuffer {
+const cloneArrayBuffer = (buffer: ArrayBufferLike): ArrayBuffer => {
   const result = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(result).set(new Uint8Array(buffer));
   return result;
-}
+};
 
 /**
  * Clone a DataView — shares the same underlying ArrayBuffer clone logic.
  */
-function cloneDataView(dataView: DataView): DataView {
-  const buffer = cloneArrayBuffer(dataView.buffer);
-  return new DataView(buffer, dataView.byteOffset, dataView.byteLength);
-}
+const cloneDataView = (dataView: DataView): DataView =>
+  new DataView(
+    cloneArrayBuffer(dataView.buffer),
+    dataView.byteOffset,
+    dataView.byteLength,
+  );
 
 /**
  * Clone any TypedArray (Int8Array, Float32Array, …).
  * Preserves the constructor type and copies element-by-element.
  */
-function cloneTypedArray<T extends ArrayBufferView>(typedArray: T): T {
+const cloneTypedArray = <T extends ArrayBufferView>(typedArray: T): T => {
   const buffer = cloneArrayBuffer(typedArray.buffer);
   // Each TypedArray constructor: new XxxArray(buffer, byteOffset, length)
-  const Ctor = typedArray.constructor as new (
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const TypedArrayCtor = typedArray.constructor as new (
     buffer: ArrayBuffer,
     byteOffset: number,
     length: number,
   ) => T;
-  return new Ctor(buffer, typedArray.byteOffset, (typedArray as unknown as ArrayLike<unknown>).length);
-}
+  return new TypedArrayCtor(
+    buffer,
+    typedArray.byteOffset,
+    (typedArray as unknown as ArrayLike<unknown>).length,
+  );
+};
 
 /**
  * Clone a RegExp, preserving `source`, `flags`, and `lastIndex`.
  */
-function cloneRegExp(regexp: RegExp): RegExp {
+const cloneRegExp = (regexp: RegExp): RegExp => {
   const result = new RegExp(regexp.source, regexp.flags);
   result.lastIndex = regexp.lastIndex;
   return result;
-}
+};
 
 /**
  * Clone a Date — new Date with the same timestamp.
  */
-function cloneDate(date: Date): Date {
-  return new Date(date.getTime());
-}
+const cloneDate = (date: Date): Date => new Date(date.getTime());
 
 // ─── Type tag checks ─────────────────────────────────────────────────────────
 
-function isObject(value: unknown): value is object {
-  return value !== null && typeof value === 'object';
-}
+const TYPED_ARRAY_TAG =
+  /^\[object (?:Int8|Uint8|Uint8Clamped|Int16|Uint16|Int32|Uint32|Float32|Float64|BigInt64|BigUint64)Array\]$/;
 
-const typedArrayTag = /^\[object (?:Int8|Uint8|Uint8Clamped|Int16|Uint16|Int32|Uint32|Float32|Float64|BigInt64|BigUint64)Array\]$/;
-
-function isTypedArray(value: unknown): value is ArrayBufferView & { length: number } {
-  return typedArrayTag.test(toString.call(value));
-}
+const isTypedArray = (value: unknown): value is ArrayBufferView & { length: number } =>
+  TYPED_ARRAY_TAG.test(toString.call(value));
 
 // ─── Core recursive clone ────────────────────────────────────────────────────
 
@@ -141,7 +143,8 @@ function isTypedArray(value: unknown): value is ArrayBufferView & { length: numb
  * @param value  - The value to clone.
  * @param stack  - Map of source → clone to break circular cycles.
  */
-function baseClone<T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> {
+
+const baseClone = <T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> => {
   // ── Primitives & functions ──────────────────────────────────────────────
   if (value === null || typeof value !== 'object') {
     return value as CloneDeep<T>;
@@ -215,27 +218,27 @@ function baseClone<T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> {
   stack.set(value, result);
 
   // Copy own enumerable + string-keyed properties
-  const keys = Object.keys(value as object);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i] as keyof typeof value;
-    (result as Record<string, unknown>)[key as string] = baseClone(
-      (value as object)[key],
+  const keys = Object.keys(value);
+  for (const key of keys) {
+    const k = key as keyof typeof value;
+    (result as Record<string, unknown>)[key] = baseClone(
+      value[k],
       stack,
     );
   }
 
   // Copy symbol-keyed properties
-  const symKeys = Object.getOwnPropertySymbols(value as object);
-  for (let i = 0; i < symKeys.length; i++) {
-    const sym = symKeys[i] as keyof typeof value;
-    (result as Record<symbol, unknown>)[sym as symbol] = baseClone(
-      (value as object)[sym],
+  const symKeys = Object.getOwnPropertySymbols(value);
+  for (const sym of symKeys) {
+    const s = sym as keyof typeof value;
+    (result as Record<symbol, unknown>)[sym] = baseClone(
+      value[s],
       stack,
     );
   }
 
   return result as CloneDeep<T>;
-}
+};
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -271,6 +274,5 @@ function baseClone<T>(value: T, stack: Map<unknown, unknown>): CloneDeep<T> {
  * copy !== obj;        // true  — distinct object graph
  * ```
  */
-export function cloneDeep<T>(value: T): CloneDeep<T> {
-  return baseClone(value, new Map<unknown, unknown>());
-}
+export const cloneDeep = <T>(value: T): CloneDeep<T> =>
+  baseClone(value, new Map<unknown, unknown>());

@@ -34,21 +34,19 @@ const globalDefaults: AnimationDefaults = {
  * // 之后所有动画的默认时长为 1.2s，缓动为 easeInOut
  * ```
  */
-export function setDefaultConfig(config: Partial<AnimationDefaults>): void {
+const setDefaultConfig = (config: Partial<AnimationDefaults>): void => {
   if (!config || typeof config !== 'object') {
     throw new TypeError('配置必须是一个对象');
   }
   Object.assign(globalDefaults, config);
-}
+};
 
 /**
  * 获取当前全局默认配置的只读副本。
  *
  * @returns 全局默认配置的浅拷贝
  */
-export function getDefaultConfig(): Readonly<AnimationDefaults> {
-  return { ...globalDefaults };
-}
+const getDefaultConfig = (): Readonly<AnimationDefaults> => ({ ...globalDefaults });
 
 /**
  * 将用户配置与全局默认配置合并，生成内部完整配置。
@@ -60,20 +58,20 @@ export function getDefaultConfig(): Readonly<AnimationDefaults> {
  *
  * @internal
  */
-export function mergeWithDefaults(config?: Partial<InternalAnimationConfig>): InternalAnimationConfig {
-  return {
-    duration: config?.duration ?? globalDefaults.duration,
-    delay: config?.delay ?? globalDefaults.delay,
-    ease: config?.ease ?? globalDefaults.ease,
-    repeat: config?.repeat ?? globalDefaults.repeat,
-    yoyo: config?.yoyo ?? globalDefaults.yoyo,
-    to: config?.to,
-    from: config?.from,
-    onStart: config?.onStart,
-    onUpdate: config?.onUpdate,
-    onPause: config?.onPause,
-    onComplete: config?.onComplete,
-    onStop: config?.onStop,
-    onSeek: config?.onSeek,
-  };
-}
+const mergeWithDefaults = (config?: Partial<InternalAnimationConfig>): InternalAnimationConfig => ({
+  duration: config?.duration ?? globalDefaults.duration,
+  delay: config?.delay ?? globalDefaults.delay,
+  ease: config?.ease ?? globalDefaults.ease,
+  repeat: config?.repeat ?? globalDefaults.repeat,
+  yoyo: config?.yoyo ?? globalDefaults.yoyo,
+  to: config?.to,
+  from: config?.from,
+  onStart: config?.onStart,
+  onUpdate: config?.onUpdate,
+  onPause: config?.onPause,
+  onComplete: config?.onComplete,
+  onStop: config?.onStop,
+  onSeek: config?.onSeek,
+});
+
+export { setDefaultConfig, getDefaultConfig, mergeWithDefaults };

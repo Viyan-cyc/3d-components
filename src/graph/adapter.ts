@@ -11,14 +11,18 @@
  * 全部为纯函数、零 Three.js 依赖，可独立单测。
  */
 
-import type { EdgeData, GraphData, NodeData, NodeId } from './types';
+import type {
+  EdgeData, GraphData, NodeData, NodeId,
+} from './types';
 
 /**
  * 数据校验结果。
  */
 export interface ValidationResult {
+
   /** 是否通过校验。 */
   ok: boolean;
+
   /** 校验失败原因列表（`ok === true` 时为空）。 */
   errors: string[];
 }
@@ -41,7 +45,7 @@ export interface ValidationResult {
  * if (!result.ok) console.warn(result.errors);
  * ```
  */
-export function validate(data: GraphData): ValidationResult {
+export const validate = function (data: GraphData): ValidationResult {
   const errors: string[] = [];
   const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
   const edges = Array.isArray(data?.edges) ? data.edges : [];
@@ -50,33 +54,31 @@ export function validate(data: GraphData): ValidationResult {
   for (const n of nodes) {
     if (n.id === undefined || n.id === null || n.id === '') {
       errors.push(`节点缺少有效 id：${JSON.stringify(n)}`);
-      continue;
+    } else {
+      if (idSet.has(n.id)) {
+        errors.push(`节点 id 重复：${n.id}`);
+      }
+      idSet.add(n.id);
     }
-    if (idSet.has(n.id)) {
-      errors.push(`节点 id 重复：${n.id}`);
-    }
-    idSet.add(n.id);
   }
 
   for (const e of edges) {
     if (e.source === undefined || e.source === null) {
       errors.push(`边缺少 source：${JSON.stringify(e)}`);
-      continue;
-    }
-    if (e.target === undefined || e.target === null) {
+    } else if (e.target === undefined || e.target === null) {
       errors.push(`边缺少 target：${JSON.stringify(e)}`);
-      continue;
-    }
-    if (!idSet.has(e.source)) {
-      errors.push(`边的 source 指向不存在的节点：${e.source}`);
-    }
-    if (!idSet.has(e.target)) {
-      errors.push(`边的 target 指向不存在的节点：${e.target}`);
+    } else {
+      if (!idSet.has(e.source)) {
+        errors.push(`边的 source 指向不存在的节点：${e.source}`);
+      }
+      if (!idSet.has(e.target)) {
+        errors.push(`边的 target 指向不存在的节点：${e.target}`);
+      }
     }
   }
 
   return { ok: errors.length === 0, errors };
-}
+};
 
 /**
  * 归一化图数据：补全缺省字段，返回深拷贝后的规范化副本（不修改原输入）。
@@ -96,7 +98,7 @@ export function validate(data: GraphData): ValidationResult {
  * // norm.edges[0].id 一定存在
  * ```
  */
-export function normalize(data: GraphData): GraphData {
+export const normalize = function (data: GraphData): GraphData {
   const nodes: NodeData[] = (data?.nodes ?? []).map((n) => ({
     ...n,
     type: n.type ?? 'mesh',
@@ -119,16 +121,19 @@ export function normalize(data: GraphData): GraphData {
   });
 
   return { nodes, edges };
-}
+};
 
 /**
  * 节点索引与邻接表。
  */
 export interface GraphIndex {
+
   /** id → 节点数据。 */
   nodeMap: Map<NodeId, NodeData>;
+
   /** id → 邻接节点 id 数组（无向：source 与 target 互相加入）。 */
   adjacency: Map<NodeId, NodeId[]>;
+
   /** id → 该节点参与的所有边（含 source 与 target 两种角色）。 */
   incidentEdges: Map<NodeId, { source: NodeId; target: NodeId }[]>;
 }
@@ -145,7 +150,7 @@ export interface GraphIndex {
  * idx.adjacency.get('n1'); // ['n2', 'n3', ...]
  * ```
  */
-export function buildIndex(data: GraphData): GraphIndex {
+export const buildIndex = function (data: GraphData): GraphIndex {
   const nodeMap = new Map<NodeId, NodeData>();
   const adjacency = new Map<NodeId, NodeId[]>();
   const incidentEdges = new Map<NodeId, { source: NodeId; target: NodeId }[]>();
@@ -161,16 +166,16 @@ export function buildIndex(data: GraphData): GraphIndex {
 
   for (const e of edges) {
     const { source, target } = e;
-    if (!nodeMap.has(source) || !nodeMap.has(target)) continue;
-
-    adjacency.get(source)!.push(target);
-    adjacency.get(target)!.push(source);
-    incidentEdges.get(source)!.push({ source, target });
-    incidentEdges.get(target)!.push({ source, target });
+    if (nodeMap.has(source) && nodeMap.has(target)) {
+      adjacency.get(source)!.push(target);
+      adjacency.get(target)!.push(source);
+      incidentEdges.get(source)!.push({ source, target });
+      incidentEdges.get(target)!.push({ source, target });
+    }
   }
 
   return { nodeMap, adjacency, incidentEdges };
-}
+};
 
 /**
  * 一步完成「校验 + 归一化 + 建索引」的便捷函数。
@@ -186,11 +191,11 @@ export function buildIndex(data: GraphData): GraphIndex {
  * const { data, index } = prepare(rawData);
  * ```
  */
-export function prepare(data: GraphData): { data: GraphData; index: GraphIndex } {
+export const prepare = function (data: GraphData): { data: GraphData; index: GraphIndex } {
   const result = validate(data);
   if (!result.ok) {
     throw new Error(`GraphData 校验失败：\n  - ${result.errors.join('\n  - ')}`);
   }
   const norm = normalize(data);
   return { data: norm, index: buildIndex(norm) };
-}
+};

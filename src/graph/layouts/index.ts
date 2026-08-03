@@ -29,11 +29,13 @@
  * ```
  */
 
+import type {
+  BaseLayoutConfig, LayoutFn, LayoutPreset, LayoutType,
+} from './types';
 import { circular } from './circular';
 import { force } from './force';
 import { grid } from './grid';
 import { hex } from './hex';
-import type { BaseLayoutConfig, LayoutFn, LayoutPreset, LayoutType } from './types';
 
 export { circular } from './circular';
 export { force } from './force';
@@ -71,19 +73,22 @@ const LAYOUT_REGISTRY: Record<LayoutType, LayoutFn> = {
  * @param preset - 声明式布局预设（可为 `undefined`）。
  * @returns `{ layout, config }` 或 `null`。
  */
-export function resolveLayoutPreset(
-  preset?: LayoutPreset | null,
-): { layout: LayoutFn; config?: BaseLayoutConfig } | null {
-  if (!preset) return null;
+interface ResolveResult { layout: LayoutFn; config?: BaseLayoutConfig }
+
+export const resolveLayoutPreset = function (preset?: LayoutPreset | null): ResolveResult | null {
+  if (!preset) {
+    return null;
+  }
   const layout = LAYOUT_REGISTRY[preset.type];
   return { layout, config: preset.config };
-}
+};
 
 /**
  * Layouts 命名空间 —— 汇总所有布局算法，便于发现式调用。
  *
  * 与命名导入等价；命名空间风格便于在 IDE 中列出可用布局。
  */
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const Layouts = {
   circular,
   force,

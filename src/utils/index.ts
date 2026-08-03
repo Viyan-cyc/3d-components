@@ -38,10 +38,10 @@
  * - **Object**: {@link cloneDeep}
  */
 
-import * as colorUtils from './color';
-import * as mathUtils from './math';
-import * as geometryUtils from './geometry';
 import * as cloneDeepUtils from './cloneDeep';
+import * as colorUtils from './color';
+import * as geometryUtils from './geometry';
+import * as mathUtils from './math';
 
 /**
  * Util namespace — all utility functions in one object.
@@ -57,6 +57,7 @@ import * as cloneDeepUtils from './cloneDeep';
  *
  * @see For individual imports, see the sub-module exports.
  */
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const Util = {
   ...mathUtils,
   ...colorUtils,

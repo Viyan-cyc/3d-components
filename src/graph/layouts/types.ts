@@ -15,6 +15,10 @@
 
 import type { NodeData, NodeId, NodePos3D } from '../types';
 
+/** 三维模式维度值（供类型注解共用）。 */
+
+type Dim3D = 3;
+
 /**
  * 所有布局配置的公共基类。
  *
@@ -27,6 +31,7 @@ import type { NodeData, NodeId, NodePos3D } from '../types';
  * ```
  */
 export interface BaseLayoutConfig {
+
   /**
    * 2D 布局结果映射到三维空间的哪个平面。
    * - `'xy'` → 布局计算出的 `(x, y)` 映射为三维坐标 `(x, y, 0)`。
@@ -103,31 +108,37 @@ export type LayoutFn<C extends BaseLayoutConfig = BaseLayoutConfig> = (
  * ```
  */
 export interface CircularLayoutConfig extends BaseLayoutConfig {
+
   /**
    * 圆环半径（基础值）。
    * @default 3
    */
   radius?: number;
+
   /**
    * 起始角度（弧度）。
    * @default 0
    */
   startAngle?: number;
+
   /**
    * 结束角度（弧度）。默认 `2π`（整圆）；改小可画弧。
    * @default Math.PI * 2
    */
   endAngle?: number;
+
   /**
    * 同心环数量（仅 `groupBy` 缺省时生效）。节点按 index 轮询均分到各环。
    * @default 1
    */
   rings?: number;
+
   /**
    * 相邻同心环的半径步进（仅 `rings > 1` 或 `groupBy` 分层时生效）。
    * @default 1
    */
   radiusStep?: number;
+
   /**
    * 分层字段名。命中时按 `node[groupBy]` 的取值去重分桶，**每组一个深度层**
    * （用 `depthOffset + groupIndex * layerSpacing`）。借 {@link NodeData} 的
@@ -157,53 +168,63 @@ export interface CircularLayoutConfig extends BaseLayoutConfig {
  * ```
  */
 export interface ForceLayoutConfig extends BaseLayoutConfig {
+
   /**
    * 维度。`3`（默认）= 三维力导向，**此时 `plane`/`depthOffset`/`layerSpacing` 均为 no-op**
    * （无被忽略轴）；`2` = 在 xy 平面计算后经 {@link BaseLayoutConfig.plane} 映射到三维。
    * @default 3
    */
-  dimensions?: 2 | 3;
+  dimensions?: 2 | Dim3D;
+
   /**
    * 迭代步数。越多越收敛；节点很多（>600）时布局函数会自动减半并 `console.warn`。
    * @default 300
    */
   iterations?: number;
+
   /**
    * 弹簧（边）静止长度。
    * @default 1
    */
   linkDistance?: number;
+
   /**
    * 弹簧刚度（每步施加比例）。
    * @default 0.3
    */
   linkStrength?: number;
+
   /**
    * 节点间库仑斥力强度。**正值 = 斥力**（节点互相推开）。
    * @default 30
    */
   chargeStrength?: number;
+
   /**
    * 中心引力强度（把全体节点拉向 {@link ForceLayoutConfig.center}）。
    * @default 0.02
    */
   centerStrength?: number;
+
   /**
    * 中心坐标 `[x, y, z]`。
    * @default [0, 0, 0]
    */
   center?: [number, number, number];
+
   /**
    * 速度阻尼（每步速度乘以 `1 - velocityDecay`）。默认 `0.6`，
    * 因本布局结果常作为 gsap 过渡的**静止态**，收敛稳定性优先于「活跃感」。
    * @default 0.6
    */
   velocityDecay?: number;
+
   /**
    * 连接结构（无向）。**力导向的吸引项依赖它**；缺省/空时退化为纯斥力 + 向心
    * （节点会被推开但仍聚拢在中心，仍返回有限坐标）。`Graph3D.applyLayout` 会自动注入。
    */
   edges?: Array<{ source: NodeId; target: NodeId }>;
+
   /**
    * 是否启用 **Barnes-Hut 近似**计算斥力（3D 八叉树，`O(n log n)`，Step 5）。
    *
@@ -214,6 +235,7 @@ export interface ForceLayoutConfig extends BaseLayoutConfig {
    * @default false
    */
   barnesHut?: boolean;
+
   /**
    * Barnes-Hut **开角阈值** θ。子树尺寸 `s` 与距离 `d` 之比 `s/d < θ` 时聚合近似；
    * 越小越精确（更接近 `O(n²)`）也越慢，越大越快越粗糙。
@@ -253,11 +275,13 @@ export interface ForceLayoutConfig extends BaseLayoutConfig {
  * ```
  */
 export interface HexLayoutConfig extends BaseLayoutConfig {
+
   /**
    * 六边形外接圆半径（中心 → 顶点）。决定蜂巢整体尺度与相邻中心距（平顶相邻中心距 `1.5·radius`）。
    * @default 1
    */
   radius?: number;
+
   /**
    * 六边形朝向。
    * - `'flat'`（默认）：平顶 —— 顶点朝左右，自然蜂巢形态。
@@ -267,12 +291,14 @@ export interface HexLayoutConfig extends BaseLayoutConfig {
    * @default 'flat'
    */
   orientation?: 'flat' | 'pointy';
+
   /**
    * 堆叠层数（仅 `groupBy` 缺省时生效）。节点按 index 轮询均分到各层，每层一张蜂巢切片，
    * 在被忽略轴上以 `layerSpacing` 为步长分层。
    * @default 1
    */
   layers?: number;
+
   /**
    * 分层字段名。命中时按 `node[groupBy]` 的取值去重分桶，**每组一个深度层**
    * （用 `depthOffset + groupIndex * layerSpacing`），组内各自铺一张蜂巢。
@@ -308,29 +334,35 @@ export interface HexLayoutConfig extends BaseLayoutConfig {
  * ```
  */
 export interface GridLayoutConfig extends BaseLayoutConfig {
+
   /**
    * 列数（每行节点数）。缺省按 `ceil(sqrt(n / levels))` 推算。
    */
   cols?: number;
+
   /**
    * 行数（每层行数）。缺省按 `ceil(n / (cols · levels))` 推算。
    */
   rows?: number;
+
   /**
    * 层数（垂直堆叠层数）。
    * @default 1
    */
   levels?: number;
+
   /**
    * X 方向间距（列间距，对应 `col → x`）。
    * @default 1
    */
   spacingX?: number;
+
   /**
    * Y 方向间距（层间距，垂直方向，对应 `level → y`）。
    * @default 1
    */
   spacingY?: number;
+
   /**
    * Z 方向间距（行间距，对应 `row → z`）。
    * @default 1

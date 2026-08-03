@@ -1,5 +1,6 @@
+
 import * as THREE from 'three';
-import { animate, type AnimationController } from '../animation';
+import { type AnimationController, animate } from '../animation';
 import type { ComponentOptions, IDisposable } from '../types';
 
 /** 网格所在平面。`'xz'` 为水平地面（默认），`'xy'` 为面向 +Z 的立面（如 2D 坐标墙）。 */
@@ -19,6 +20,7 @@ export type GridPlane = 'xz' | 'xy';
  * ```
  */
 export interface GridOptions extends ComponentOptions {
+
   /**
    * 主网格（粗线）间距缩放，单位与世界单位一致。
    * 每隔该距离绘制一条粗线。 @default 5
@@ -88,6 +90,16 @@ export interface GridOptions extends ComponentOptions {
    */
   zAxisColor?: THREE.ColorRepresentation;
 }
+
+// ===================== Default values =====================
+const DEFAULT_PRIMARY_SCALE = 5;
+const DEFAULT_PRIMARY_FADE = 0.7;
+const DEFAULT_SECONDARY_FADE = 0.4;
+const DEFAULT_FADE_START = 30;
+const DEFAULT_FADE_END = 100;
+const DEFAULT_GRID_COLOR = 0x333333;
+const DEFAULT_X_AXIS_COLOR = 0xff0000;
+const DEFAULT_Z_AXIS_COLOR = 0x0000ff;
 
 // ===================== shaders =====================
 // 原理：用一个覆盖整屏的四边形（裁剪空间 [-1,1]），在顶点着色器把四边形四个角
@@ -190,7 +202,10 @@ const fragmentShader = /* glsl */ `
     gl_FragDepth = computeDepth(fragPos3D);
 
     // 主、次两层网格叠加；交点在相机后方（t <= 0）时丢弃，避免在视野上方画出网格。
-    gl_FragColor = (grid(fragPos3D, primaryScale, primaryFade) + grid(fragPos3D, secondaryScale, secondaryFade)) * float(t > 0.0);
+    gl_FragColor = (
+      grid(fragPos3D, primaryScale, primaryFade)
+      + grid(fragPos3D, secondaryScale, secondaryFade)
+    ) * float(t > 0.0);
 
     #ifdef USE_LINEARFADE
       float linearDepth = computeLinearDepth(fragPos3D);
@@ -200,8 +215,8 @@ const fragmentShader = /* glsl */ `
 `;
 
 /** 临时矩阵，避免每帧分配。 */
-const _pvm = new THREE.Matrix4();
-const _vm = new THREE.Matrix4();
+const tmpPvm = new THREE.Matrix4();
+const tmpVm = new THREE.Matrix4();
 
 /**
  * Grid —— 无限参考网格组件。
@@ -243,6 +258,7 @@ const _vm = new THREE.Matrix4();
  */
 export class Grid extends THREE.Mesh implements IDisposable {
   private _plane: GridPlane;
+
   /** flipProgress 过渡动画控制器，用于在 setPlane 时 kill 旧动画。 */
   private _flipAnim: AnimationController | null = null;
 
@@ -251,42 +267,33 @@ export class Grid extends THREE.Mesh implements IDisposable {
    */
   constructor(options: GridOptions = {}) {
     const {
-      primaryScale = 5,
+      primaryScale = DEFAULT_PRIMARY_SCALE,
       secondaryScale = 1,
       showAxis = true,
-      primaryFade = 0.7,
-      secondaryFade = 0.4,
-      fadeStart = 30,
-      fadeEnd = 100,
+      primaryFade = DEFAULT_PRIMARY_FADE,
+      secondaryFade = DEFAULT_SECONDARY_FADE,
+      fadeStart = DEFAULT_FADE_START,
+      fadeEnd = DEFAULT_FADE_END,
       linearFade = true,
       plane = 'xz',
-      color = 0x333333,
-      xAxisColor = 0xff0000,
-      zAxisColor = 0x0000ff,
+      color = DEFAULT_GRID_COLOR,
+      xAxisColor = DEFAULT_X_AXIS_COLOR,
+      zAxisColor = DEFAULT_Z_AXIS_COLOR,
     } = options;
 
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        u_PvmInverse: { value: new THREE.Matrix4() },
-        u_ProjectionViewModel: { value: new THREE.Matrix4() },
-        u_ViewModel: { value: new THREE.Matrix4() },
-        u_GridColor: { value: new THREE.Color(color) },
-        u_XAxisColor: { value: new THREE.Color(xAxisColor) },
-        u_ZAxisColor: { value: new THREE.Color(zAxisColor) },
-        u_ShowAxis: { value: showAxis },
-        flipProgress: { value: plane === 'xy' ? 1 : 0 },
-        primaryScale: { value: primaryScale },
-        secondaryScale: { value: secondaryScale },
-        primaryFade: { value: primaryFade },
-        secondaryFade: { value: secondaryFade },
-        start: { value: fadeStart },
-        end: { value: fadeEnd },
-      },
-      vertexShader,
-      fragmentShader,
-      transparent: true,
-      depthWrite: false,
-      defines: linearFade ? { USE_LINEARFADE: '' } : {},
+    const material = Grid.createMaterial({
+      color,
+      xAxisColor,
+      zAxisColor,
+      showAxis,
+      primaryScale,
+      secondaryScale,
+      primaryFade,
+      secondaryFade,
+      fadeStart,
+      fadeEnd,
+      plane,
+      linearFade,
     });
 
     // 覆盖整屏的四边形（裁剪空间 [-1,1]）。
@@ -295,11 +302,63 @@ export class Grid extends THREE.Mesh implements IDisposable {
     super(geometry, material);
 
     this._plane = plane;
-    this.frustumCulled = false; // 始终全屏，避免被视锥剔除
+    // 始终全屏，避免被视锥剔除
+    this.frustumCulled = false;
 
-    if (options.name) this.name = options.name;
-    if (options.visible !== undefined) this.visible = options.visible;
-    if (options.userData) this.userData = { ...options.userData };
+    if (options.name) {
+      this.name = options.name;
+    }
+    if (options.visible !== undefined) {
+      this.visible = options.visible;
+    }
+    if (options.userData) {
+      this.userData = { ...options.userData };
+    }
+  }
+
+  /** 创建网格着色器材质。 */
+  private static createMaterial(opts: {
+    color: THREE.ColorRepresentation;
+    xAxisColor: THREE.ColorRepresentation;
+    zAxisColor: THREE.ColorRepresentation;
+    showAxis: boolean;
+    primaryScale: number;
+    secondaryScale: number;
+    primaryFade: number;
+    secondaryFade: number;
+    fadeStart: number;
+    fadeEnd: number;
+    plane: GridPlane;
+    linearFade: boolean;
+  }): THREE.ShaderMaterial {
+    /* eslint-disable @typescript-eslint/naming-convention */
+    const uniforms: Record<string, THREE.IUniform> = {
+      u_PvmInverse: { value: new THREE.Matrix4() },
+      u_ProjectionViewModel: { value: new THREE.Matrix4() },
+      u_ViewModel: { value: new THREE.Matrix4() },
+      u_GridColor: { value: new THREE.Color(opts.color) },
+      u_XAxisColor: { value: new THREE.Color(opts.xAxisColor) },
+      u_ZAxisColor: { value: new THREE.Color(opts.zAxisColor) },
+      u_ShowAxis: { value: opts.showAxis },
+      flipProgress: { value: opts.plane === 'xy' ? 1 : 0 },
+      primaryScale: { value: opts.primaryScale },
+      secondaryScale: { value: opts.secondaryScale },
+      primaryFade: { value: opts.primaryFade },
+      secondaryFade: { value: opts.secondaryFade },
+      start: { value: opts.fadeStart },
+      end: { value: opts.fadeEnd },
+    };
+    /* eslint-enable @typescript-eslint/naming-convention */
+
+    return new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader,
+      transparent: true,
+      depthWrite: false,
+
+      defines: opts.linearFade ? { USE_LINEARFADE: '' } : {},
+    });
   }
 
   /** 强类型访问内部 ShaderMaterial。 */
@@ -320,13 +379,13 @@ export class Grid extends THREE.Mesh implements IDisposable {
     const M = this.matrixWorld;
 
     // P·V·M —— 供片元着色器换算深度；其逆供顶点着色器反投影。
-    _pvm.copy(P).multiply(V).multiply(M);
-    (u.u_ProjectionViewModel.value as THREE.Matrix4).copy(_pvm);
-    (u.u_PvmInverse.value as THREE.Matrix4).copy(_pvm).invert();
+    tmpPvm.copy(P).multiply(V).multiply(M);
+    (u.u_ProjectionViewModel.value as THREE.Matrix4).copy(tmpPvm);
+    (u.u_PvmInverse.value as THREE.Matrix4).copy(tmpPvm).invert();
 
     // V·M —— 供片元着色器换算线性深度。
-    _vm.copy(V).multiply(M);
-    (u.u_ViewModel.value as THREE.Matrix4).copy(_vm);
+    tmpVm.copy(V).multiply(M);
+    (u.u_ViewModel.value as THREE.Matrix4).copy(tmpVm);
   }
 
   /** 当前网格平面（`'xz'` 或 `'xy'`）。 */
@@ -350,11 +409,15 @@ export class Grid extends THREE.Mesh implements IDisposable {
     this._flipAnim?.destroy();
     this._flipAnim = null;
     if (useAnimate) {
+      /* eslint-disable @typescript-eslint/naming-convention */
       this._flipAnim = animate(this, {
         to: { 'material.uniforms.flipProgress.value': target },
+        /* eslint-enable @typescript-eslint/naming-convention */
         duration: 0.6,
         ease: 'easeInOutQuad',
-        onComplete: () => { this._flipAnim = null; },
+        onComplete: () => {
+          this._flipAnim = null;
+        },
       }).play();
     } else {
       this.mat.uniforms.flipProgress.value = target;

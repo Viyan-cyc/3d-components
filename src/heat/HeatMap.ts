@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 import type { IDisposable } from '../types';
 
@@ -10,12 +11,18 @@ import type { IDisposable } from '../types';
  * Values are normalised against the dataset's `max` / `min` before rendering.
  */
 export interface HeatMapPoint {
+
   /** X coordinate in pixels (0 – width). */
   x: number;
+
   /** Y coordinate in pixels (0 – height). */
   y: number;
+
   /** Intensity / weight of this point. Normalised against `max` / `min`. */
   value: number;
+
+  /** Optional per-point radius override in pixels. */
+  radius?: number;
 }
 
 /**
@@ -24,13 +31,16 @@ export interface HeatMapPoint {
  * If `max` / `min` are omitted they are auto-detected from the data array.
  */
 export interface HeatMapData {
+
   /** The data points to render. */
   data: HeatMapPoint[];
+
   /**
    * Maximum value for normalisation.
    * If omitted, the highest `value` in the data array is used.
    */
   max?: number;
+
   /**
    * Minimum value for normalisation.
    * @default 0
@@ -74,22 +84,27 @@ export type HeatMapGradient = Record<number, string>;
  * ```
  */
 export interface HeatMapOptions {
+
   /** Canvas width in pixels. @default 256 */
   width?: number;
+
   /** Canvas height in pixels. @default 256 */
   height?: number;
+
   /**
    * Default radius for heat points (pixels).
    * Can be overridden per-point if `HeatMapPoint.radius` is provided.
    * @default 40
    */
   radius?: number;
+
   /**
    * Global opacity of the rendered heatmap (0–1).
    * Applied to the final colour-mapped canvas.
    * @default 0.6
    */
   opacity?: number;
+
   /**
    * Colour gradient mapping normalised intensity to colour.
    * Keys are positions in [0, 1]; values are CSS colour strings.
@@ -101,25 +116,42 @@ export interface HeatMapOptions {
 // ─── Internal helpers ───────────────────────────────────────────────────────
 
 /** Default gradient: blue → green → yellow → red. */
+/* eslint-disable @typescript-eslint/naming-convention */
 const DEFAULT_GRADIENT: HeatMapGradient = {
   0.25: 'rgb(0,0,255)',
   0.55: 'rgb(0,255,0)',
   0.85: 'rgb(255,255,0)',
   1.0: 'rgb(255,0,0)',
 };
+/* eslint-enable @typescript-eslint/naming-convention */
+
+/** Number of entries in the gradient palette. */
+const PALETTE_SIZE = 256;
+
+/** Number of channels per pixel in RGBA image data. */
+const RGBA_CHANNELS = 4;
+
+/** Index of the alpha channel within an RGBA pixel. */
+const ALPHA_CHANNEL_INDEX = 3;
+
+/** Default radius for heat points. */
+const DEFAULT_RADIUS = 40;
+
+/** Default global opacity of the rendered heatmap. */
+const DEFAULT_OPACITY = 0.6;
 
 /**
  * Pre-render a 256 × 1 gradient palette canvas.
  * Each pixel at index `i` (0–255) holds the RGBA colour for intensity `i / 255`.
  */
-function createGradientPalette(gradient: HeatMapGradient): HTMLCanvasElement {
+const createGradientPalette = (gradient: HeatMapGradient): HTMLCanvasElement => {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
+  canvas.width = PALETTE_SIZE;
   canvas.height = 1;
   const ctx = canvas.getContext('2d')!;
 
   // Build a linear gradient across the 256-pixel width
-  const linear = ctx.createLinearGradient(0, 0, 256, 0);
+  const linear = ctx.createLinearGradient(0, 0, PALETTE_SIZE, 0);
   const stops = Object.keys(gradient)
     .map(Number)
     .sort((a, b) => a - b);
@@ -129,65 +161,77 @@ function createGradientPalette(gradient: HeatMapGradient): HTMLCanvasElement {
   }
 
   ctx.fillStyle = linear;
-  ctx.fillRect(0, 0, 256, 1);
+  ctx.fillRect(0, 0, PALETTE_SIZE, 1);
   return canvas;
-}
+};
 
 /**
  * Draw a single radial-gradient circle onto the shadow canvas.
  * The circle's alpha at the centre equals `alpha`; it fades to 0 at the edge.
  */
-function drawAlphaCircle(
+const drawAlphaCircle = (
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number,
   alpha: number,
-): void {
+): void => {
   const safeRadius = Math.max(1, radius);
   const gradient = ctx.createRadialGradient(x, y, 0, x, y, safeRadius);
   gradient.addColorStop(0, `rgba(0,0,0,${alpha})`);
   gradient.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(x - safeRadius, y - safeRadius, safeRadius * 2, safeRadius * 2);
+};
+
+/** Options for the {@link colourise} helper. */
+interface ColouriseOptions {
+  width: number;
+  height: number;
+  opacity: number;
 }
 
 /**
  * Map the alpha channel of the shadow canvas through the gradient palette,
  * writing the coloured result into the display canvas.
  */
-function colourise(
+const colourise = (
   shadowCtx: CanvasRenderingContext2D,
   displayCtx: CanvasRenderingContext2D,
   palette: HTMLCanvasElement,
-  width: number,
-  height: number,
-  opacity: number,
-): void {
+  options: ColouriseOptions,
+): void => {
+  const { width, height, opacity } = options;
   const shadowData = shadowCtx.getImageData(0, 0, width, height);
   const pixels = shadowData.data;
 
   // Read the palette once
   const paletteCtx = palette.getContext('2d')!;
-  const paletteData = paletteCtx.getImageData(0, 0, 256, 1).data;
+  const paletteData = paletteCtx.getImageData(0, 0, PALETTE_SIZE, 1).data;
 
   // Write coloured output
   const output = displayCtx.createImageData(width, height);
   const out = output.data;
 
-  for (let i = 0; i < pixels.length; i += 4) {
-    const alpha = pixels[i + 3]; // shadow canvas stores intensity in alpha
-    if (alpha === 0) continue; // skip transparent pixels
-
-    const paletteOffset = alpha * 4;
-    out[i] = paletteData[paletteOffset];     // R
-    out[i + 1] = paletteData[paletteOffset + 1]; // G
-    out[i + 2] = paletteData[paletteOffset + 2]; // B
-    out[i + 3] = Math.round(paletteData[paletteOffset + 3] * opacity); // A
+  for (let i = 0; i < pixels.length; i += RGBA_CHANNELS) {
+    // shadow canvas stores intensity in alpha
+    const alpha = pixels[i + ALPHA_CHANNEL_INDEX];
+    // skip transparent pixels
+    if (alpha !== 0) {
+      const paletteOffset = alpha * RGBA_CHANNELS;
+      // R
+      out[i] = paletteData[paletteOffset];
+      // G
+      out[i + 1] = paletteData[paletteOffset + 1];
+      // B
+      out[i + 2] = paletteData[paletteOffset + 2];
+      // A
+      out[i + ALPHA_CHANNEL_INDEX] = Math.round(paletteData[paletteOffset + ALPHA_CHANNEL_INDEX] * opacity);
+    }
   }
 
   displayCtx.putImageData(output, 0, 0);
-}
+};
 
 // ─── HeatMap class ──────────────────────────────────────────────────────────
 
@@ -316,10 +360,10 @@ export class HeatMap implements IDisposable {
    */
   constructor(options: HeatMapOptions = {}) {
     const {
-      width = 256,
-      height = 256,
-      radius = 40,
-      opacity = 0.6,
+      width = PALETTE_SIZE,
+      height = PALETTE_SIZE,
+      radius = DEFAULT_RADIUS,
+      opacity = DEFAULT_OPACITY,
       gradient = DEFAULT_GRADIENT,
     } = options;
 
@@ -346,7 +390,8 @@ export class HeatMap implements IDisposable {
 
     // Three.js texture
     this._texture = new THREE.CanvasTexture(this._displayCanvas);
-    this._texture.flipY = false; // canvas origin is top-left
+    // canvas origin is top-left
+    this._texture.flipY = false;
 
     // Initialise empty dataset
     this._data = { data: [], min: 0, max: 1 };
@@ -495,20 +540,13 @@ export class HeatMap implements IDisposable {
     for (const point of this._data.data) {
       const normalised = (point.value - min) / range;
       const alpha = Math.max(0, Math.min(1, normalised));
-      const radius = (point as any).radius ?? this._radius;
+      const radius = point.radius ?? this._radius;
       drawAlphaCircle(this._shadowCtx, point.x, point.y, radius, alpha);
     }
 
     // ── Pass 2: Colour mapping ──
     this._displayCtx.clearRect(0, 0, w, h);
-    colourise(
-      this._shadowCtx,
-      this._displayCtx,
-      this._palette,
-      w,
-      h,
-      this._opacity,
-    );
+    colourise(this._shadowCtx, this._displayCtx, this._palette, { width: w, height: h, opacity: this._opacity });
 
     // ── Update texture ──
     this._texture.needsUpdate = true;

@@ -33,12 +33,16 @@ export type NodeId = string | number;
  * ```
  */
 export interface NodePos3D {
+
   /** 节点 id，对应输入数据的 {@link NodeData.id}。 */
   id: NodeId;
+
   /** X 坐标。 */
   x: number;
+
   /** Y 坐标（通常为垂直/高度方向）。 */
   y: number;
+
   /** Z 坐标（通常为深度方向）。 */
   z: number;
 }
@@ -60,6 +64,7 @@ export interface NodePos3D {
  * ```
  */
 export interface NodeData {
+
   /** **必填**。节点唯一标识。 */
   id: NodeId;
 
@@ -68,8 +73,10 @@ export interface NodeData {
    * 未提供则由布局算法给出（第一步默认在原点环形散布）。
    */
   x?: number;
+
   /** 见 {@link NodeData.x}。 */
   y?: number;
+
   /** 见 {@link NodeData.x}。 */
   z?: number;
 
@@ -107,8 +114,10 @@ export interface NodeData {
  * ```
  */
 export interface EdgeData {
+
   /** **必填**。起点节点 id。 */
   source: NodeId;
+
   /** **必填**。终点节点 id。 */
   target: NodeId;
 
@@ -143,8 +152,10 @@ export interface EdgeData {
  * ```
  */
 export interface GraphData {
+
   /** 节点数组。 */
   nodes: NodeData[];
+
   /** 边数组。 */
   edges: EdgeData[];
 }

@@ -1,6 +1,184 @@
+
 import * as THREE from 'three';
 import { BlurPass } from './BlurPass';
 import type { IDisposable } from '../../types';
+
+// ---- Default value constants ----
+
+/** Default resolution of the reflection render target. */
+const DEFAULT_RESOLUTION = 256;
+
+/** Default minimum depth threshold for depth-aware blur. */
+const DEFAULT_MIN_DEPTH_THRESHOLD = 0.9;
+
+/** Default bias controlling the ratio between depth and blur. */
+const DEFAULT_DEPTH_TO_BLUR_RATIO_BIAS = 0.25;
+
+/** Default base color for the reflector material. */
+const DEFAULT_COLOR = 0xffffff;
+
+/** Scale factor for converting clip-space to texture-space coordinates. */
+const CLIP_TO_TEXTURE_SCALE = 0.5;
+
+// ---- Merged default options ----
+
+/**
+ * Default values for all non-texture reflector options.
+ * Spread before user options to provide fallbacks without
+ * destructuring defaults (which inflate cyclomatic complexity).
+ */
+const DEFAULT_REFLECTOR_OPTIONS = {
+  resolution: DEFAULT_RESOLUTION,
+  blur: [0, 0] as [number, number],
+  mixBlur: 0,
+  mixStrength: 1,
+  mixContrast: 1,
+  mirror: 0,
+  distortion: 1,
+  minDepthThreshold: DEFAULT_MIN_DEPTH_THRESHOLD,
+  maxDepthThreshold: 1,
+  depthScale: 0,
+  depthToBlurRatioBias: DEFAULT_DEPTH_TO_BLUR_RATIO_BIAS,
+  reflectorOffset: 0,
+  color: DEFAULT_COLOR as THREE.ColorRepresentation,
+  metalness: 0,
+  roughness: 0,
+};
+
+// ---- GLSL shader snippets ----
+
+/** Vertex shader prefix: adds textureMatrix uniform and my_vUv varying. */
+const VERTEX_SHADER_PREFIX = `
+  uniform mat4 textureMatrix;
+  varying vec4 my_vUv;
+`;
+
+/** Vertex shader replacement for #include <project_vertex>. */
+const VERTEX_SHADER_REPLACEMENT = `#include <project_vertex>
+  my_vUv = textureMatrix * vec4( position, 1.0 );
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );`;
+
+/** Fragment shader prefix: adds reflection-related uniforms and varyings. */
+const FRAGMENT_SHADER_PREFIX = `
+  uniform sampler2D tDiffuse;
+  uniform sampler2D tDiffuseBlur;
+  uniform sampler2D tDepth;
+  uniform sampler2D distortionMap;
+  uniform float distortion;
+  uniform float cameraNear;
+  uniform float cameraFar;
+  uniform bool hasBlur;
+  uniform float mixBlur;
+  uniform float mirror;
+  uniform float mixStrength;
+  uniform float minDepthThreshold;
+  uniform float maxDepthThreshold;
+  uniform float mixContrast;
+  uniform float depthScale;
+  uniform float depthToBlurRatioBias;
+  varying vec4 my_vUv;
+`;
+
+/** Fragment shader replacement for #include <emissivemap_fragment>. */
+const FRAGMENT_SHADER_REPLACEMENT = `#include <emissivemap_fragment>
+
+  float distortionFactor = 0.0;
+  #ifdef USE_DISTORTION
+    distortionFactor = texture2D(distortionMap, vUv).r * distortion;
+  #endif
+
+  vec4 new_vUv = my_vUv;
+  new_vUv.x += distortionFactor;
+  new_vUv.y += distortionFactor;
+
+  vec4 base = texture2DProj(tDiffuse, new_vUv);
+  vec4 blur = texture2DProj(tDiffuseBlur, new_vUv);
+
+  vec4 merge = base;
+
+  #ifdef USE_NORMALMAP
+    vec2 normal_uv = vec2(0.0);
+    vec4 normalColor = texture2D(normalMap, vUv * normalScale);
+    vec3 my_normal = normalize(vec3(
+      normalColor.r * 2.0 - 1.0,
+      normalColor.b,
+      normalColor.g * 2.0 - 1.0
+    ));
+    vec3 coord = new_vUv.xyz / new_vUv.w;
+    normal_uv = coord.xy + coord.z * my_normal.xz * 0.05;
+    vec4 base_normal = texture2D(tDiffuse, normal_uv);
+    vec4 blur_normal = texture2D(tDiffuseBlur, normal_uv);
+    merge = base_normal;
+    blur = blur_normal;
+  #endif
+
+  float depthFactor = 0.0001;
+  float blurFactor = 0.0;
+
+  #ifdef USE_DEPTH
+    vec4 depth = texture2DProj(tDepth, new_vUv);
+    depthFactor = smoothstep(
+      minDepthThreshold, maxDepthThreshold,
+      1.0-(depth.r * depth.a)
+    );
+    depthFactor *= depthScale;
+    depthFactor = max(0.0001, min(1.0, depthFactor));
+
+    #ifdef USE_BLUR
+      blur = blur * min(1.0, depthFactor + depthToBlurRatioBias);
+      merge = merge * min(1.0, depthFactor + 0.5);
+    #else
+      merge = merge * depthFactor;
+    #endif
+
+  #endif
+
+  float reflectorRoughnessFactor = roughness;
+  #ifdef USE_ROUGHNESSMAP
+    vec4 reflectorTexelRoughness = texture2D( roughnessMap, vUv );
+    reflectorRoughnessFactor *= reflectorTexelRoughness.g;
+  #endif
+
+  #ifdef USE_BLUR
+    blurFactor = min(1.0, mixBlur * reflectorRoughnessFactor);
+    merge = mix(merge, blur, blurFactor);
+  #endif
+
+  vec4 newMerge = vec4(0.0, 0.0, 0.0, 1.0);
+  newMerge.r = (merge.r - 0.5) * mixContrast + 0.5;
+  newMerge.g = (merge.g - 0.5) * mixContrast + 0.5;
+  newMerge.b = (merge.b - 0.5) * mixContrast + 0.5;
+
+  diffuseColor.rgb = diffuseColor.rgb * (
+    (1.0 - min(1.0, mirror)) + newMerge.rgb * mixStrength
+  );
+`;
+
+// ---- Module-level helpers ----
+
+/**
+ * Create the pair of render targets used for the reflection pipeline.
+ * FBO1 holds the sharp reflection + depth; FBO2 receives the blurred result.
+ */
+const createReflectionTargets = (resolution: number): {
+  fbo1: THREE.WebGLRenderTarget;
+  fbo2: THREE.WebGLRenderTarget;
+} => {
+  const rtParams = {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    type: THREE.HalfFloatType,
+  };
+  const fbo1 = new THREE.WebGLRenderTarget(resolution, resolution, rtParams);
+  fbo1.depthBuffer = true;
+  fbo1.depthTexture = new THREE.DepthTexture(resolution, resolution);
+  fbo1.depthTexture.format = THREE.DepthFormat;
+  fbo1.depthTexture.type = THREE.UnsignedShortType;
+  const fbo2 = new THREE.WebGLRenderTarget(resolution, resolution, rtParams);
+  return { fbo1, fbo2 };
+};
+
+// ---- Options interface ----
 
 /**
  * Options for constructing a {@link MeshReflectorMaterial}.
@@ -18,6 +196,7 @@ import type { IDisposable } from '../../types';
  * ```
  */
 export interface MeshReflectorMaterialOptions {
+
   /**
    * Resolution of the reflection render target (width = height).
    * Higher values produce sharper reflections at the cost of GPU performance.
@@ -204,10 +383,10 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
   private _uMirror = { value: 0.0 };
   private _uMixBlur = { value: 0.0 };
   private _uBlurStrength = { value: 1.0 };
-  private _uMinDepthThreshold = { value: 0.9 };
+  private _uMinDepthThreshold = { value: DEFAULT_MIN_DEPTH_THRESHOLD };
   private _uMaxDepthThreshold = { value: 1.0 };
   private _uDepthScale = { value: 0.0 };
-  private _uDepthToBlurRatioBias = { value: 0.25 };
+  private _uDepthToBlurRatioBias = { value: DEFAULT_DEPTH_TO_BLUR_RATIO_BIAS };
   private _uDistortion = { value: 1.0 };
   private _uMixContrast = { value: 1.0 };
 
@@ -240,51 +419,27 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
    * @param options - Configuration object. All properties are optional.
    */
   constructor(options: MeshReflectorMaterialOptions = {}) {
+    const opts = { ...DEFAULT_REFLECTOR_OPTIONS, ...options };
     const {
-      resolution = 256,
-      blur = [0, 0],
-      mixBlur = 0,
-      mixStrength = 1,
-      mixContrast = 1,
-      mirror = 0,
-      distortion = 1,
-      distortionMap,
-      minDepthThreshold = 0.9,
-      maxDepthThreshold = 1,
-      depthScale = 0,
-      depthToBlurRatioBias = 0.25,
-      reflectorOffset = 0,
-      color = 0xffffff,
-      metalness = 0,
-      roughness = 0,
-    } = options;
+      resolution, blur, mixBlur, mixStrength, mixContrast,
+      mirror, distortion, distortionMap, minDepthThreshold,
+      maxDepthThreshold, depthScale, depthToBlurRatioBias,
+      reflectorOffset, color, metalness, roughness,
+    } = opts;
 
     super({ color, metalness, roughness });
-
     this._reflectorOffset = reflectorOffset;
 
-    // Normalize blur to [x, y]
-    const blurArr: [number, number] = Array.isArray(blur) ? blur : [blur, blur];
+    const blurArr: [number, number] =
+      Array.isArray(blur) ? blur : [blur, blur];
     const blurX = blurArr[0];
     const blurY = blurArr[1];
     this._hasBlurFlag = blurX + blurY > 0;
 
-    // Create render targets
-    const rtParams = {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      type: THREE.HalfFloatType,
-    };
+    const { fbo1, fbo2 } = createReflectionTargets(resolution);
+    this._fbo1 = fbo1;
+    this._fbo2 = fbo2;
 
-    this._fbo1 = new THREE.WebGLRenderTarget(resolution, resolution, rtParams);
-    this._fbo1.depthBuffer = true;
-    this._fbo1.depthTexture = new THREE.DepthTexture(resolution, resolution);
-    this._fbo1.depthTexture.format = THREE.DepthFormat;
-    this._fbo1.depthTexture.type = THREE.UnsignedShortType;
-
-    this._fbo2 = new THREE.WebGLRenderTarget(resolution, resolution, rtParams);
-
-    // Create blur pass if needed
     if (this._hasBlurFlag) {
       this._blurPass = new BlurPass({
         resolution,
@@ -297,108 +452,229 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
       });
     }
 
-    // Set uniform values
+    this._assignUniforms({
+      mirror,
+      mixBlur,
+      mixStrength,
+      minDepthThreshold,
+      maxDepthThreshold,
+      depthScale,
+      depthToBlurRatioBias,
+      distortion,
+      distortionMap,
+      mixContrast,
+    });
+
+    this._initDefines(depthScale, distortionMap);
+  }
+
+  /** Assign uniform values from constructor options. */
+  private _assignUniforms(opts: {
+    mirror: number;
+    mixBlur: number;
+    mixStrength: number;
+    minDepthThreshold: number;
+    maxDepthThreshold: number;
+    depthScale: number;
+    depthToBlurRatioBias: number;
+    distortion: number;
+    distortionMap?: THREE.Texture | null;
+    mixContrast: number;
+  }): void {
     this._uTDiffuse.value = this._fbo1.texture;
     this._uTDepth.value = this._fbo1.depthTexture;
     this._uTDiffuseBlur.value = this._fbo2.texture;
     this._uTextureMatrix.value = this._mat4;
     this._uHasBlur.value = this._hasBlurFlag;
-    this._uMirror.value = mirror;
-    this._uMixBlur.value = mixBlur;
-    this._uBlurStrength.value = mixStrength;
-    this._uMinDepthThreshold.value = minDepthThreshold;
-    this._uMaxDepthThreshold.value = maxDepthThreshold;
-    this._uDepthScale.value = depthScale;
-    this._uDepthToBlurRatioBias.value = depthToBlurRatioBias;
-    this._uDistortion.value = distortion;
-    this._uDistortionMap.value = distortionMap ?? null;
-    this._uMixContrast.value = mixContrast;
+    this._uMirror.value = opts.mirror;
+    this._uMixBlur.value = opts.mixBlur;
+    this._uBlurStrength.value = opts.mixStrength;
+    this._uMinDepthThreshold.value = opts.minDepthThreshold;
+    this._uMaxDepthThreshold.value = opts.maxDepthThreshold;
+    this._uDepthScale.value = opts.depthScale;
+    this._uDepthToBlurRatioBias.value = opts.depthToBlurRatioBias;
+    this._uDistortion.value = opts.distortion;
+    this._uDistortionMap.value = opts.distortionMap ?? null;
+    this._uMixContrast.value = opts.mixContrast;
+  }
 
-    // Set defines — these trigger shader recompilation, so they must be set before first render
-    if (this._hasBlurFlag) this.defines.USE_BLUR = '';
-    if (depthScale > 0) this.defines.USE_DEPTH = '';
-    if (distortionMap) this.defines.USE_DISTORTION = '';
+  /** Initialize shader defines from constructor options. */
+  private _initDefines(depthScale: number, distortionMap?: THREE.Texture): void {
+    if (this._hasBlurFlag) {
+      this.defines.USE_BLUR = '';
+    }
+    if (depthScale > 0) {
+      this.defines.USE_DEPTH = '';
+    }
+    if (distortionMap) {
+      this.defines.USE_DISTORTION = '';
+    }
   }
 
   // ---- Uniform getters / setters ----
 
   /** The sharp reflection texture (auto-set from internal FBO). */
-  get tDiffuse(): THREE.Texture | null { return this._uTDiffuse.value; }
-  set tDiffuse(v: THREE.Texture | null) { this._uTDiffuse.value = v; }
+  get tDiffuse(): THREE.Texture | null {
+    return this._uTDiffuse.value;
+  }
+
+  set tDiffuse(v: THREE.Texture | null) {
+    this._uTDiffuse.value = v;
+  }
 
   /** The depth texture of the reflection (auto-set from internal FBO). */
-  get tDepth(): THREE.DepthTexture | null { return this._uTDepth.value; }
-  set tDepth(v: THREE.DepthTexture | null) { this._uTDepth.value = v; }
+  get tDepth(): THREE.DepthTexture | null {
+    return this._uTDepth.value;
+  }
+
+  set tDepth(v: THREE.DepthTexture | null) {
+    this._uTDepth.value = v;
+  }
 
   /** The blurred reflection texture (auto-set from internal FBO). */
-  get tDiffuseBlur(): THREE.Texture | null { return this._uTDiffuseBlur.value; }
-  set tDiffuseBlur(v: THREE.Texture | null) { this._uTDiffuseBlur.value = v; }
+  get tDiffuseBlur(): THREE.Texture | null {
+    return this._uTDiffuseBlur.value;
+  }
+
+  set tDiffuseBlur(v: THREE.Texture | null) {
+    this._uTDiffuseBlur.value = v;
+  }
 
   /** The texture matrix that transforms world positions to reflection UV. */
-  get textureMatrix(): THREE.Matrix4 | null { return this._uTextureMatrix.value; }
-  set textureMatrix(v: THREE.Matrix4 | null) { this._uTextureMatrix.value = v; }
+  get textureMatrix(): THREE.Matrix4 | null {
+    return this._uTextureMatrix.value;
+  }
+
+  set textureMatrix(v: THREE.Matrix4 | null) {
+    this._uTextureMatrix.value = v;
+  }
 
   /** Whether blur is active. */
-  get hasBlur(): boolean { return this._uHasBlur.value; }
-  set hasBlur(v: boolean) { this._uHasBlur.value = v; }
+  get hasBlur(): boolean {
+    return this._uHasBlur.value;
+  }
+
+  set hasBlur(v: boolean) {
+    this._uHasBlur.value = v;
+  }
 
   /** Mirror factor (0 = blend with base, 1 = pure reflection). */
-  get mirror(): number { return this._uMirror.value; }
-  set mirror(v: number) { this._uMirror.value = v; }
+  get mirror(): number {
+    return this._uMirror.value;
+  }
+
+  set mirror(v: number) {
+    this._uMirror.value = v;
+  }
 
   /** Blur mix factor (0 = sharp only, 1 = fully blurred). */
-  get mixBlur(): number { return this._uMixBlur.value; }
-  set mixBlur(v: number) { this._uMixBlur.value = v; }
+  get mixBlur(): number {
+    return this._uMixBlur.value;
+  }
+
+  set mixBlur(v: number) {
+    this._uMixBlur.value = v;
+  }
 
   /** Reflection strength multiplier. */
-  get mixStrength(): number { return this._uBlurStrength.value; }
-  set mixStrength(v: number) { this._uBlurStrength.value = v; }
+  get mixStrength(): number {
+    return this._uBlurStrength.value;
+  }
+
+  set mixStrength(v: number) {
+    this._uBlurStrength.value = v;
+  }
 
   /** Min depth threshold for depth-aware blur. */
-  get minDepthThreshold(): number { return this._uMinDepthThreshold.value; }
-  set minDepthThreshold(v: number) { this._uMinDepthThreshold.value = v; }
+  get minDepthThreshold(): number {
+    return this._uMinDepthThreshold.value;
+  }
+
+  set minDepthThreshold(v: number) {
+    this._uMinDepthThreshold.value = v;
+  }
 
   /** Max depth threshold for depth-aware blur. */
-  get maxDepthThreshold(): number { return this._uMaxDepthThreshold.value; }
-  set maxDepthThreshold(v: number) { this._uMaxDepthThreshold.value = v; }
+  get maxDepthThreshold(): number {
+    return this._uMaxDepthThreshold.value;
+  }
+
+  set maxDepthThreshold(v: number) {
+    this._uMaxDepthThreshold.value = v;
+  }
 
   /** Depth scale for depth-aware blur. */
-  get depthScale(): number { return this._uDepthScale.value; }
-  set depthScale(v: number) { this._uDepthScale.value = v; }
+  get depthScale(): number {
+    return this._uDepthScale.value;
+  }
+
+  set depthScale(v: number) {
+    this._uDepthScale.value = v;
+  }
 
   /** Depth-to-blur ratio bias. */
-  get depthToBlurRatioBias(): number { return this._uDepthToBlurRatioBias.value; }
-  set depthToBlurRatioBias(v: number) { this._uDepthToBlurRatioBias.value = v; }
+  get depthToBlurRatioBias(): number {
+    return this._uDepthToBlurRatioBias.value;
+  }
+
+  set depthToBlurRatioBias(v: number) {
+    this._uDepthToBlurRatioBias.value = v;
+  }
 
   /** Distortion intensity. */
-  get distortion(): number { return this._uDistortion.value; }
-  set distortion(v: number) { this._uDistortion.value = v; }
+  get distortion(): number {
+    return this._uDistortion.value;
+  }
+
+  set distortion(v: number) {
+    this._uDistortion.value = v;
+  }
 
   /** Distortion map texture. */
-  get distortionMap(): THREE.Texture | null { return this._uDistortionMap.value; }
-  set distortionMap(v: THREE.Texture | null) { this._uDistortionMap.value = v; }
+  get distortionMap(): THREE.Texture | null {
+    return this._uDistortionMap.value;
+  }
+
+  set distortionMap(v: THREE.Texture | null) {
+    this._uDistortionMap.value = v;
+  }
 
   /** Reflection contrast. */
-  get mixContrast(): number { return this._uMixContrast.value; }
-  set mixContrast(v: number) { this._uMixContrast.value = v; }
+  get mixContrast(): number {
+    return this._uMixContrast.value;
+  }
+
+  set mixContrast(v: number) {
+    this._uMixContrast.value = v;
+  }
 
   /** Reflector offset along its normal. */
-  get reflectorOffset(): number { return this._reflectorOffset; }
-  set reflectorOffset(v: number) { this._reflectorOffset = v; }
+  get reflectorOffset(): number {
+    return this._reflectorOffset;
+  }
+
+  set reflectorOffset(v: number) {
+    this._reflectorOffset = v;
+  }
 
   /**
    * Inject reflection uniforms and shader code into the standard material.
    *
-   * Called automatically by Three.js when the material is first used for rendering.
-   * You should not need to call this directly.
+   * Called automatically by Three.js when the material is first used
+   * for rendering. You should not need to call this directly.
    */
   override onBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms): void {
     if (!shader.defines?.USE_UV) {
       shader.defines ??= {};
       shader.defines.USE_UV = '';
     }
+    this._injectUniforms(shader);
+    this._injectVertexShader(shader);
+    this._injectFragmentShader(shader);
+  }
 
-    // Inject uniforms
+  /** Inject reflection-related uniforms into the shader program. */
+  private _injectUniforms(shader: THREE.WebGLProgramParametersWithUniforms): void {
     shader.uniforms.hasBlur = this._uHasBlur;
     shader.uniforms.tDiffuse = this._uTDiffuse;
     shader.uniforms.tDepth = this._uTDepth;
@@ -414,107 +690,23 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
     shader.uniforms.depthToBlurRatioBias = this._uDepthToBlurRatioBias;
     shader.uniforms.distortion = this._uDistortion;
     shader.uniforms.mixContrast = this._uMixContrast;
+  }
 
-    // Vertex shader: add textureMatrix uniform and my_vUv varying
-    shader.vertexShader = `
-      uniform mat4 textureMatrix;
-      varying vec4 my_vUv;
-    ${shader.vertexShader}`;
-
+  /** Inject vertex shader modifications for reflection UV projection. */
+  private _injectVertexShader(shader: THREE.WebGLProgramParametersWithUniforms): void {
+    shader.vertexShader = VERTEX_SHADER_PREFIX + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <project_vertex>',
-      `#include <project_vertex>
-        my_vUv = textureMatrix * vec4( position, 1.0 );
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );`,
+      VERTEX_SHADER_REPLACEMENT,
     );
+  }
 
-    // Fragment shader: add reflection uniforms and compositing logic
-    shader.fragmentShader = `
-      uniform sampler2D tDiffuse;
-      uniform sampler2D tDiffuseBlur;
-      uniform sampler2D tDepth;
-      uniform sampler2D distortionMap;
-      uniform float distortion;
-      uniform float cameraNear;
-      uniform float cameraFar;
-      uniform bool hasBlur;
-      uniform float mixBlur;
-      uniform float mirror;
-      uniform float mixStrength;
-      uniform float minDepthThreshold;
-      uniform float maxDepthThreshold;
-      uniform float mixContrast;
-      uniform float depthScale;
-      uniform float depthToBlurRatioBias;
-      varying vec4 my_vUv;
-    ${shader.fragmentShader}`;
-
+  /** Inject fragment shader modifications for reflection compositing. */
+  private _injectFragmentShader(shader: THREE.WebGLProgramParametersWithUniforms): void {
+    shader.fragmentShader = FRAGMENT_SHADER_PREFIX + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>
-
-      float distortionFactor = 0.0;
-      #ifdef USE_DISTORTION
-        distortionFactor = texture2D(distortionMap, vUv).r * distortion;
-      #endif
-
-      vec4 new_vUv = my_vUv;
-      new_vUv.x += distortionFactor;
-      new_vUv.y += distortionFactor;
-
-      vec4 base = texture2DProj(tDiffuse, new_vUv);
-      vec4 blur = texture2DProj(tDiffuseBlur, new_vUv);
-
-      vec4 merge = base;
-
-      #ifdef USE_NORMALMAP
-        vec2 normal_uv = vec2(0.0);
-        vec4 normalColor = texture2D(normalMap, vUv * normalScale);
-        vec3 my_normal = normalize( vec3( normalColor.r * 2.0 - 1.0, normalColor.b,  normalColor.g * 2.0 - 1.0 ) );
-        vec3 coord = new_vUv.xyz / new_vUv.w;
-        normal_uv = coord.xy + coord.z * my_normal.xz * 0.05;
-        vec4 base_normal = texture2D(tDiffuse, normal_uv);
-        vec4 blur_normal = texture2D(tDiffuseBlur, normal_uv);
-        merge = base_normal;
-        blur = blur_normal;
-      #endif
-
-      float depthFactor = 0.0001;
-      float blurFactor = 0.0;
-
-      #ifdef USE_DEPTH
-        vec4 depth = texture2DProj(tDepth, new_vUv);
-        depthFactor = smoothstep(minDepthThreshold, maxDepthThreshold, 1.0-(depth.r * depth.a));
-        depthFactor *= depthScale;
-        depthFactor = max(0.0001, min(1.0, depthFactor));
-
-        #ifdef USE_BLUR
-          blur = blur * min(1.0, depthFactor + depthToBlurRatioBias);
-          merge = merge * min(1.0, depthFactor + 0.5);
-        #else
-          merge = merge * depthFactor;
-        #endif
-
-      #endif
-
-      float reflectorRoughnessFactor = roughness;
-      #ifdef USE_ROUGHNESSMAP
-        vec4 reflectorTexelRoughness = texture2D( roughnessMap, vUv );
-        reflectorRoughnessFactor *= reflectorTexelRoughness.g;
-      #endif
-
-      #ifdef USE_BLUR
-        blurFactor = min(1.0, mixBlur * reflectorRoughnessFactor);
-        merge = mix(merge, blur, blurFactor);
-      #endif
-
-      vec4 newMerge = vec4(0.0, 0.0, 0.0, 1.0);
-      newMerge.r = (merge.r - 0.5) * mixContrast + 0.5;
-      newMerge.g = (merge.g - 0.5) * mixContrast + 0.5;
-      newMerge.b = (merge.b - 0.5) * mixContrast + 0.5;
-
-      diffuseColor.rgb = diffuseColor.rgb * ((1.0 - min(1.0, mirror)) + newMerge.rgb * mixStrength);
-      `,
+      FRAGMENT_SHADER_REPLACEMENT,
     );
   }
 
@@ -522,8 +714,9 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
    * Update the reflection texture for the current frame.
    *
    * **Must be called every frame before `renderer.render(scene, camera)`.**
-   * This renders the scene from a mirrored virtual camera with an oblique clip plane
-   * into an internal render target, then optionally applies a multi-pass blur.
+   * This renders the scene from a mirrored virtual camera with an oblique
+   * clip plane into an internal render target, then optionally applies
+   * a multi-pass blur.
    *
    * @param renderer - The WebGL renderer.
    * @param scene - The scene to reflect.
@@ -546,11 +739,15 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
     camera: THREE.PerspectiveCamera,
   ): boolean {
     const parent = this._parentMesh;
-    if (!parent || (parent as THREE.Mesh).material !== this) return false;
+    if (!parent || (parent).material !== this) {
+      return false;
+    }
 
     // Compute virtual camera position and oblique clip plane
     const shouldRender = this._computeVirtualCamera(parent, camera);
-    if (!shouldRender) return false;
+    if (!shouldRender) {
+      return false;
+    }
 
     // Temporarily hide the reflector mesh to avoid self-reflection
     parent.visible = false;
@@ -563,7 +760,9 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(this._fbo1);
     renderer.state.buffers.depth.setMask(true);
-    if (!renderer.autoClear) renderer.clear();
+    if (!renderer.autoClear) {
+      renderer.clear();
+    }
     renderer.render(scene, this._virtualCamera);
 
     // Apply blur if enabled
@@ -623,12 +822,7 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
     const normal = this._normal;
     const view = this._view;
     const target = this._target;
-    const lookAtPosition = this._lookAtPosition;
-    const clipPlane = this._clipPlane;
-    const q = this._q;
-    const textureMatrix = this._mat4;
     const virtualCamera = this._virtualCamera;
-    const reflectorPlane = this._reflectorPlane;
 
     reflectorWorldPosition.setFromMatrixPosition(parent.matrixWorld);
     cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
@@ -640,56 +834,98 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
     view.subVectors(reflectorWorldPosition, cameraWorldPosition);
 
     // Avoid rendering when reflector is facing away
-    if (view.dot(normal) > 0) return false;
+    if (view.dot(normal) > 0) {
+      return false;
+    }
 
     view.reflect(normal).negate();
     view.add(reflectorWorldPosition);
 
     rotationMatrix.extractRotation(camera.matrixWorld);
-    lookAtPosition.set(0, 0, -1).applyMatrix4(rotationMatrix).add(cameraWorldPosition);
+    this._lookAtPosition
+      .set(0, 0, -1)
+      .applyMatrix4(rotationMatrix)
+      .add(cameraWorldPosition);
 
-    target.subVectors(reflectorWorldPosition, lookAtPosition);
+    target.subVectors(reflectorWorldPosition, this._lookAtPosition);
     target.reflect(normal).negate();
     target.add(reflectorWorldPosition);
 
+    this._setupVirtualCamera(virtualCamera, view, target, { rotationMatrix, normal }, camera);
+
+    this._updateTextureMatrix(parent);
+    this._applyObliqueClipPlane();
+
+    return true;
+  }
+
+  /** Position the virtual camera and copy projection from the main camera. */
+  private _setupVirtualCamera(
+    virtualCamera: THREE.PerspectiveCamera,
+    view: THREE.Vector3,
+    target: THREE.Vector3,
+    transform: { rotationMatrix: THREE.Matrix4; normal: THREE.Vector3 },
+    camera: THREE.PerspectiveCamera,
+  ): void {
     virtualCamera.position.copy(view);
-    virtualCamera.up.set(0, 1, 0).applyMatrix4(rotationMatrix).reflect(normal);
+    virtualCamera.up
+      .set(0, 1, 0)
+      .applyMatrix4(transform.rotationMatrix)
+      .reflect(transform.normal);
     virtualCamera.lookAt(target);
     virtualCamera.far = camera.far;
     virtualCamera.updateMatrixWorld();
     virtualCamera.projectionMatrix.copy(camera.projectionMatrix);
+  }
 
-    // Update the texture matrix
-    textureMatrix.set(0.5, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 1.0);
-    textureMatrix.multiply(virtualCamera.projectionMatrix);
-    textureMatrix.multiply(virtualCamera.matrixWorldInverse);
+  /**
+   * Update the texture matrix that transforms world positions to
+   * reflection UV coordinates.
+   */
+  private _updateTextureMatrix(parent: THREE.Object3D): void {
+    const textureMatrix = this._mat4;
+    textureMatrix.set(
+      CLIP_TO_TEXTURE_SCALE, 0, 0, CLIP_TO_TEXTURE_SCALE,
+      0, CLIP_TO_TEXTURE_SCALE, 0, CLIP_TO_TEXTURE_SCALE,
+      0, 0, CLIP_TO_TEXTURE_SCALE, CLIP_TO_TEXTURE_SCALE,
+      0, 0, 0, 1,
+    );
+    textureMatrix.multiply(this._virtualCamera.projectionMatrix);
+    textureMatrix.multiply(this._virtualCamera.matrixWorldInverse);
     textureMatrix.multiply(parent.matrixWorld);
+  }
 
-    // Oblique clip plane
-    reflectorPlane.setFromNormalAndCoplanarPoint(normal, reflectorWorldPosition);
-    reflectorPlane.applyMatrix4(virtualCamera.matrixWorldInverse);
+  /**
+   * Apply the oblique clip plane to the virtual camera's projection matrix.
+   * Prevents rendering of geometry behind the reflector plane.
+   */
+  private _applyObliqueClipPlane(): void {
+    this._reflectorPlane.setFromNormalAndCoplanarPoint(this._normal, this._reflectorWorldPosition);
+    this._reflectorPlane.applyMatrix4(this._virtualCamera.matrixWorldInverse);
 
+    const clipPlane = this._clipPlane;
     clipPlane.set(
-      reflectorPlane.normal.x,
-      reflectorPlane.normal.y,
-      reflectorPlane.normal.z,
-      reflectorPlane.constant,
+      this._reflectorPlane.normal.x,
+      this._reflectorPlane.normal.y,
+      this._reflectorPlane.normal.z,
+      this._reflectorPlane.constant,
     );
 
-    const projectionMatrix = virtualCamera.projectionMatrix;
-    q.x = (Math.sign(clipPlane.x) + projectionMatrix.elements[8]) / projectionMatrix.elements[0];
-    q.y = (Math.sign(clipPlane.y) + projectionMatrix.elements[9]) / projectionMatrix.elements[5];
-    q.z = -1.0;
-    q.w = (1.0 + projectionMatrix.elements[10]) / projectionMatrix.elements[14];
+    const q = this._q;
+    const projMatrix = this._virtualCamera.projectionMatrix;
+    q.x = (Math.sign(clipPlane.x) + projMatrix.elements[8])
+      / projMatrix.elements[0];
+    q.y = (Math.sign(clipPlane.y) + projMatrix.elements[9])
+      / projMatrix.elements[5];
+    q.z = -1;
+    q.w = (1 + projMatrix.elements[10]) / projMatrix.elements[14];
 
-    clipPlane.multiplyScalar(2.0 / clipPlane.dot(q));
+    clipPlane.multiplyScalar(2 / clipPlane.dot(q));
 
-    projectionMatrix.elements[2] = clipPlane.x;
-    projectionMatrix.elements[6] = clipPlane.y;
-    projectionMatrix.elements[10] = clipPlane.z + 1.0;
-    projectionMatrix.elements[14] = clipPlane.w;
-
-    return true;
+    projMatrix.elements[2] = clipPlane.x;
+    projMatrix.elements[6] = clipPlane.y;
+    projMatrix.elements[10] = clipPlane.z + 1;
+    projMatrix.elements[14] = clipPlane.w;
   }
 
   /**

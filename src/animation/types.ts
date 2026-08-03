@@ -83,12 +83,16 @@ export interface Vec3Like {
  * ```
  */
 export interface PropertyTarget {
+
   /** 位置目标（局部坐标） */
   position?: Vec3Like;
+
   /** 旋转目标（欧拉角，弧度制） */
   rotation?: Vec3Like;
+
   /** 缩放目标 */
   scale?: Vec3Like;
+
   /** 任意点路径属性，如 'material.color'、'material.opacity' 等 */
   [key: string]: unknown;
 }
@@ -111,6 +115,7 @@ export interface PropertyTarget {
  * ```
  */
 export interface AnimationConfig {
+
   /**
    * 属性目标值。
    * 省略 `from` 时，从当前值动画到 `to` 指定的值。
@@ -181,14 +186,19 @@ export interface AnimationConfig {
  * 通过 {@link setDefaultConfig} 修改，通过 {@link getDefaultConfig} 读取。
  */
 export interface AnimationDefaults {
+
   /** 动画时长（秒） */
   duration: number;
+
   /** 延迟启动时间（秒） */
   delay: number;
+
   /** 缓动函数 */
   ease: EasingInput;
+
   /** 重复次数 */
   repeat: number;
+
   /** 是否往复播放 */
   yoyo: boolean;
 }
@@ -218,6 +228,7 @@ export interface AnimationDefaults {
  * ```
  */
 export interface AnimationController {
+
   /**
    * 添加一个串行动画步骤。
    *
@@ -312,6 +323,7 @@ export interface AnimationController {
  * ```
  */
 export interface AnimationStepBuilder {
+
   /**
    * 添加一个动画子步骤。
    * 在 `.parallel()` 回调内，多个 `.to()` 调用会按顺序执行。

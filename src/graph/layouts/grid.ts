@@ -36,18 +36,24 @@ import type { GridLayoutConfig } from './types';
  * Layouts.grid(nodes, { levels: 3, spacingX: 1.2, spacingY: 2.4, spacingZ: 1.2 });
  * ```
  */
-export function grid(nodes: NodeData[], config?: GridLayoutConfig): NodePos3D[] {
+export const grid = function (nodes: NodeData[], config?: GridLayoutConfig): NodePos3D[] {
   const n = nodes.length;
-  if (n === 0) return [];
+  if (n === 0) {
+    return [];
+  }
 
   const cfg = config ?? {};
   const levels = Math.max(1, cfg.levels ?? 1);
   // cols 缺省：尽量让每层接近正方形 → ceil(sqrt(n / levels))。
   let cols = cfg.cols ?? Math.ceil(Math.sqrt(n / levels));
-  if (cols < 1) cols = 1;
+  if (cols < 1) {
+    cols = 1;
+  }
   // rows 缺省：铺满剩余节点 → ceil(n / (cols · levels))。
   let rows = cfg.rows ?? Math.ceil(n / (cols * levels));
-  if (rows < 1) rows = 1;
+  if (rows < 1) {
+    rows = 1;
+  }
 
   const spacingX = cfg.spacingX ?? 1;
   const spacingY = cfg.spacingY ?? 1;
@@ -73,4 +79,4 @@ export function grid(nodes: NodeData[], config?: GridLayoutConfig): NodePos3D[] 
     };
   }
   return out;
-}
+};

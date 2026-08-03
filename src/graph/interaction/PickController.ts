@@ -28,11 +28,10 @@
  */
 
 import * as THREE from 'three';
-import type { Node3D } from '../elements/Node3D';
+import type { GraphEvent, GraphEventHandler, GraphPickKind } from './types';
 import type { Edge3D } from '../elements/Edge3D';
 import type { Graph3D } from '../Graph3D';
 import type { NodeId } from '../types';
-import type { GraphEvent, GraphEventHandler, GraphPickKind } from './types';
 
 /** pointerdown → pointerup 的位移阈值（px），超过视为拖拽，不触发 click。 */
 const CLICK_MOVE_THRESHOLD = 5;
@@ -46,44 +45,58 @@ const LINE_PICK_PIXELS = 6;
 
 /** 悬停放大倍率。 */
 const HOVER_SCALE = 1.25;
+
 /** 默认 emissive 强度（还原基准）。 */
 const DEFAULT_EMISSIVE_INTENSITY = 0;
+
 /** 节点悬停 emissive 强度。 */
 const HOVER_EMISSIVE_INTENSITY = 0.35;
+
 /** 节点选中 emissive 强度（强于悬停）。 */
 const SELECT_EMISSIVE_INTENSITY = 0.6;
 
 /** 反馈强调色（橙）—— 边悬停/选中 + 邻接边高亮 + 节点 emissive 共用。 */
 const EDGE_HIGHLIGHT_COLOR = 0xff8a3b;
+
 /** 边默认色（还原基准）。 */
 const EDGE_DEFAULT_COLOR = 0x9aa7b8;
-/** 节点默认色（还原基准）。 */
-const NODE_DEFAULT_COLOR = 0x4a90e2;
+
+/** 边默认不透明度（line 形态）。 */
+const EDGE_LINE_OPACITY = 0.85;
+
+/** NDC 坐标换算系数。 */
+const NDC_SCALE = 2;
+
+/** 屏幕 NDC → 像素换算中心偏移。 */
+const SCREEN_CENTER = 0.5;
 
 // 复用临时对象，避免每帧分配。
-const _ndc = /* @__PURE__ */ new THREE.Vector2();
-const _projA = /* @__PURE__ */ new THREE.Vector3();
-const _projB = /* @__PURE__ */ new THREE.Vector3();
+const sharedNdc = /* @__PURE__ */ new THREE.Vector2();
+const projA = /* @__PURE__ */ new THREE.Vector3();
+const projB = /* @__PURE__ */ new THREE.Vector3();
+
+/** 二维屏幕坐标点。 */
+interface ScreenPoint { x: number; y: number }
 
 /**
- * 屏幕空间：点 (px,py) 到线段 (ax,ay)-(bx,by) 的最近距离。
+ * 屏幕空间：点到线段的最近距离。
  */
-function pointToSegmentDist(
-  px: number, py: number,
-  ax: number, ay: number,
-  bx: number, by: number,
+const pointToSegmentDist = function (
+  point: ScreenPoint,
+  segA: ScreenPoint,
+  segB: ScreenPoint,
 ): number {
-  const dx = bx - ax;
-  const dy = by - ay;
+  const dx = segB.x - segA.x;
+  const dy = segB.y - segA.y;
   const lenSq = dx * dx + dy * dy;
-  let t = lenSq === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  let t = lenSq === 0 ? 0 : ((point.x - segA.x) * dx + (point.y - segA.y) * dy) / lenSq;
   t = Math.max(0, Math.min(1, t));
-  const cx = ax + t * dx;
-  const cy = ay + t * dy;
-  const ex = px - cx;
-  const ey = py - cy;
+  const cx = segA.x + t * dx;
+  const cy = segA.y + t * dy;
+  const ex = point.x - cx;
+  const ey = point.y - cy;
   return Math.sqrt(ex * ex + ey * ey);
-}
+};
 
 /**
  * {@link PickController} 构造参数。
@@ -102,22 +115,31 @@ function pointToSegmentDist(
  * ```
  */
 export interface PickControllerOptions {
+
   /** 监听 pointer 事件的宿主（通常是渲染 canvas）。 */
   domElement: HTMLElement;
+
   /** 拾取目标图组件。 */
   graph: Graph3D;
+
   /** 摄像机（NDC 射线 origin）。 */
   camera: THREE.Camera;
+
   /** 是否启用。 @default true */
   enabled?: boolean;
+
   /** 是否启用 hover 拾取。 @default true */
   hover?: boolean;
+
   /** 是否应用内置悬停反馈（放大+发光）。 @default true */
   highlightOnHover?: boolean;
+
   /** 是否应用内置选中反馈（常亮发光）。 @default true */
   highlightOnSelect?: boolean;
+
   /** 选中节点时是否高亮相邻边（仅提亮邻接边，其余边不变）。 @default true */
   neighborHighlight?: boolean;
+
   /**
    * 选中模式。
    * - `'single'`（默认）：互斥。选中新元素自动取消旧选中。
@@ -127,8 +149,10 @@ export interface PickControllerOptions {
    * @default 'single'
    */
   selectionMode?: 'single' | 'multiple';
+
   /** hover / unhover 事件回调。 */
   onHover?: GraphEventHandler;
+
   /** click / select / unselect 事件回调。 */
   onSelect?: GraphEventHandler;
 }
@@ -156,6 +180,7 @@ export class PickController {
   private highlightOnHover: boolean;
   private highlightOnSelect: boolean;
   private neighborHighlight: boolean;
+
   /** 选中模式：'single' 互斥 / 'multiple' 累加 toggle。 */
   private selectionMode: 'single' | 'multiple';
   onHover?: GraphEventHandler;
@@ -163,14 +188,17 @@ export class PickController {
 
   /** 当前悬停的元素 id（含 kind）。 */
   private hovered: PickHit | null = null;
+
   /** 当前选中的节点 id 集合。 */
   private readonly selectedNodes = new Set<NodeId>();
+
   /** 当前选中的边 id 集合。 */
   private readonly selectedEdges = new Set<NodeId>();
 
   /** pointerdown 落点（用于判断 click vs 拖拽）。 */
   private downX = 0;
   private downY = 0;
+
   /** pointerdown 是否已记录（pointerup 时校验）。 */
   private downActive = false;
 
@@ -209,23 +237,34 @@ export class PickController {
 
   /** 运行时启停拾取。停用时还原所有内置反馈。 */
   setEnabled(enabled: boolean): void {
-    if (this.enabled === enabled) return;
+    if (this.enabled === enabled) {
+      return;
+    }
     this.enabled = enabled;
-    if (!enabled) this.resetFeedback();
+    if (!enabled) {
+      this.resetFeedback();
+    }
   }
 
   /** 运行时切换内置悬停反馈开关，并重算当前悬停元素视觉。 */
   setHighlightOnHover(value: boolean): void {
     this.highlightOnHover = value;
-    if (this.hovered?.kind === 'node') this.reapplyNode(this.hovered.id);
-    else if (this.hovered?.kind === 'edge') this.reapplyEdge(this.hovered.id);
+    if (this.hovered?.kind === 'node') {
+      this.reapplyNode(this.hovered.id);
+    } else if (this.hovered?.kind === 'edge') {
+      this.reapplyEdge(this.hovered.id);
+    }
   }
 
   /** 运行时切换内置选中反馈开关，并重算所有选中元素视觉。 */
   setHighlightOnSelect(value: boolean): void {
     this.highlightOnSelect = value;
-    for (const id of this.selectedNodes) this.reapplyNode(id);
-    for (const id of this.selectedEdges) this.reapplyEdge(id);
+    for (const id of this.selectedNodes) {
+      this.reapplyNode(id);
+    }
+    for (const id of this.selectedEdges) {
+      this.reapplyEdge(id);
+    }
     this.reapplyAllEdges();
   }
 
@@ -241,7 +280,9 @@ export class PickController {
    * - 切到 `'multiple'` 时，当前选中全部保留。
    */
   setSelectionMode(mode: 'single' | 'multiple'): void {
-    if (this.selectionMode === mode) return;
+    if (this.selectionMode === mode) {
+      return;
+    }
     this.selectionMode = mode;
     if (mode === 'single') {
       // 保留最后一个选中元素（节点优先于边），清除其余并派 unselect。
@@ -278,7 +319,7 @@ export class PickController {
    * 每帧由渲染循环调用（可选）。当前内置反馈为即时反馈，本方法预留
    * 给后续步骤做平滑过渡（lerp emissive / scale）。
    */
-  update(_delta: number): void {
+  update(_delta: number): void { // eslint-disable-line @typescript-eslint/no-unused-vars
     // 预留：平滑过渡反馈。当前即时反馈无需每帧逻辑。
   }
 
@@ -292,7 +333,9 @@ export class PickController {
    * @returns 是否确实清空了（无选中时返回 false 且不派事件）。
    */
   clearSelection(nativeEvent?: PointerEvent): boolean {
-    if (this.selectedNodes.size === 0 && this.selectedEdges.size === 0) return false;
+    if (this.selectedNodes.size === 0 && this.selectedEdges.size === 0) {
+      return false;
+    }
     const prevNodes = [...this.selectedNodes];
     const prevEdges = [...this.selectedEdges];
     this.selectedNodes.clear();
@@ -333,45 +376,58 @@ export class PickController {
   // ────────────────────────────── pointer handlers ──────────────────────────
 
   private handlePointerMove(e: PointerEvent): void {
-    if (!this.enabled || !this.hoverEnabled) return;
+    if (!this.enabled || !this.hoverEnabled) {
+      return;
+    }
     const hit = this.pick(e);
     const prevId = this.hovered?.id;
     const nextId = hit?.id;
 
-    if (prevId === nextId) return; // 未变化
+    // 未变化
+    if (prevId === nextId) {
+      return;
+    }
 
     // 离开旧悬停。
     if (this.hovered) {
       const prev = this.hovered;
       this.hovered = null;
-      if (prev.kind === 'node') this.reapplyNode(prev.id);
-      else this.reapplyEdge(prev.id);
-      this.dispatch({ type: 'unhover', id: prev.id, kind: prev.kind, nativeEvent: e });
+      this.reapplyByKind(prev.kind, prev.id);
+      this.dispatch({
+        type: 'unhover', id: prev.id, kind: prev.kind, nativeEvent: e,
+      });
     }
 
     // 进入新悬停。
     if (hit) {
       this.hovered = hit;
-      if (hit.kind === 'node') this.reapplyNode(hit.id);
-      else this.reapplyEdge(hit.id);
-      this.dispatch({ type: 'hover', id: hit.id, kind: hit.kind, nativeEvent: e });
+      this.reapplyByKind(hit.kind, hit.id);
+      this.dispatch({
+        type: 'hover', id: hit.id, kind: hit.kind, nativeEvent: e,
+      });
     }
   }
 
   private handlePointerDown(e: PointerEvent): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
     this.downX = e.clientX;
     this.downY = e.clientY;
     this.downActive = true;
   }
 
   private handlePointerUp(e: PointerEvent): void {
-    if (!this.enabled || !this.downActive) return;
+    if (!this.enabled || !this.downActive) {
+      return;
+    }
     this.downActive = false;
     // 区分点击 vs 拖拽（OrbitControls 拖拽不触发 click）。
     const dx = e.clientX - this.downX;
     const dy = e.clientY - this.downY;
-    if (Math.hypot(dx, dy) > CLICK_MOVE_THRESHOLD) return;
+    if (Math.hypot(dx, dy) > CLICK_MOVE_THRESHOLD) {
+      return;
+    }
 
     const hit = this.pick(e);
 
@@ -382,102 +438,142 @@ export class PickController {
     }
 
     // 先派 click（节点与边都派）。
-    this.dispatch({ type: 'click', id: hit.id, kind: hit.kind, nativeEvent: e });
+    this.dispatch({
+      type: 'click', id: hit.id, kind: hit.kind, nativeEvent: e,
+    });
 
     const set = hit.kind === 'node' ? this.selectedNodes : this.selectedEdges;
     const already = set.has(hit.id);
 
     if (this.selectionMode === 'single') {
-      // 互斥：点已选 → 取消；点未选 → 清空旧选中后选中新元素。
-      if (already) {
-        set.delete(hit.id);
-        if (hit.kind === 'node') this.reapplyNode(hit.id);
-        else this.reapplyEdge(hit.id);
-        this.reapplyAllEdges();
-        this.dispatch({ type: 'unselect', id: hit.id, kind: hit.kind, nativeEvent: e });
-      } else {
-        // 清空旧选中（派 unselect），再选中新元素。
-        this.clearSelection(e);
-        set.add(hit.id);
-        if (hit.kind === 'node') this.reapplyNode(hit.id);
-        else this.reapplyEdge(hit.id);
-        this.reapplyAllEdges();
-        this.dispatch({ type: 'select', id: hit.id, kind: hit.kind, nativeEvent: e });
-      }
+      this.handleSingleSelect(hit, already, set, e);
     } else {
-      // multiple：纯累加 toggle。点已选 → 取消；点未选 → 追加。
-      if (already) {
-        set.delete(hit.id);
-        if (hit.kind === 'node') this.reapplyNode(hit.id);
-        else this.reapplyEdge(hit.id);
-        this.reapplyAllEdges();
-        this.dispatch({ type: 'unselect', id: hit.id, kind: hit.kind, nativeEvent: e });
-      } else {
-        set.add(hit.id);
-        if (hit.kind === 'node') this.reapplyNode(hit.id);
-        else this.reapplyEdge(hit.id);
-        this.reapplyAllEdges();
-        this.dispatch({ type: 'select', id: hit.id, kind: hit.kind, nativeEvent: e });
-      }
+      this.handleMultipleSelect(hit, already, set, e);
+    }
+  }
+
+  /**
+   * 处理 single 模式选中逻辑。
+   */
+  private handleSingleSelect(hit: PickHit, already: boolean, set: Set<NodeId>, e: PointerEvent): void {
+    if (already) {
+      set.delete(hit.id);
+      this.reapplyByKind(hit.kind, hit.id);
+      this.reapplyAllEdges();
+      this.dispatch({
+        type: 'unselect', id: hit.id, kind: hit.kind, nativeEvent: e,
+      });
+    } else {
+      this.clearSelection(e);
+      set.add(hit.id);
+      this.reapplyByKind(hit.kind, hit.id);
+      this.reapplyAllEdges();
+      this.dispatch({
+        type: 'select', id: hit.id, kind: hit.kind, nativeEvent: e,
+      });
+    }
+  }
+
+  /**
+   * 处理 multiple 模式选中逻辑。
+   */
+  private handleMultipleSelect(hit: PickHit, already: boolean, set: Set<NodeId>, e: PointerEvent): void {
+    if (already) {
+      set.delete(hit.id);
+      this.reapplyByKind(hit.kind, hit.id);
+      this.reapplyAllEdges();
+      this.dispatch({
+        type: 'unselect', id: hit.id, kind: hit.kind, nativeEvent: e,
+      });
+    } else {
+      set.add(hit.id);
+      this.reapplyByKind(hit.kind, hit.id);
+      this.reapplyAllEdges();
+      this.dispatch({
+        type: 'select', id: hit.id, kind: hit.kind, nativeEvent: e,
+      });
     }
   }
 
   private handlePointerLeave(): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
     if (this.hovered) {
       const prev = this.hovered;
       this.hovered = null;
-      if (prev.kind === 'node') this.reapplyNode(prev.id);
-      else this.reapplyEdge(prev.id);
+      this.reapplyByKind(prev.kind, prev.id);
       // pointerleave 无 nativeEvent 可用，构造一个空的合成事件用于回调。
-      this.dispatch({ type: 'unhover', id: prev.id, kind: prev.kind, nativeEvent: new PointerEvent('pointerleave') });
+      this.dispatch({
+        type: 'unhover', id: prev.id, kind: prev.kind, nativeEvent: new PointerEvent('pointerleave'),
+      });
     }
     this.downActive = false;
+  }
+
+  /** 按 kind 调用 reapplyNode 或 reapplyEdge。 */
+  private reapplyByKind(kind: GraphPickKind, id: NodeId): void {
+    if (kind === 'node') {
+      this.reapplyNode(id);
+    } else {
+      this.reapplyEdge(id);
+    }
   }
 
   // ────────────────────────────── raycast ───────────────────────────────────
 
   /**
-   * 把 client 坐标转 NDC 并拾取。**节点优先于边**：
-   * 1. 先用 raycaster 拾取节点（mesh 面拾取，精准）。`raycaster.params.Line.threshold`
-   *    已设 0，故 LineSegments 直线边**不会**被 raycaster 命中。
-   * 2. 若无节点命中，再用**屏幕像素距离**判定直线边：鼠标屏幕点到边两端构成
-   *    的线段的最近距离 < {@link LINE_PICK_PIXELS} 才算命中。
-   *
-   * 直线边用屏幕像素阈值而非 world-unit，使其热区在任意相机距离下都紧贴线本身，
-   * 避免「离线很远也被拾取」。`'path'` 形态是 Mesh，走 raycaster 面拾取（见步骤 2）。
+   * 把 client 坐标转 NDC 并拾取。**节点优先于边**。
    */
   private pick(e: PointerEvent): PickHit | null {
     const rect = this.dom.getBoundingClientRect();
-    _ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    _ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(_ndc, this.camera);
+    sharedNdc.x = ((e.clientX - rect.left) / rect.width) * NDC_SCALE - 1;
+    sharedNdc.y = -((e.clientY - rect.top) / rect.height) * NDC_SCALE + 1;
+    this.raycaster.setFromCamera(sharedNdc, this.camera);
 
     const intersects = this.raycaster.intersectObject(this.graph, true);
 
     // 第一轮：找节点（mesh 命中）。
-    for (const it of intersects) {
-      const nodeId = this.findUserData(it.object, 'nodeId');
-      if (nodeId !== undefined) return { kind: 'node', id: nodeId as NodeId };
+    const nodeHit = this.findNodeHit(intersects);
+    if (nodeHit) {
+      return nodeHit;
     }
 
     // 第二轮：path 形态边（Mesh，已被 raycaster 命中）。
-    for (const it of intersects) {
-      const edgeId = this.findUserData(it.object, 'edgeId');
-      const edge = edgeId !== undefined ? this.graph.getEdge(edgeId as NodeId) : null;
-      if (edge && edge.type === 'path') {
-        return { kind: 'edge', id: edgeId as NodeId };
-      }
+    const pathHit = this.findPathHit(intersects);
+    if (pathHit) {
+      return pathHit;
     }
 
     // 第三轮：line 形态边，屏幕像素距离判定。
     return this.pickEdgeByScreen(e.clientX, e.clientY, rect);
   }
 
+  /** 从 raycaster 命中列表中找节点。 */
+  private findNodeHit(intersects: THREE.Intersection[]): PickHit | null {
+    for (const it of intersects) {
+      const nodeId = this.findUserData(it.object, 'nodeId');
+      if (nodeId !== undefined) {
+        return { kind: 'node', id: nodeId as NodeId };
+      }
+    }
+    return null;
+  }
+
+  /** 从 raycaster 命中列表中找 path 形态边。 */
+  private findPathHit(intersects: THREE.Intersection[]): PickHit | null {
+    for (const it of intersects) {
+      const edgeId = this.findUserData(it.object, 'edgeId');
+      const edge = edgeId === undefined ? null : this.graph.getEdge(edgeId as NodeId);
+      if (edge && edge.type === 'path') {
+        return { kind: 'edge', id: edgeId as NodeId };
+      }
+    }
+    return null;
+  }
+
   /**
-   * 用屏幕像素距离拾取直线边。遍历所有 `type==='line'` 的边，把其两端节点
-   * 世界坐标投影到屏幕，算鼠标点到该线段的最近屏幕距离，取最小且 <
-   * {@link LINE_PICK_PIXELS} 的边。返回 null 表示未命中。
+   * 用屏幕像素距离拾取直线边。
    */
   private pickEdgeByScreen(
     clientX: number,
@@ -491,35 +587,55 @@ export class PickController {
     let bestDist = LINE_PICK_PIXELS;
 
     for (const edge of edges) {
-      if (edge.type !== 'line') continue;
-      const src = this.graph.getNode(edge.sourceId);
-      const tgt = this.graph.getNode(edge.targetId);
-      if (!src || !tgt) continue;
-
-      // 两端世界坐标 → NDC → 屏幕像素。
-      src.getWorldPosition(_projA).project(this.camera);
-      tgt.getWorldPosition(_projB).project(this.camera);
-      const ax = (_projA.x * 0.5 + 0.5) * w;
-      const ay = (-_projA.y * 0.5 + 0.5) * h;
-      const bx = (_projB.x * 0.5 + 0.5) * w;
-      const by = (-_projB.y * 0.5 + 0.5) * h;
-
-      const px = clientX - rect.left;
-      const py = clientY - rect.top;
-      const dist = pointToSegmentDist(px, py, ax, ay, bx, by);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = edge.edgeId;
+      if (edge.type === 'line') {
+        const result = this.computeEdgeScreenDist(edge, { w, h }, { x: clientX, y: clientY }, rect);
+        if (result !== null && result.dist < bestDist) {
+          bestDist = result.dist;
+          bestId = edge.edgeId;
+        }
       }
     }
-    return bestId !== null ? { kind: 'edge', id: bestId } : null;
+    return bestId === null ? null : { kind: 'edge', id: bestId };
+  }
+
+  /**
+   * 计算一条边在屏幕上的距离。
+   */
+  private computeEdgeScreenDist(
+    edge: Edge3D,
+    screen: { w: number; h: number },
+    client: { x: number; y: number },
+    rect: DOMRect,
+  ): { dist: number } | null {
+    const src = this.graph.getNode(edge.sourceId);
+    const tgt = this.graph.getNode(edge.targetId);
+    if (src === undefined || tgt === undefined) {
+      return null;
+    }
+
+    // 两端世界坐标 → NDC → 屏幕像素。
+    src.getWorldPosition(projA).project(this.camera);
+    tgt.getWorldPosition(projB).project(this.camera);
+    const segA: ScreenPoint = {
+      x: (projA.x * SCREEN_CENTER + SCREEN_CENTER) * screen.w,
+      y: (-projA.y * SCREEN_CENTER + SCREEN_CENTER) * screen.h,
+    };
+    const segB: ScreenPoint = {
+      x: (projB.x * SCREEN_CENTER + SCREEN_CENTER) * screen.w,
+      y: (-projB.y * SCREEN_CENTER + SCREEN_CENTER) * screen.h,
+    };
+    const point: ScreenPoint = { x: client.x - rect.left, y: client.y - rect.top };
+    const dist = pointToSegmentDist(point, segA, segB);
+    return { dist };
   }
 
   /** 沿 object 父链回查指定 userData 键的值。 */
   private findUserData(obj: THREE.Object3D, key: string): unknown {
     let cur: THREE.Object3D | null = obj;
     while (cur) {
-      if (cur.userData[key] !== undefined) return cur.userData[key];
+      if (cur.userData[key] !== undefined) {
+        return cur.userData[key];
+      }
       cur = cur.parent;
     }
     return undefined;
@@ -530,18 +646,16 @@ export class PickController {
   /** 按 {选中 > 悬停 > 默认} 优先级重算单个节点的视觉。 */
   private reapplyNode(id: NodeId): void {
     const node = this.graph.getNode(id);
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     // Node3D 的材质恒为 MeshStandardMaterial（见 Node3D.getMaterial）。
-    const mat = node.getMaterial() as THREE.MeshStandardMaterial;
+    const mat = node.getMaterial();
     const isSelected = this.selectedNodes.has(id);
     const isHovered = this.hovered?.kind === 'node' && this.hovered.id === id;
 
     // emissive：选中 > 悬停 > 默认（仅在内置反馈开启时应用）。
-    // 反馈色用强调橙（与邻边高亮色一致），靠 emissiveIntensity 控制强弱；
-    // 关闭反馈或默认态时 intensity=0，emissive 不显效。
-    let intensity = DEFAULT_EMISSIVE_INTENSITY;
-    if (isSelected && this.highlightOnSelect) intensity = SELECT_EMISSIVE_INTENSITY;
-    else if (isHovered && this.highlightOnHover) intensity = HOVER_EMISSIVE_INTENSITY;
+    const intensity = this.computeNodeIntensity(isSelected, isHovered);
     if (intensity > 0) {
       mat.emissive.setHex(EDGE_HIGHLIGHT_COLOR);
     } else {
@@ -555,56 +669,73 @@ export class PickController {
   }
 
   /**
+   * 计算节点 emissive 强度。
+   */
+  private computeNodeIntensity(isSelected: boolean, isHovered: boolean): number {
+    if (isSelected && this.highlightOnSelect) {
+      return SELECT_EMISSIVE_INTENSITY;
+    }
+    if (isHovered && this.highlightOnHover) {
+      return HOVER_EMISSIVE_INTENSITY;
+    }
+    return DEFAULT_EMISSIVE_INTENSITY;
+  }
+
+  /**
    * 按 {选中 > 悬停 > 默认} 优先级重算单条边的视觉。
-   *
-   * - 选中（且 `highlightOnSelect`）：提亮为强调橙、不透明。`'path'` 形态
-   *   （MeshStandardMaterial）额外加 emissive 强化。
-   * - 悬停（且 `highlightOnHover`）：提亮为强调橙、不透明（弱于选中，无 emissive）。
-   * - 默认：还原色与透明度。**但**若该边是某选中节点的邻接边（见
-   *   {@link reapplyAllEdges}），则保持邻接高亮 —— 故本方法不覆盖邻接高亮态，
-   *   邻接高亮由 `reapplyAllEdges` 统一管理。
-   *
-   * 调用顺序约定：先 `reapplyAllEdges`（决定邻接高亮底色），再 `reapplyEdge`
-   * （在 hover/select 时覆盖为更强态）。本方法在「非 hover/非 select」时
-   * 仅还原默认，不主动应用邻接高亮（避免与 reapplyAllEdges 重复）。
    */
   private reapplyEdge(id: NodeId): void {
     const edge = this.graph.getEdge(id);
-    if (!edge) return;
+    if (!edge) {
+      return;
+    }
     const mat = edge.getMaterial();
     const isSelected = this.selectedEdges.has(id);
     const isHovered = this.hovered?.kind === 'edge' && this.hovered.id === id;
     const active = (isSelected && this.highlightOnSelect) || (isHovered && this.highlightOnHover);
 
     if (active) {
-      mat.color.setHex(EDGE_HIGHLIGHT_COLOR);
-      mat.transparent = true;
-      mat.opacity = 1;
-      // 'path' 形态是 MeshStandardMaterial，加 emissive 强化选中/悬停。
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.emissive.setHex(EDGE_HIGHLIGHT_COLOR);
-        mat.emissiveIntensity = isSelected ? SELECT_EMISSIVE_INTENSITY : HOVER_EMISSIVE_INTENSITY;
-      }
+      this.applyEdgeHighlight(mat, isSelected);
     } else {
-      // 还原默认色/透明度（邻接高亮态由 reapplyAllEdges 覆盖，此处还原后会被它重设）。
-      mat.color.setHex(EDGE_DEFAULT_COLOR);
-      mat.transparent = edge.type === 'line';
-      mat.opacity = edge.type === 'line' ? 0.85 : 1;
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.emissive.setHex(0x000000);
-        mat.emissiveIntensity = DEFAULT_EMISSIVE_INTENSITY;
-      }
+      this.applyEdgeDefault(mat, edge.type);
+    }
+  }
+
+  /**
+   * 应用边高亮视觉。
+   */
+  private applyEdgeHighlight(
+    mat: THREE.LineBasicMaterial | THREE.MeshStandardMaterial,
+    isSelected: boolean,
+  ): void {
+    mat.color.setHex(EDGE_HIGHLIGHT_COLOR);
+    mat.transparent = true;
+    mat.opacity = 1;
+    // 'path' 形态是 MeshStandardMaterial，加 emissive 强化选中/悬停。
+    if (mat instanceof THREE.MeshStandardMaterial) {
+      mat.emissive.setHex(EDGE_HIGHLIGHT_COLOR);
+      mat.emissiveIntensity = isSelected ? SELECT_EMISSIVE_INTENSITY : HOVER_EMISSIVE_INTENSITY;
+    }
+  }
+
+  /**
+   * 应用边默认视觉。
+   */
+  private applyEdgeDefault(
+    mat: THREE.LineBasicMaterial | THREE.MeshStandardMaterial,
+    edgeType: 'line' | 'path',
+  ): void {
+    mat.color.setHex(EDGE_DEFAULT_COLOR);
+    mat.transparent = edgeType === 'line';
+    mat.opacity = edgeType === 'line' ? EDGE_LINE_OPACITY : 1;
+    if (mat instanceof THREE.MeshStandardMaterial) {
+      mat.emissive.setHex(0x000000);
+      mat.emissiveIntensity = DEFAULT_EMISSIVE_INTENSITY;
     }
   }
 
   /**
    * 重算所有边的状态：先全部还原默认，再应用「邻接边高亮」。
-   *
-   * 邻接边高亮：当存在选中**节点**且 `neighborHighlight` 开启时，把选中节点的
-   * 关联边提亮为强调橙（不透明）；**其余边保持默认原状不变**（不 dim、不删除）。
-   *
-   * 注意：边的自身 hover/select 反馈由 {@link reapplyEdge} 覆盖，优先级高于
-   * 邻接高亮。调用方应先调本方法设邻接底色，再对 hover/select 边调 reapplyEdge。
    */
   private reapplyAllEdges(): void {
     const edges = this.graph.getEdges();
@@ -612,10 +743,27 @@ export class PickController {
     const hasNodeSelection = this.selectedNodes.size > 0 && this.neighborHighlight;
 
     // 收集所有选中节点的邻接边 id。
+    const highlightEdgeIds = this.collectNeighborEdgeIds(edges, index, hasNodeSelection);
+
+    for (const edge of edges) {
+      this.reapplySingleEdgeInAll(edge, highlightEdgeIds, hasNodeSelection);
+    }
+  }
+
+  /**
+   * 收集选中节点的邻接边 id。
+   */
+  private collectNeighborEdgeIds(
+    edges: Edge3D[],
+    index: { incidentEdges: Map<NodeId, { source: NodeId; target: NodeId }[]> } | null,
+    hasNodeSelection: boolean,
+  ): Set<NodeId> {
     const highlightEdgeIds = new Set<NodeId>();
     if (hasNodeSelection && index) {
       const byEndpoints = new Map<string, Edge3D>();
-      for (const e of edges) byEndpoints.set(`${e.sourceId}->${e.targetId}`, e);
+      for (const e of edges) {
+        byEndpoints.set(`${e.sourceId}->${e.targetId}`, e);
+      }
 
       for (const nodeId of this.selectedNodes) {
         const incident = index.incidentEdges.get(nodeId) ?? [];
@@ -624,47 +772,52 @@ export class PickController {
           const fwd = `${ie.source}->${ie.target}`;
           const rev = `${ie.target}->${ie.source}`;
           const e = byEndpoints.get(fwd) ?? byEndpoints.get(rev);
-          if (e) highlightEdgeIds.add(e.edgeId);
+          if (e) {
+            highlightEdgeIds.add(e.edgeId);
+          }
         }
       }
     }
+    return highlightEdgeIds;
+  }
 
-    for (const edge of edges) {
-      const mat = edge.getMaterial();
-      const isHovered = this.hovered?.kind === 'edge' && this.hovered.id === edge.edgeId;
-      const isSelected = this.selectedEdges.has(edge.edgeId);
-      const edgeActive =
-        (isSelected && this.highlightOnSelect) || (isHovered && this.highlightOnHover);
-      const neighborHighlight = hasNodeSelection && highlightEdgeIds.has(edge.edgeId);
+  /**
+   * 在 reapplyAllEdges 中重算单条边的视觉。
+   */
+  private reapplySingleEdgeInAll(
+    edge: Edge3D,
+    highlightEdgeIds: Set<NodeId>,
+    hasNodeSelection: boolean,
+  ): void {
+    const mat = edge.getMaterial();
+    const isHovered = this.hovered?.kind === 'edge' && this.hovered.id === edge.edgeId;
+    const isSelected = this.selectedEdges.has(edge.edgeId);
+    const edgeActive =
+      (isSelected && this.highlightOnSelect) || (isHovered && this.highlightOnHover);
+    const isNeighborHighlight = hasNodeSelection && highlightEdgeIds.has(edge.edgeId);
 
-      if (edgeActive) {
-        // 边自身 hover/select 优先级最高。
-        mat.color.setHex(EDGE_HIGHLIGHT_COLOR);
-        mat.transparent = true;
-        mat.opacity = 1;
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive.setHex(EDGE_HIGHLIGHT_COLOR);
-          mat.emissiveIntensity = isSelected ? SELECT_EMISSIVE_INTENSITY : HOVER_EMISSIVE_INTENSITY;
-        }
-      } else if (neighborHighlight) {
-        // 邻接边高亮：提亮、不透明，无 emissive（区分于边自身选中）。
-        mat.color.setHex(EDGE_HIGHLIGHT_COLOR);
-        mat.transparent = true;
-        mat.opacity = 1;
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive.setHex(0x000000);
-          mat.emissiveIntensity = DEFAULT_EMISSIVE_INTENSITY;
-        }
-      } else {
-        // 其余边保持默认原状（不 dim、不删除）。
-        mat.color.setHex(EDGE_DEFAULT_COLOR);
-        mat.transparent = edge.type === 'line';
-        mat.opacity = edge.type === 'line' ? 0.85 : 1;
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive.setHex(0x000000);
-          mat.emissiveIntensity = DEFAULT_EMISSIVE_INTENSITY;
-        }
-      }
+    if (edgeActive) {
+      // 边自身 hover/select 优先级最高。
+      this.applyEdgeHighlight(mat, isSelected);
+    } else if (isNeighborHighlight) {
+      // 邻接边高亮：提亮、不透明，无 emissive（区分于边自身选中）。
+      this.applyNeighborHighlight(mat);
+    } else {
+      // 其余边保持默认原状（不 dim、不删除）。
+      this.applyEdgeDefault(mat, edge.type);
+    }
+  }
+
+  /**
+   * 应用邻接边高亮视觉。
+   */
+  private applyNeighborHighlight(mat: THREE.LineBasicMaterial | THREE.MeshStandardMaterial): void {
+    mat.color.setHex(EDGE_HIGHLIGHT_COLOR);
+    mat.transparent = true;
+    mat.opacity = 1;
+    if (mat instanceof THREE.MeshStandardMaterial) {
+      mat.emissive.setHex(0x000000);
+      mat.emissiveIntensity = DEFAULT_EMISSIVE_INTENSITY;
     }
   }
 
@@ -677,19 +830,24 @@ export class PickController {
     this.selectedNodes.clear();
     this.selectedEdges.clear();
 
-    if (prevHovered?.kind === 'node') this.reapplyNode(prevHovered.id);
-    else if (prevHovered?.kind === 'edge') this.reapplyEdge(prevHovered.id);
-    for (const id of prevNodes) this.reapplyNode(id);
-    for (const id of prevEdges) this.reapplyEdge(id);
+    if (prevHovered?.kind === 'node') {
+      this.reapplyNode(prevHovered.id);
+    } else if (prevHovered?.kind === 'edge') {
+      this.reapplyEdge(prevHovered.id);
+    }
+    for (const id of prevNodes) {
+      this.reapplyNode(id);
+    }
+    for (const id of prevEdges) {
+      this.reapplyEdge(id);
+    }
     this.reapplyAllEdges();
   }
 
   // ────────────────────────────── event dispatch ────────────────────────────
 
   /** 构造 GraphEvent 并回调用户处理器（附带元素 data）。 */
-  private dispatch(
-    base: Omit<GraphEvent, 'data'>,
-  ): void {
+  private dispatch(base: Omit<GraphEvent, 'data'>): void {
     const data = this.readElementData(base.kind, base.id);
     const evt: GraphEvent = { ...base, data };
     if (base.type === 'hover' || base.type === 'unhover') {
@@ -702,15 +860,19 @@ export class PickController {
   /** 读取节点/边携带的 data 字段（用于事件回调）。 */
   private readElementData(kind: GraphPickKind, id: NodeId): Record<string, unknown> | undefined {
     if (kind === 'node') {
-      return this.graph.getNode(id)?.data?.data as Record<string, unknown> | undefined;
+      return this.graph.getNode(id)?.data?.data;
     }
     const edges = this.graph.getEdges();
     const edge = edges.find((e) => e.edgeId === id);
     // Edge3D 未直接暴露 data；从 Graph3D 规范化数据回查。
-    if (!edge) return undefined;
+    if (!edge) {
+      return undefined;
+    }
     const graphData = this.graph.getData();
-    if (!graphData) return undefined;
+    if (!graphData) {
+      return undefined;
+    }
     const edgeData = graphData.edges.find((e) => e.id === id);
-    return edgeData?.data as Record<string, unknown> | undefined;
+    return edgeData?.data;
   }
 }

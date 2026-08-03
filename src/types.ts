@@ -1,3 +1,4 @@
+
 import type * as THREE from 'three';
 
 /**
@@ -16,6 +17,7 @@ import type * as THREE from 'three';
  * ```
  */
 export interface ComponentOptions {
+
   /**
    * Optional name applied to the `Object3D.name` property.
    * Useful for debugging and scene traversal.
@@ -42,6 +44,7 @@ export interface ComponentOptions {
  * added to the group during construction.
  */
 export interface GroupComponentOptions extends ComponentOptions {
+
   /**
    * Children to add to the group on construction.
    * Each child is passed to `this.add(child)` in the constructor.
@@ -65,6 +68,7 @@ export interface GroupComponentOptions extends ComponentOptions {
  * ```
  */
 export interface IUpdatable {
+
   /**
    * Called every frame by the render loop.
    *
@@ -90,6 +94,7 @@ export interface IUpdatable {
  * ```
  */
 export interface IDisposable {
+
   /**
    * Release all resources held by this component.
    *
@@ -110,10 +115,13 @@ export interface IDisposable {
  * ```
  */
 export interface Vec3 {
+
   /** X coordinate */
   x: number;
+
   /** Y coordinate */
   y: number;
+
   /** Z coordinate */
   z: number;
 }
@@ -127,12 +135,16 @@ export interface Vec3 {
  * ```
  */
 export interface ColorRGBA {
+
   /** Red channel (0–1) */
   r: number;
+
   /** Green channel (0–1) */
   g: number;
+
   /** Blue channel (0–1) */
   b: number;
+
   /** Alpha channel (0–1). @default 1 */
   a?: number;
 }

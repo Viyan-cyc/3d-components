@@ -40,14 +40,19 @@ export type GraphPickKind = 'node' | 'edge';
  * ```
  */
 export interface GraphEvent {
+
   /** 事件类型。 */
   type: GraphEventType;
+
   /** 被交互的元素 id（节点或边）。 */
   id: NodeId;
+
   /** 元素种类（节点 / 边）。 */
   kind: GraphPickKind;
+
   /** 该元素携带的业务数据（节点的 `NodeData.data` / 边的 `EdgeData.data`）。 */
   data?: Record<string, unknown>;
+
   /** 触发该事件的原始指针事件。 */
   nativeEvent: PointerEvent;
 }
