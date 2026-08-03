@@ -149,6 +149,8 @@
     "globals": "^17.8.0",
     "gsap": "^3.15.0",
     "highlight.js": "^11.11.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "three": "^0.185.0",
     "three-bvh-csg": "^0.0.18",
     "three-mesh-bvh": "^0.9.10",
@@ -164,6 +166,10 @@
     "docs:serve": "vite docs --open --port 7777",
     "prepublishOnly": "npm run build",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix"
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint --fix --max-warnings 0 --no-warn-ignored"
   }
 }
