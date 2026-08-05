@@ -10,6 +10,7 @@
  * - **Heat components** (`/heat`) — Heat-map visualisation meshes extending `THREE.Mesh`
  * - **Material components** (`/material`) — Pre-configured PBR materials extending `THREE.MeshStandardMaterial`
  * - **Utility namespace** (`/utils`) — Math, color, and geometry helpers via `Util.xxx()`
+ * - **Asset cache** (`/loader`) — On-demand model & texture loading with in-memory cache
  *
  * ## Peer Dependencies
  * This library requires you to install `three` and `gsap` in your project:
@@ -42,6 +43,7 @@ export * from './controls';
 export * from './camera';
 export * from './interactive';
 export * from './animation';
+export * from './loader';
 
 // Re-export types for convenience
 export type * from './types';

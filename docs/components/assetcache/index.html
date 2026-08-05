@@ -1,0 +1,112 @@
+<div class="page">
+  <h2>AssetCache</h2>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">模型与贴图的按需加载 / 内存缓存组件。采用两层缓存：<code>THREE.Cache</code>（文件层，缓存原始字节）+ 内部 <code>Map&lt;url, Promise&gt;</code>（对象层，缓存解析后的 <code>GLTF</code> / <code>Texture</code>，并对并发请求去重）。注册时不加载，<code>loadModel</code> / <code>loadTexture</code> 时才发起网络请求，命中缓存后不再请求。模型与贴图 API 完全对称。</p>
+
+  <div class="demo-card">
+    <canvas id="c-assetcache"></canvas>
+    <div class="demo-ctrl" id="ctrl-assetcache"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> AssetCache()</div>
+  <p class="desc">使用 <code>new AssetCache()</code> 创建一个独立缓存实例。</p>
+
+  <h4>注册与加载</h4>
+  <table class="pt">
+    <thead><tr><th>方法</th><th>签名</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>registerModel</td><td><code>(key, url, options?)</code></td><td>注册模型（不加载），options 仅首次加载生效</td></tr>
+      <tr><td>registerTexture</td><td><code>(key, url, options?)</code></td><td>注册贴图（不加载），options 仅首次加载生效</td></tr>
+      <tr><td>loadModel</td><td><code>(key) =&gt; Promise&lt;GLTF&gt;</code></td><td>按 key 加载模型，返回共享 GLTF 实例</td></tr>
+      <tr><td>loadTexture</td><td><code>(key) =&gt; Promise&lt;Texture&gt;</code></td><td>按 key 加载贴图，返回共享 Texture 实例</td></tr>
+      <tr><td>loadModelFromUrl</td><td><code>(url, options?) =&gt; Promise&lt;GLTF&gt;</code></td><td>直接按 URL 加载模型（无需注册）</td></tr>
+      <tr><td>loadTextureFromUrl</td><td><code>(url, options?) =&gt; Promise&lt;Texture&gt;</code></td><td>直接按 URL 加载贴图（无需注册）</td></tr>
+      <tr><td>preloadModel</td><td><code>(key) =&gt; void</code></td><td>后台预加载模型，不返回结果</td></tr>
+      <tr><td>preloadTexture</td><td><code>(key) =&gt; void</code></td><td>后台预加载贴图，不返回结果</td></tr>
+    </tbody>
+  </table>
+
+  <h4>克隆（clone）</h4>
+  <table class="pt">
+    <thead><tr><th>方法</th><th>签名</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>cloneModel</td><td><code>(key, options?) =&gt; Promise&lt;Object3D&gt;</code></td><td>克隆模型，默认最浅（全共享），options 控制哪些独立</td></tr>
+      <tr><td>cloneMaterial</td><td><code>(material, options?) =&gt; Material</code></td><td>单独克隆材质，控制 material / texture 共享</td></tr>
+    </tbody>
+  </table>
+
+  <p class="desc">三种资源（geometry / material / texture）可各自决定共享与否，排列组合出多种克隆策略：</p>
+  <table class="pt">
+    <thead><tr><th>CloneOptions</th><th>默认</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>shareGeometry</td><td><code>true</code></td><td>共享 geometry 引用（省内存）；<code>false</code> 复制独立几何，可独立变形</td></tr>
+      <tr><td>shareMaterial</td><td><code>true</code></td><td>共享 material 引用；<code>false</code> 复制独立材质，改色不串</td></tr>
+      <tr><td>shareTexture</td><td><code>true</code></td><td>共享 material 内 texture；<code>false</code> 复制独立 texture（仅 <code>shareMaterial: false</code> 时生效，image 数据仍共享）</td></tr>
+    </tbody>
+  </table>
+
+  <h4>查询与清理</h4>
+  <table class="pt">
+    <thead><tr><th>方法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>hasModel / hasTexture</td><td>是否已注册</td></tr>
+      <tr><td>isModelLoaded / isTextureLoaded</td><td>是否已加载完成并进入缓存</td></tr>
+      <tr><td>clearModel / clearTexture / clearAll</td><td>移除缓存引用（不释放 GPU，安全，可重新加载）</td></tr>
+      <tr><td>disposeModel / disposeTexture / disposeAll</td><td>释放 GPU 资源（克隆体 / 引用共享资源时慎用）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>注意事项</h3>
+  <div class="method">
+    <p><strong>复用：</strong><code>loadModel</code> 返回共享实例，<code>Object3D</code> 只能有一个父节点，多处复用用 <code>cloneModel</code>。共享材质时改色会串，需独立改色传 <code>shareMaterial: false</code> 或用 <code>AssetCache.cloneMaterial</code>。</p>
+  </div>
+  <div class="method">
+    <p><strong>释放：</strong><code>clearModel</code> / <code>clearTexture</code> 仅删引用可重载；<code>disposeModel</code> / <code>disposeTexture</code> 会释放 GPU 资源，若仍有克隆体 / 引用在用会导致其失效。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { AssetCache } from '@a3d/a3d-components/loader';
+
+const cache = new AssetCache();
+
+// 1. 注册（不加载）
+cache.registerModel('robot', '/models/robot.glb');
+cache.registerTexture('metal', '/textures/metal.png');
+
+// 2. 按需加载（首次请求，之后命中缓存、不再请求）
+const robot = await cache.loadModel('robot');
+const tex = await cache.loadTexture('metal');
+scene.add(robot.scene);
+
+// 3. 克隆复用：默认浅拷贝（全共享，最省内存）
+const a = await cache.cloneModel('robot');
+scene.add(a);
+
+// 4. 深拷贝（全独立，互不影响）
+const b = await cache.cloneModel('robot', {
+  shareGeometry: false, shareMaterial: false, shareTexture: false,
+});
+scene.add(b);
+
+// 5. 自定义粒度：共享 geometry，独立 material（texture 仍共享）
+const c = await cache.cloneModel('robot', { shareMaterial: false });
+scene.add(c);
+
+// 6. 单独克隆材质（独立材质 + 独立 texture）
+const mat = cache.cloneMaterial(mesh.material, {
+  shareMaterial: false,
+  shareTexture: false,
+});
+
+// 7. 预热
+cache.preloadModel('robot');
+cache.preloadTexture('metal');
+
+// 8. 从场景移除（缓存保留，重新 loadModel 瞬时命中）
+scene.remove(robot.scene);
+
+// 9. 清理缓存（重新 loadModel / loadTexture 将走网络请求）
+cache.clearModel('robot');   // 移除模型缓存引用
+cache.disposeModel('robot'); // 释放模型 GPU（确认无克隆体在用）</code></pre>
+</div>
