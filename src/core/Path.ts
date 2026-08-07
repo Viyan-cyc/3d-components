@@ -1,5 +1,6 @@
 
 import * as THREE from 'three';
+import { animate, type AnimationController } from '../animation';
 import type { GroupComponentOptions, IDisposable } from '../types';
 
 /** A 3D coordinate tuple, e.g. `[x, y, z]`. */
@@ -76,6 +77,39 @@ export interface PathData {
   arrow?: boolean;
 }
 
+/**
+ * 流光效果配置。
+ *
+ * 作用于**整组 paths**：把各路径段按物理长度占比拼接成统一的全局 `[0,1]` 空间，
+ * 一条带拖尾的高亮光带从第一个 path 流向最后一个 path。
+ */
+export interface FlowOptions {
+
+  /** 是否开启流光。 @default false */
+  enabled?: boolean;
+
+  /** 流光颜色。 @default 0xffffff */
+  color?: THREE.ColorRepresentation;
+
+  /** 流动速度（全局圈/秒）。 @default 1 */
+  speed?: number;
+
+  /** 流动方向：`1` = 第一条 → 最后一条，`-1` = 反向。 @default 1 */
+  direction?: 1 | -1;
+
+  /** 光头亮带占流光总长度的比例（`0-1`，越大光头越宽、拖尾越短）。 @default 0.25 */
+  width?: number;
+
+  /** 流光总长度（归一化到全局 `[0,1]`）；光头与拖尾按 `width` 比例分配，长度变化时拖尾始终可见。 @default 0.4 */
+  tailLength?: number;
+
+  /** 流光强度（emissive 叠加倍率，可 >1 求 HDR 发光）。 @default 2 */
+  intensity?: number;
+
+  /** 全局流光个数（沿整组 paths 等间距分布）。 @default 1 */
+  repeat?: number;
+}
+
 /** Options for constructing a {@link Path}. */
 export interface PathOptions extends GroupComponentOptions {
 
@@ -84,6 +118,12 @@ export interface PathOptions extends GroupComponentOptions {
 
   /** 共享材质。所有路径复用。不传则使用默认 `MeshStandardMaterial`（`dispose()` 时一并释放）。 */
   material?: THREE.Material;
+
+  /**
+   * 流光效果配置。开启后流光贯穿整组 paths（从第一条流向最后一条）。
+   * 流光材质由本组件 clone 生成并独立释放，不影响传入的 `material`。 @default 不开启
+   */
+  flow?: FlowOptions;
 }
 
 // ===================== frames =====================
@@ -200,6 +240,20 @@ const DEFAULT_WIDTH = 0.1;
 const DEFAULT_RADIAL_SEGMENTS = 8;
 // 闭合路径所需的最少顶点数。
 const MIN_CLOSE_POINTS = 3;
+// 流光默认光头占比（占流光总长度的比例，0-1）。
+const DEFAULT_FLOW_WIDTH = 0.25;
+// 流光默认总长度（归一化到全局 [0,1]）。
+const DEFAULT_FLOW_TAIL = 0.4;
+// 流光默认强度。
+const DEFAULT_FLOW_INTENSITY = 2;
+// 流光默认速度（全局圈/秒）。
+const DEFAULT_FLOW_SPEED = 1;
+// 流光默认重复个数。
+const DEFAULT_FLOW_REPEAT = 1;
+// uv 归一化除零保护。
+const FLOW_U_EPSILON = 1e-5;
+// 单帧 dt 限幅（秒），避免标签页恢复后相位大跳。
+const FLOW_DT_CLAMP = 0.1;
 
 // ===================== curve helpers =====================
 
@@ -656,7 +710,10 @@ const buildTubeGeometry = (frames: Frames, opts: TubeOptions): THREE.BufferGeome
   if (radialSegments >= MIN_RADIAL_FOR_CAP && opts.generateStartCap) {
     appendTubeStartCap(ctx, frames);
   }
-  return toGeometry(buffers.positions, buffers.normals, buffers.uvs, buffers.indices);
+  const tubeGeo = toGeometry(buffers.positions, buffers.normals, buffers.uvs, buffers.indices);
+  tubeGeo.userData.flowTotalLength = totalLength;
+  tubeGeo.userData.flowUMax = totalLength / uScale;
+  return tubeGeo;
 };
 
 // ===================== PlaneBuilder =====================
@@ -868,7 +925,10 @@ const buildPlaneGeometry = (frames: Frames, opts: PlaneOptions): THREE.BufferGeo
   if (opts.arrow) {
     appendPlaneArrow(ctx, frames);
   }
-  return toGeometry(buffers.positions, buffers.normals, buffers.uvs, buffers.indices);
+  const planeGeo = toGeometry(buffers.positions, buffers.normals, buffers.uvs, buffers.indices);
+  planeGeo.userData.flowTotalLength = totalLength;
+  planeGeo.userData.flowUMax = totalLength / uScale;
+  return planeGeo;
 };
 
 // ===================== path orchestration =====================
@@ -952,6 +1012,113 @@ const buildPathGeometry = (data: PathData): THREE.BufferGeometry | null => {
   return buildTubePath(data, frames, uvMode);
 };
 
+// ===================== flow =====================
+
+/** 流光顶点注入：声明并传递 uv varying（不依赖受 `USE_UV` 限制的 `vUv`）。 */
+const flowVertex = /* glsl */ `
+  varying vec2 vFlowUv;
+`;
+
+/** 流光片元声明：varying + uniforms（外观 uniforms 跨段共享，定位 uniforms 各段独立）。 */
+const flowFragmentDecls = /* glsl */ `
+  varying vec2 vFlowUv;
+  uniform vec3 uFlowColor;
+  uniform float uFlowOffset;
+  uniform float uFlowRepeat;
+  uniform float uFlowWidth;
+  uniform float uFlowTailLength;
+  uniform float uFlowIntensity;
+  uniform float uFlowPathStart;
+  uniform float uFlowPathSpan;
+  uniform float uFlowUMax;
+  uniform float uFlowDirection;
+`;
+
+/**
+ * 流光片元逻辑：在全局 `[0,1]` 空间计算光头亮带 + 渐暗拖尾，
+ * 叠加到 `totalEmissiveRadiance`（暗处可见，受 tonemapping/colorspace 处理）。
+ */
+const flowFragmentLogic = /* glsl */ `
+  float uNorm = vFlowUv.x / max(uFlowUMax, ${FLOW_U_EPSILON});
+  float globalPos = uFlowPathStart + uNorm * uFlowPathSpan;
+  float p = fract(globalPos * uFlowRepeat);
+  float head = fract(uFlowOffset);
+  float dist = fract((head - p) * uFlowDirection);
+  float headWidth = uFlowTailLength * uFlowWidth;
+  float headBand = smoothstep(headWidth, 0.0, dist);
+  float tail = smoothstep(uFlowTailLength, headWidth, dist);
+  float flow = clamp(max(headBand, tail), 0.0, 1.0);
+  totalEmissiveRadiance += uFlowColor * flow * uFlowIntensity;
+`;
+
+/** 创建流光共享 uniforms（外观参数，所有路径段引用同一份，改一处全同步）。 */
+const createFlowSharedUniforms = (flow: FlowOptions): Record<string, THREE.IUniform> => {
+  const width = THREE.MathUtils.clamp(
+    flow.width ?? DEFAULT_FLOW_WIDTH,
+    FLOW_U_EPSILON,
+    1 - FLOW_U_EPSILON,
+  );
+  const tailLength = THREE.MathUtils.clamp(
+    flow.tailLength ?? DEFAULT_FLOW_TAIL,
+    FLOW_U_EPSILON,
+    1,
+  );
+  return {
+    uFlowColor: { value: new THREE.Color(flow.color ?? 0xffffff) },
+    uFlowOffset: { value: 0 },
+    uFlowRepeat: { value: Math.max(flow.repeat ?? DEFAULT_FLOW_REPEAT, 1) },
+    uFlowWidth: { value: width },
+    uFlowTailLength: { value: tailLength },
+    uFlowIntensity: { value: flow.intensity ?? DEFAULT_FLOW_INTENSITY },
+    uFlowDirection: { value: flow.direction ?? 1 },
+  };
+};
+
+/** 创建单条路径的流光定位 uniforms（`pathStart`/`pathSpan`/`uMax` 各段独立）。 */
+const createFlowPathUniforms = (
+  pathStart: number,
+  pathSpan: number,
+  uMax: number,
+): Record<string, THREE.IUniform> => ({
+  uFlowPathStart: { value: pathStart },
+  uFlowPathSpan: { value: pathSpan },
+  uFlowUMax: { value: Math.max(uMax, FLOW_U_EPSILON) },
+});
+
+/**
+ * 把流光逻辑注入到克隆材质（`onBeforeCompile`），叠加到 emissive。
+ *
+ * 镜像 `Wireframe` 的 `applyWireframeOverride` 模式：合并 uniforms、
+ * 顶点 replace `void main()` 注入 `vFlowUv = uv`、片元 replace `void main()`
+ * 注入声明、replace `#include <emissivemap_fragment>` 追加流光计算。
+ * 不设 `transparent`（流光是加性发光，无 alpha）。
+ */
+const applyFlowOverride = (
+  material: THREE.Material,
+  sharedUniforms: Record<string, THREE.IUniform>,
+  pathUniforms: Record<string, THREE.IUniform>,
+): void => {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms = { ...shader.uniforms, ...sharedUniforms, ...pathUniforms };
+
+    shader.vertexShader = shader.vertexShader.replace(
+      'void main() {',
+      `${flowVertex}\nvoid main() {\n  vFlowUv = uv;`,
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      `${flowFragmentDecls}\nvoid main() {`,
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>\n  ${flowFragmentLogic}`,
+    );
+  };
+  material.needsUpdate = true;
+};
+
 // ===================== Path component =====================
 
 /**
@@ -1002,6 +1169,12 @@ const buildPathGeometry = (data: PathData): THREE.BufferGeometry | null => {
 export class Path extends THREE.Group implements IDisposable {
   private readonly material: THREE.Material;
   private readonly ownsMaterial: boolean;
+  private flowSharedUniforms: Record<string, THREE.IUniform> | null = null;
+  private readonly flowMaterials: THREE.Material[] = [];
+  private flowController: AnimationController | null = null;
+  private readonly flowClock = new THREE.Clock();
+  private flowSpeed = DEFAULT_FLOW_SPEED;
+  private flowDirection: 1 | -1 = 1;
 
   constructor(options: PathOptions) {
     super();
@@ -1024,6 +1197,7 @@ export class Path extends THREE.Group implements IDisposable {
         side: THREE.DoubleSide,
       });
     const paths = Array.isArray(options.paths) ? options.paths : [];
+    const pathMeshes: THREE.Mesh[] = [];
     for (const data of paths) {
       const geometry = buildPathGeometry(data);
       if (geometry) {
@@ -1031,6 +1205,7 @@ export class Path extends THREE.Group implements IDisposable {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         this.add(mesh);
+        pathMeshes.push(mesh);
       }
     }
     if (options.children) {
@@ -1038,10 +1213,14 @@ export class Path extends THREE.Group implements IDisposable {
         this.add(child);
       }
     }
+    if (options.flow?.enabled) {
+      this.initFlow(pathMeshes, options.flow);
+    }
   }
 
-  /** 释放所有路径几何体；若材质由本组件创建则一并释放。 */
+  /** 释放所有路径几何体与流光资源；若材质由本组件创建则一并释放。 */
   dispose(): void {
+    this.disposeFlow();
     this.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (mesh.isMesh) {
@@ -1052,5 +1231,163 @@ export class Path extends THREE.Group implements IDisposable {
     if (this.ownsMaterial) {
       this.material.dispose();
     }
+  }
+
+  /**
+   * 初始化流光：按各段物理长度占比拼接全局 `[0,1]` 空间，
+   * 为每段克隆材质并注入流光，外观 uniforms 跨段共享。
+   */
+  private initFlow(meshes: THREE.Mesh[], flow: FlowOptions): void {
+    if (meshes.length === 0) {
+      return;
+    }
+    let totalLength = 0;
+    for (const mesh of meshes) {
+      totalLength += Number(mesh.geometry.userData.flowTotalLength) || 0;
+    }
+    if (totalLength <= 0) {
+      return;
+    }
+    const sharedUniforms = createFlowSharedUniforms(flow);
+    this.flowSharedUniforms = sharedUniforms;
+    this.flowSpeed = flow.speed ?? DEFAULT_FLOW_SPEED;
+    this.flowDirection = flow.direction ?? 1;
+    let cumLength = 0;
+    for (const mesh of meshes) {
+      const len = Number(mesh.geometry.userData.flowTotalLength) || 0;
+      const pathStart = cumLength / totalLength;
+      const pathSpan = len / totalLength;
+      cumLength += len;
+      const uMax = Number(mesh.geometry.userData.flowUMax) || 0;
+      this.applyFlowToMesh(mesh, sharedUniforms, pathStart, pathSpan, uMax);
+    }
+    this.startFlow();
+  }
+
+  /** 为单个 mesh 克隆材质、注入流光、替换 material 并登记。 */
+  private applyFlowToMesh(
+    mesh: THREE.Mesh,
+    sharedUniforms: Record<string, THREE.IUniform>,
+    pathStart: number,
+    pathSpan: number,
+    uMax: number,
+  ): void {
+    const pathUniforms = createFlowPathUniforms(pathStart, pathSpan, uMax);
+    const flowMat = this.material.clone();
+    applyFlowOverride(flowMat, sharedUniforms, pathUniforms);
+    mesh.material = flowMat;
+    this.flowMaterials.push(flowMat);
+  }
+
+  /** 每帧推进全局流光相位（wall-clock dt，对 `onUpdate` 双触发免疫）。 */
+  private onFlowTick(): void {
+    if (!this.flowSharedUniforms) {
+      return;
+    }
+    let dt = this.flowClock.getDelta();
+    if (dt > FLOW_DT_CLAMP) {
+      dt = FLOW_DT_CLAMP;
+    }
+    this.flowSharedUniforms.uFlowOffset.value += dt * this.flowSpeed * this.flowDirection;
+  }
+
+  /** 开始/恢复流光动画。无流光路径时为空操作。 */
+  startFlow(): this {
+    if (!this.flowSharedUniforms) {
+      return this;
+    }
+    let controller = this.flowController;
+    if (!controller) {
+      this.flowClock.getDelta();
+      controller = animate(new THREE.Object3D(), {
+        duration: 1,
+        ease: 'linear',
+        repeat: -1,
+        onUpdate: () => this.onFlowTick(),
+      });
+      this.flowController = controller;
+    }
+    controller.play();
+    return this;
+  }
+
+  /** 暂停流光动画。 */
+  stopFlow(): this {
+    this.flowController?.pause();
+    return this;
+  }
+
+  /** 设置流光颜色。 */
+  setFlowColor(color: THREE.ColorRepresentation): this {
+    if (this.flowSharedUniforms) {
+      (this.flowSharedUniforms.uFlowColor.value as THREE.Color).set(color);
+    }
+    return this;
+  }
+
+  /** 设置流动速度。 */
+  setFlowSpeed(speed: number): this {
+    this.flowSpeed = speed;
+    return this;
+  }
+
+  /** 设置流动方向。 */
+  setFlowDirection(direction: 1 | -1): this {
+    this.flowDirection = direction;
+    if (this.flowSharedUniforms) {
+      this.flowSharedUniforms.uFlowDirection.value = direction;
+    }
+    return this;
+  }
+
+  /** 设置流光强度。 */
+  setFlowIntensity(intensity: number): this {
+    if (this.flowSharedUniforms) {
+      this.flowSharedUniforms.uFlowIntensity.value = intensity;
+    }
+    return this;
+  }
+
+  /** 设置光头占比（`0-1`，占流光总长度的比例）。 */
+  setFlowWidth(width: number): this {
+    if (this.flowSharedUniforms) {
+      this.flowSharedUniforms.uFlowWidth.value = THREE.MathUtils.clamp(
+        width,
+        FLOW_U_EPSILON,
+        1 - FLOW_U_EPSILON,
+      );
+    }
+    return this;
+  }
+
+  /** 设置流光总长度（归一化 `[0,1]`）；光头按 `width` 比例缩放，拖尾始终保留。 */
+  setFlowTailLength(tailLength: number): this {
+    if (this.flowSharedUniforms) {
+      this.flowSharedUniforms.uFlowTailLength.value = THREE.MathUtils.clamp(
+        tailLength,
+        FLOW_U_EPSILON,
+        1,
+      );
+    }
+    return this;
+  }
+
+  /** 设置全局流光个数。 */
+  setFlowRepeat(repeat: number): this {
+    if (this.flowSharedUniforms) {
+      this.flowSharedUniforms.uFlowRepeat.value = Math.max(repeat, 1);
+    }
+    return this;
+  }
+
+  /** 释放流光资源：先停动画，再释放克隆材质。 */
+  private disposeFlow(): void {
+    this.flowController?.destroy();
+    this.flowController = null;
+    for (const mat of this.flowMaterials) {
+      mat.dispose();
+    }
+    this.flowMaterials.length = 0;
+    this.flowSharedUniforms = null;
   }
 }

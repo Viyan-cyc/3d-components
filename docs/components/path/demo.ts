@@ -56,6 +56,12 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
     caps: true,
     texture: true,
     uvMode: 'repeat' as 'repeat' | 'stretch',
+    flow: true,
+    flowColor: '#00ffff',
+    flowSpeed: 0.5,
+    flowDir: 1 as 1 | -1,
+    flowRepeat: 1,
+    flowTail: 0.5,
   };
   let path: Path | null = null;
 
@@ -84,6 +90,17 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
             }),
       }],
       material: pathMaterial,
+      flow: params.flow
+        ? {
+            enabled: true,
+            color: params.flowColor,
+            speed: params.flowSpeed,
+            direction: params.flowDir,
+            repeat: params.flowRepeat,
+            intensity: 2.5,
+            tailLength: params.flowTail,
+          }
+        : undefined,
     });
     // 贴图设置
     if (params.texture) {
@@ -118,7 +135,27 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
       <select id="sel-p-uv">
         <option value="repeat" selected>repeat · 按米平铺</option>
         <option value="stretch">stretch · 铺满</option>
-      </select></label>`;
+      </select></label>
+    <hr>
+    <label class="check"><input type="checkbox" id="inp-p-flow" checked>流光 flow</label>
+    <label><span>流光色:</span>
+      <select id="sel-p-fc">
+        <option value="#00ffff" selected>青</option>
+        <option value="#ff3366">红</option>
+        <option value="#ffcc00">金</option>
+        <option value="#ffffff">白</option>
+      </select></label>
+    <label><span>速度: <code id="v-p-fs">0.50</code></span>
+    <input type="range" id="inp-p-fs" min="0" max="2" step="0.05" value="0.5"></label>
+    <label><span>方向:</span>
+      <select id="sel-p-fd">
+        <option value="1" selected>正向 →</option>
+        <option value="-1">反向 ←</option>
+      </select></label>
+    <label><span>重复: <code id="v-p-fr">1</code></span>
+    <input type="range" id="inp-p-fr" min="1" max="6" step="1" value="1"></label>
+    <label><span>长度: <code id="v-p-ft">0.50</code></span>
+    <input type="range" id="inp-p-ft" min="0.1" max="1" step="0.05" value="0.5"></label>`;
 
   function updateDisabled() {
     const plane = params.mode === 'plane';
@@ -166,6 +203,33 @@ export function initDemo(canvas: HTMLCanvasElement, ctrl: HTMLElement): void {
   ctrl.querySelector('#sel-p-uv')!.addEventListener('change', (e) => {
     params.uvMode = (e.target as HTMLSelectElement).value as 'repeat' | 'stretch';
     rebuild();
+  });
+  ctrl.querySelector('#inp-p-flow')!.addEventListener('change', (e) => {
+    params.flow = (e.target as HTMLInputElement).checked;
+    rebuild();
+  });
+  ctrl.querySelector('#sel-p-fc')!.addEventListener('change', (e) => {
+    params.flowColor = (e.target as HTMLSelectElement).value;
+    path?.setFlowColor(params.flowColor);
+  });
+  ctrl.querySelector('#inp-p-fs')!.addEventListener('input', (e) => {
+    params.flowSpeed = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-p-fs')!.textContent = params.flowSpeed.toFixed(2);
+    path?.setFlowSpeed(params.flowSpeed);
+  });
+  ctrl.querySelector('#sel-p-fd')!.addEventListener('change', (e) => {
+    params.flowDir = +(e.target as HTMLSelectElement).value as 1 | -1;
+    path?.setFlowDirection(params.flowDir);
+  });
+  ctrl.querySelector('#inp-p-fr')!.addEventListener('input', (e) => {
+    params.flowRepeat = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-p-fr')!.textContent = String(params.flowRepeat);
+    path?.setFlowRepeat(params.flowRepeat);
+  });
+  ctrl.querySelector('#inp-p-ft')!.addEventListener('input', (e) => {
+    params.flowTail = +(e.target as HTMLInputElement).value;
+    ctrl.querySelector('#v-p-ft')!.textContent = params.flowTail.toFixed(2);
+    path?.setFlowTailLength(params.flowTail);
   });
 
   startLoop(renderer, scene, camera, resize, () => {});

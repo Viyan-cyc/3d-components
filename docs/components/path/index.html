@@ -24,6 +24,22 @@
       <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
       <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
       <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code></td></tr>
+      <tr><td>flow</td><td><code>FlowOptions</code></td><td>—</td><td>流光效果配置。开启后一条带拖尾的高亮光带贯穿整组 paths（从第一条流向最后一条）。流光材质由组件 clone 生成并独立释放</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Flow — <code>FlowOptions</code>（流光效果）</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>enabled</td><td><code>boolean</code></td><td>false</td><td>是否开启流光</td></tr>
+      <tr><td>color</td><td><code>ColorRepresentation</code></td><td>0xffffff</td><td>流光颜色</td></tr>
+      <tr><td>speed</td><td><code>number</code></td><td>1</td><td>流动速度（全局圈/秒）</td></tr>
+      <tr><td>direction</td><td><code>1 | -1</code></td><td>1</td><td>流动方向：<code>1</code> = 第一条 → 最后一条，<code>-1</code> = 反向</td></tr>
+      <tr><td>width</td><td><code>number</code></td><td>0.25</td><td>光头亮带占流光总长度的比例（<code>0-1</code>，越大光头越宽、拖尾越短）</td></tr>
+      <tr><td>tailLength</td><td><code>number</code></td><td>0.4</td><td>流光总长度（归一化到全局 <code>[0,1]</code>）；光头与拖尾按 <code>width</code> 比例分配，长度变化时拖尾始终可见</td></tr>
+      <tr><td>intensity</td><td><code>number</code></td><td>2</td><td>流光强度（emissive 叠加倍率，可 >1 求 HDR 发光）</td></tr>
+      <tr><td>repeat</td><td><code>number</code></td><td>1</td><td>全局流光个数（沿整组 paths 等间距分布）</td></tr>
     </tbody>
   </table>
 
@@ -59,7 +75,19 @@
   <h3>Methods</h3>
   <div class="method">
     <div class="sig">.dispose(): void</div>
-    <p>释放所有路径几何体；若材质由本组件创建则一并释放（外部传入的 <code>material</code> 不会被释放）。</p>
+    <p>释放所有路径几何体与流光资源；若材质由本组件创建则一并释放（外部传入的 <code>material</code> 不会被释放）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setFlowColor(color): this &nbsp;·&nbsp; .setFlowSpeed(speed): this &nbsp;·&nbsp; .setFlowDirection(direction): this &nbsp;·&nbsp; .setFlowIntensity(intensity): this</div>
+    <p>运行时调整流光外观（链式）。颜色/强度改共享 uniform 即时生效；速度/方向改内部相位推进。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.setFlowWidth(width): this &nbsp;·&nbsp; .setFlowTailLength(tailLength): this &nbsp;·&nbsp; .setFlowRepeat(repeat): this</div>
+    <p>运行时调整光头宽度、拖尾长度、流光个数（链式）。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.startFlow(): this &nbsp;·&nbsp; .stopFlow(): this</div>
+    <p>开始/恢复、暂停流光动画。构造时若 <code>flow.enabled</code> 为真会自动 <code>startFlow()</code>。</p>
   </div>
 
   <h3>示例</h3>
@@ -92,5 +120,16 @@ const ring = new Path({
     mode: 'tube', close: true, radius: 0.1, radialSegments: 12,
   }],
 });
-scene.add(ring);</code></pre>
+scene.add(ring);
+
+// 带流光的管道（青色光带 + 拖尾，从起点流向终点）
+const flow = new Path({
+  paths: [{
+    path: [[0,0,0],[3,0,0],[3,0,3],[0,0,3]],
+    mode: 'tube', bevelRadius: 0.4, radius: 0.12,
+  }],
+  flow: { enabled: true, color: 0x00ffff, speed: 0.5, tailLength: 0.5, intensity: 2.5 },
+});
+scene.add(flow);
+// 运行时调整：flow.setFlowDirection(-1).setFlowRepeat(3);</code></pre>
 </div>

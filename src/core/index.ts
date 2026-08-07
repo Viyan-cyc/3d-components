@@ -19,7 +19,9 @@ export type { ShapeOptions, ShapeData } from './Shape';
 export { Grid } from './Grid';
 export type { GridOptions, GridPlane } from './Grid';
 export { Path } from './Path';
-export type { PathOptions, PathData, PathMode } from './Path';
+export type {
+  PathOptions, PathData, PathMode, FlowOptions,
+} from './Path';
 
 export { Outlines } from './Outlines';
 export type { OutlinesOptions } from './Outlines';
