@@ -1,0 +1,78 @@
+<div class="page">
+  <h2>MaterialManager</h2>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">材质管理器:按风格模板(dark/light/outdoor)管理材质配置,<code>setTheme</code> 一键换肤。<code>copy</code> 返回共享材质实例(换肤时直接改原对象、引用始终不变),<code>clone(shareTexture=false)</code> 返回独立材质 + 独立贴图(可各自改 repeat)。贴图经注入的 <code>AssetCache</code> 异步加载,就绪 / 换肤时回调通知。换肤时无需重新赋值 <code>mesh.material</code>、无需自己 dispose。</p>
+
+  <div class="demo-card">
+    <canvas id="c-materialmanager"></canvas>
+    <div class="demo-ctrl" id="ctrl-materialmanager"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> MaterialManager(options: MaterialManagerOptions)</div>
+  <table class="pt">
+    <thead><tr><th>选项</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>themes</td><td><code>Record&lt;string, Theme&gt;</code></td><td>风格模板集合:theme 名 → 材质配置表</td></tr>
+      <tr><td>current</td><td><code>string?</code></td><td>初始 theme,默认第一个</td></tr>
+      <tr><td>assetCache</td><td><code>AssetCache?</code></td><td>注入的缓存,用于贴图异步加载;未注入仅支持纯配色</td></tr>
+      <tr><td>onError</td><td><code>(key, err) =&gt; void?</code></td><td>错误回调(未知 key/theme、type 不一致、贴图失败、共享模式误用 repeat 等)</td></tr>
+      <tr><td>placeholderColor</td><td><code>ColorRepresentation?</code></td><td>占位色:带贴图材质在贴图未就绪时填 color(避免闪白),就绪后恢复 config color(默认白)。无贴图材质不受影响</td></tr>
+    </tbody>
+  </table>
+
+  <h3>方法</h3>
+  <table class="pt">
+    <thead><tr><th>方法</th><th>签名</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>copy</td><td><code>(key, cb) =&gt; Unsubscriber</code></td><td>共享材质实例,换肤自动生效,引用不变</td></tr>
+      <tr><td>clone</td><td><code>(key, cb, shareTexture=true) =&gt; Unsubscriber</code></td><td>独立材质;<code>shareTexture=false</code> 连贴图独立(可各自 repeat)</td></tr>
+      <tr><td>setTheme</td><td><code>(name) =&gt; Promise&lt;void&gt;</code></td><td>一键换肤,所有订阅直接改写,贴图就绪后 resolve</td></tr>
+      <tr><td>getTheme</td><td><code>() =&gt; string</code></td><td>当前 theme 名</td></tr>
+      <tr><td>dispose</td><td><code>() =&gt; void</code></td><td>释放所有材质与 owned 贴图(共享贴图归 AssetCache)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>核心不变式</h3>
+  <div class="method"><p><strong>引用不变</strong> —— 换肤时直接改原材质对象的属性,不创建新对象。引用始终不变,初始 <code>mesh.material = m</code> 一次即可,后续换肤自动生效,无需重新赋值或释放旧材质。</p></div>
+  <div class="method"><p><strong>类型固定</strong> —— 同一 key 首次的材质类型被固定。新主题若声明不同类型会触发 <code>onError</code> 并跳过(不重建,否则引用会变)。同一 key 在各主题应保持类型一致。</p></div>
+  <div class="method"><p><strong>共享贴图不可独立变换</strong> —— <code>copy</code> 与 <code>clone(shareTexture=true)</code> 共用同一份 Texture,<code>repeat/offset/rotation</code> 改一处会牵连所有引用,故忽略并报 <code>onError</code>。需独立变换用 <code>clone(shareTexture=false)</code>,生成独立贴图副本。</p></div>
+  <div class="method"><p><strong>贴图字段三种写法</strong> —— 每个贴图字段(如 map):写 <code>{ url }</code> 让管理器加载应用;写 <code>null</code> 清除该贴图;不写则管理器不碰,保留你手动设的贴图。例:dark 写了 <code>map</code>、light 不写,切到 light 时 map 仍在;想去掉就写 <code>map: null</code>。</p></div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { MaterialManager } from '@a3d/a3d-components/material';
+import { AssetCache } from '@a3d/a3d-components/loader';
+
+const mm = new MaterialManager({
+  themes: {
+    red:  { car: { type: 'standard', color: 0xe94560, map: { url: '/car.jpg' } } },
+    blue: { car: { type: 'standard', color: 0x4560e9, map: { url: '/car.jpg' } } },
+  },
+  current: 'red',
+  assetCache: new AssetCache(),
+  placeholderColor: 0x333333,
+  onError: (k, e) => console.error(k, e),
+});
+
+// copy:共享材质实例。仅 init 时挂到 mesh,换肤时引用不变、自动生效
+const unsub1 = mm.copy('car', (mat, reason) => {
+  if (reason === 'init') meshA.material = mat;
+});
+const unsub2 = mm.copy('car', (mat, reason) => {
+  if (reason === 'init') meshB.material = mat;  // 与 meshA 共享同一材质
+});
+
+// clone(shareTexture=false):独立材质 + 独立贴图,可各自改 repeat
+const unsub3 = mm.clone('car', (mat, reason) => {
+  if (reason === 'init') meshC.material = mat;
+}, false);
+
+// 一键换肤:所有材质 color 被直接改写,引用不变,无需重新赋值
+await mm.setTheme('blue');   // meshA/B/C 同步变蓝
+
+// 取消订阅
+unsub1();     // copy:仅取消回调,共享材质不释放(meshB 仍正常换肤)
+unsub3();     // clone:取消回调 + 释放独立材质和贴图
+
+mm.dispose();  // 释放所有材质与 owned 贴图</code></pre>
+</div>

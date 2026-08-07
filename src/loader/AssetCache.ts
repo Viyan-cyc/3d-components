@@ -76,9 +76,33 @@ export interface CloneOptions {
   shareTexture?: boolean;
 }
 
+/**
+ * 生成器产物：用于按需生成（而非从 URL 加载）的模型，如 AI 生成。
+ * 二选一：`bytes`（已拿到 glb 字节，走 `GLTFLoader.parse`）或 `src`（远程 URL，走 `GLTFLoader.load`）。
+ */
+export interface GeneratedModelResult {
+
+  /** glb / gltf 字节，优先用此路径（不经过 THREE.Cache）。 */
+  bytes?: ArrayBuffer;
+
+  /** 远程 URL（生成器返回链接的情况）。 */
+  src?: string;
+}
+
+/**
+ * 模型生成器：按 key 生成一次，结果由 AssetCache 缓存。
+ * 生成器只应在**首次**加载时被调用；并发与后续命中由 AssetCache 去重 / 缓存接管。
+ */
+export type ModelGenerator = () => Promise<GeneratedModelResult>;
+
 interface RegistryEntry<T> {
   readonly url: string;
   readonly options?: T;
+}
+
+interface GeneratorEntry {
+  readonly generator: ModelGenerator;
+  readonly options?: ModelLoadOptions;
 }
 
 const DEFAULT_WRAP = THREE.ClampToEdgeWrapping;
@@ -146,6 +170,7 @@ export class AssetCache implements IDisposable {
   private readonly loadedTextures = new Map<string, THREE.Texture>();
   private readonly registry = new Map<string, RegistryEntry<ModelLoadOptions>>();
   private readonly textureRegistry = new Map<string, RegistryEntry<TextureLoadOptions>>();
+  private readonly generatorRegistry = new Map<string, GeneratorEntry>();
   private readonly modelLoader = new GLTFLoader();
   private disposed = false;
 
@@ -158,6 +183,24 @@ export class AssetCache implements IDisposable {
    */
   registerModel(key: string, url: string, options?: ModelLoadOptions): this {
     this.registry.set(key, { url, options });
+    return this;
+  }
+
+  /**
+   * 注册一个**生成器**模型资源（仅声明，不加载）。
+   *
+   * 用于按需生成的模型（如混元 AI 生成）：没有固定 URL，首次 `loadModel(key)` /
+   * `cloneModel(key)` 时调用生成器取得 `bytes` 或 `src`，解析后缓存，后续命中直接复用。
+   *
+   * 并发与重复调用由 AssetCache 去重：同 key 共享一个 in-flight promise，生成器只被调用一次。
+   * `options.extendLoader` 在**首次**解析时生效（如配置 DRACO）。
+   * @param key - 资源键，后续 `loadModel(key)` / `cloneModel(key)` 使用。
+   * @param generator - 生成器，返回 `{ bytes }` 或 `{ src }`。
+   * @param options - 加载选项（仅首次解析时生效）。
+   * @returns this，支持链式调用。
+   */
+  registerModelGenerator(key: string, generator: ModelGenerator, options?: ModelLoadOptions): this {
+    this.generatorRegistry.set(key, { generator, options });
     return this;
   }
 
@@ -181,6 +224,9 @@ export class AssetCache implements IDisposable {
    * @param key - {@link registerModel} 时使用的键。
    */
   async loadModel(key: string): Promise<GLTF> {
+    if (this.generatorRegistry.has(key)) {
+      return this.loadModelFromGenerator(key);
+    }
     const entry = this.registry.get(key);
     if (!entry) {
       throw new Error(`[AssetCache] 未注册的模型 key: "${key}"`);
@@ -207,6 +253,46 @@ export class AssetCache implements IDisposable {
     // 缓存 Promise 而非结果，对并发请求去重：同一 URL 只发起一次网络请求。
     this.modelCache.set(url, promise);
     return promise;
+  }
+
+  /**
+   * 按生成器 key 加载模型。生成器只在首次调用，结果（GLTF）按 key 缓存，
+   * 后续命中直接复用，并发共享同一个 in-flight promise（生成器只被调用一次）。
+   *
+   * 生成器返回 `bytes` 走 `GLTFLoader.parse`（不经过 THREE.Cache），
+   * 返回 `src` 走 `GLTFLoader.load`（与 URL 路径一致，命中 THREE.Cache）。
+   */
+  private async loadModelFromGenerator(key: string): Promise<GLTF> {
+    this.assertNotDisposed();
+    const cached = this.modelCache.get(key);
+    if (cached) {
+      return cached;
+    }
+    const entry = this.generatorRegistry.get(key);
+    const promise = (async () => {
+      const result = await entry!.generator();
+      let gltf: GLTF;
+      if (result.bytes) {
+        gltf = await this.parseGLTFBytes(result.bytes, entry!.options);
+      } else if (result.src) {
+        gltf = await this.requestGLTF(result.src, entry!.options);
+      } else {
+        throw new Error(`[AssetCache] 生成器未返回 bytes 或 src: "${key}"`);
+      }
+      this.loadedModels.set(key, gltf);
+      return gltf;
+    })();
+    // 缓存 Promise 而非结果，对并发去重：同 key 并发只调用一次生成器。
+    this.modelCache.set(key, promise);
+    return promise;
+  }
+
+  /** 把 glb 字节解析成 GLTF（不经过 THREE.Cache，用于生成器返回 bytes 的情况）。 */
+  private parseGLTFBytes(bytes: ArrayBuffer, options?: ModelLoadOptions): Promise<GLTF> {
+    const loader = this.getLoader(options);
+    return new Promise<GLTF>((resolve, reject) => {
+      loader.parse(bytes, '', resolve, reject);
+    });
   }
 
   /**
@@ -275,9 +361,14 @@ export class AssetCache implements IDisposable {
     void this.loadTexture(key);
   }
 
-  /** 是否已注册该模型。 */
+  /** 是否已注册该模型（含 URL 注册与生成器注册）。 */
   hasModel(key: string): boolean {
-    return this.registry.has(key);
+    return this.registry.has(key) || this.generatorRegistry.has(key);
+  }
+
+  /** 是否已注册该生成器模型。 */
+  hasModelGenerator(key: string): boolean {
+    return this.generatorRegistry.has(key);
   }
 
   /** 是否已注册该贴图。 */
@@ -287,6 +378,9 @@ export class AssetCache implements IDisposable {
 
   /** 模型是否已加载完成并进入缓存。 */
   isModelLoaded(key: string): boolean {
+    if (this.generatorRegistry.has(key)) {
+      return this.loadedModels.has(key);
+    }
     const entry = this.registry.get(key);
     return entry ? this.loadedModels.has(entry.url) : false;
   }
@@ -303,6 +397,12 @@ export class AssetCache implements IDisposable {
    * @returns this，支持链式调用。
    */
   clearModel(key: string): this {
+    // 生成器条目无 url，按 key 直接清；不涉及 THREE.Cache（bytes 解析不经过它）。
+    if (this.generatorRegistry.has(key)) {
+      this.modelCache.delete(key);
+      this.loadedModels.delete(key);
+      return this;
+    }
     const entry = this.registry.get(key);
     if (entry) {
       this.modelCache.delete(entry.url);
@@ -333,6 +433,7 @@ export class AssetCache implements IDisposable {
     this.textureCache.clear();
     this.loadedModels.clear();
     this.loadedTextures.clear();
+    this.generatorRegistry.clear();
     THREE.Cache.clear();
     return this;
   }
@@ -345,6 +446,16 @@ export class AssetCache implements IDisposable {
    * @returns this，支持链式调用。
    */
   disposeModel(key: string): this {
+    // 生成器条目无 url，按 key 释放与清理。
+    if (this.generatorRegistry.has(key)) {
+      const gltf = this.loadedModels.get(key);
+      if (gltf) {
+        this.disposeObject3D(gltf.scene);
+      }
+      this.modelCache.delete(key);
+      this.loadedModels.delete(key);
+      return this;
+    }
     const entry = this.registry.get(key);
     if (entry) {
       const gltf = this.loadedModels.get(entry.url);
@@ -390,6 +501,7 @@ export class AssetCache implements IDisposable {
     this.textureCache.clear();
     this.loadedModels.clear();
     this.loadedTextures.clear();
+    this.generatorRegistry.clear();
     THREE.Cache.clear();
     this.disposed = true;
     return this;

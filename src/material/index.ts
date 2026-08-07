@@ -18,3 +18,15 @@
 
 export { MeshReflectorMaterial } from './MeshReflectorMaterial';
 export type { MeshReflectorMaterialOptions } from './MeshReflectorMaterial';
+
+export { MaterialManager } from './MaterialManager';
+export type {
+  ChangeReason,
+  MaterialChangeCallback,
+  MaterialConfig,
+  MaterialManagerOptions,
+  MaterialType,
+  TextureDescriptor,
+  Theme,
+  Unsubscriber,
+} from './MaterialManager';
