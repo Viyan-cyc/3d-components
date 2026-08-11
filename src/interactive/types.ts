@@ -170,10 +170,17 @@ export interface IntersectionEvent {
  * Provide this when calling {@link InteractiveManager.add}.
  * Only non-undefined entries are listened for.
  *
+ * 返回值（冒泡类事件）：handler 可 `return true` 停止冒泡 —— 不再向更远命中点 / 其他注册
+ * 祖先对象派发本次事件（等价"消费掉"）。返回 false / undefined 则继续冒泡。仅「冒泡」类
+ * 事件（onClick/onDoubleClick/onPointerDown/Up/Move/Over/Enter/onWheel/onContextMenu）的
+ * 返回值生效；「不冒泡」类（onPointerOut/Leave/Cancel/LostPointerCapture/onPointerMissed）
+ * 本就 per-object 派发，返回值忽略。同一注册对象的多个订阅者都会执行（返回值只阻止跨对象
+ * 冒泡，不阻止同对象其他订阅者 —— 同 DOM stopPropagation 语义）。
+ *
  * @example
  * ```ts
  * manager.add(mesh, {
- *   onClick: (e) => console.log('clicked', e.eventObject),
+ *   onClick: (e) => { doSomething(); return true; },   // return true：消费，不冒泡到父注册对象
  *   onPointerOver: (e) => { mesh.material.emissive.setHex(0x333333); },
  *   onPointerOut: (e) => { mesh.material.emissive.setHex(0x000000); },
  * });
@@ -182,46 +189,46 @@ export interface IntersectionEvent {
 export interface EventHandlers {
 
   /** ✅ 冒泡 — 左键单击（down→up 距离≤阈值，且在 initialHits 中） */
-  onClick?: (event: IntersectionEvent) => void;
+  onClick?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 左键双击（替代第二次 click 触发） */
-  onDoubleClick?: (event: IntersectionEvent) => void;
+  onDoubleClick?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 任意鼠标键按下 */
-  onPointerDown?: (event: IntersectionEvent) => void;
+  onPointerDown?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 任意鼠标键抬起 */
-  onPointerUp?: (event: IntersectionEvent) => void;
+  onPointerUp?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 指针在已悬停对象上移动 */
-  onPointerMove?: (event: IntersectionEvent) => void;
+  onPointerMove?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 指针进入对象（与 enter 同时触发，在 move 的 handleIntersects 回调中派发） */
-  onPointerOver?: (event: IntersectionEvent) => void;
+  onPointerOver?: (event: IntersectionEvent) => boolean | void;
 
   /** ❌ 不冒泡 — 指针离开对象（与 leave 同时触发，由 cancelPointer 直接 per-object 派发） */
-  onPointerOut?: (event: IntersectionEvent) => void;
+  onPointerOut?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 指针进入对象（与 over 同时触发，在 move 的 handleIntersects 回调中派发） */
-  onPointerEnter?: (event: IntersectionEvent) => void;
+  onPointerEnter?: (event: IntersectionEvent) => boolean | void;
 
   /** ❌ 不冒泡 — 指针离开对象（与 out 同时触发，由 cancelPointer 直接 per-object 派发） */
-  onPointerLeave?: (event: IntersectionEvent) => void;
+  onPointerLeave?: (event: IntersectionEvent) => boolean | void;
 
   /** ❌ 不冒泡 — 指针取消（触发 cancelPointer 清除所有悬停） */
-  onPointerCancel?: (event: IntersectionEvent) => void;
+  onPointerCancel?: (event: IntersectionEvent) => boolean | void;
 
   /** ❌ 不冒泡 — 指针捕获丢失（由 DOM 事件触发） */
-  onLostPointerCapture?: (event: IntersectionEvent) => void;
+  onLostPointerCapture?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 鼠标滚轮 */
-  onWheel?: (event: IntersectionEvent) => void;
+  onWheel?: (event: IntersectionEvent) => boolean | void;
 
   /** ✅ 冒泡 — 右键菜单 */
-  onContextMenu?: (event: IntersectionEvent) => void;
+  onContextMenu?: (event: IntersectionEvent) => boolean | void;
 
   /** ❌ 不冒泡 — 点击空白区域（直接 per-object 派发） */
-  onPointerMissed?: (event: IntersectionEvent) => void;
+  onPointerMissed?: (event: IntersectionEvent) => boolean | void;
 }
 
 // ─── Controls Interface ───────────────────────────────────────
@@ -300,12 +307,6 @@ export interface InteractiveManagerOptions {
    * @default 2
    */
   clickThreshold?: number;
-
-  /**
-   * Maximum time in ms between pointerdown and pointerup to count as a click.
-   * @default 300
-   */
-  clickTimeThreshold?: number;
 
   /**
    * Maximum time in ms between two clicks for a doubleclick.

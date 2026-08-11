@@ -6,9 +6,15 @@ import type { EventHandlers, Intersection } from './types';
 
 /**
  * Internal bookkeeping entry for a registered Object3D.
+ *
+ * A single Object3D may carry multiple entries (one per subscriber `id`),
+ * so that independent subscribers (selection / card / declared interactions)
+ * can each attach handlers to the same object without overwriting each other.
  * @internal
  */
 export interface RegistrationEntry {
+  /** Subscriber identity. `undefined` = anonymous (legacy overwrite semantics). */
+  id?: string;
   object: THREE.Object3D;
   handlers: EventHandlers;
 

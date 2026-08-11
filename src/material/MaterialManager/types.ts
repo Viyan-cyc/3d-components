@@ -97,6 +97,27 @@ export interface MaterialConfig {
   /** 渲染面。 */
   side?: THREE.Side;
 
+  /** 透射度（physical）。 */
+  transmission?: number;
+
+  /** 折射率（physical）。 */
+  ior?: number;
+
+  /** 厚度（physical）。 */
+  thickness?: number;
+
+  /** 清漆涂层（physical）。 */
+  clearcoat?: number;
+
+  /** 清漆粗糙度（physical）。 */
+  clearcoatRoughness?: number;
+
+  /** 绒感强度（physical）。 */
+  sheen?: number;
+
+  /** 绒感颜色（physical）。 */
+  sheenColor?: THREE.ColorRepresentation;
+
   /** 漫反射贴图。`null` 显式清空。 */
   map?: TextureDescriptor | null;
 

@@ -49,6 +49,27 @@ export const applySyncProps = (material: THREE.Material, config: MaterialConfig)
   if (config.metalness !== undefined && 'metalness' in material) {
     m.metalness = config.metalness;
   }
+  if (config.transmission !== undefined && 'transmission' in material) {
+    (material as THREE.MeshPhysicalMaterial).transmission = config.transmission;
+  }
+  if (config.ior !== undefined && 'ior' in material) {
+    (material as THREE.MeshPhysicalMaterial).ior = config.ior;
+  }
+  if (config.thickness !== undefined && 'thickness' in material) {
+    (material as THREE.MeshPhysicalMaterial).thickness = config.thickness;
+  }
+  if (config.clearcoat !== undefined && 'clearcoat' in material) {
+    (material as THREE.MeshPhysicalMaterial).clearcoat = config.clearcoat;
+  }
+  if (config.clearcoatRoughness !== undefined && 'clearcoatRoughness' in material) {
+    (material as THREE.MeshPhysicalMaterial).clearcoatRoughness = config.clearcoatRoughness;
+  }
+  if (config.sheen !== undefined && 'sheen' in material) {
+    (material as THREE.MeshPhysicalMaterial).sheen = config.sheen;
+  }
+  if (config.sheenColor !== undefined && 'sheenColor' in material) {
+    (material as THREE.MeshPhysicalMaterial).sheenColor.set(config.sheenColor);
+  }
   if (config.opacity !== undefined) {
     material.opacity = config.opacity;
   }

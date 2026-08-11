@@ -30,3 +30,14 @@ export type {
   Theme,
   Unsubscriber,
 } from './MaterialManager';
+
+// 材质工厂：纯同步创建 + 属性应用 + 贴图槽位工具（供调用方组合内联材质，避免重复实现）。
+export {
+  createMaterial,
+  applySyncProps,
+  getDeclaredSlots,
+  assignTextureSlot,
+  toLoadOpts,
+  hasSlot,
+} from './MaterialManager/materialFactory';
+export type { TextureSlot } from './MaterialManager/types';

@@ -21,9 +21,6 @@ import type { IDisposable } from '../types';
 /** Pixel distance threshold for click-vs-drag discrimination. */
 const CLICK_THRESHOLD = 2;
 
-/** Maximum time (ms) between pointerdown and pointerup to count as a click. */
-const CLICK_TIME_MS = 300;
-
 /** Maximum time (ms) between two clicks for a doubleclick. */
 const DOUBLE_CLICK_TIME_MS = 300;
 
@@ -48,8 +45,9 @@ type PointerCaptureApi = {
  *    iterating the flat intersection list. `stopPropagation()` breaks the
  *    loop — it does NOT walk the parent chain.
  *
- * 3. **Hover tracking**: Keyed by composite ID (`eventObject.uuid/index/instanceId`),
- *    not just Object3D. `over`+`enter` fire together on new hover;
+ * 3. **Hover tracking**: Keyed by `eventObject.uuid` (the registered object),
+ *    so moving between child meshes of the same registered object does not
+ *    fire `out`/`over`. `over`+`enter` fire together on new hover;
  *    `out`+`leave` fire together via `cancelPointer`.
  *
  * 4. **Click validation**: Only fires on `initialHits` (objects hit during
@@ -77,12 +75,12 @@ export class InteractiveManager implements IDisposable {
 
   // ─── Config (immutable) ────────────────────────────────────
 
-  private readonly _camera: THREE.Camera;
+  /** 可变：数据驱动场景会在 applySceneData 里替换相机（透视↔正交），经 setCamera() 同步，否则 raycast 用旧相机。 */
+  private _camera: THREE.Camera;
   private readonly _domElement: HTMLElement;
   private readonly _scene: THREE.Object3D | undefined;
   private readonly _controls: ControlsLike | undefined;
   private readonly _clickThreshold: number;
-  private readonly _clickTimeThreshold: number;
   private readonly _doubleClickTimeThreshold: number;
   private readonly _recursive: boolean;
   private readonly _computeNDC: ComputeNDCFn | undefined;
@@ -95,15 +93,15 @@ export class InteractiveManager implements IDisposable {
 
   // ─── Registry ──────────────────────────────────────────────
 
-  /** Object3D → { handlers, eventCount } */
-  private readonly _registry = new Map<THREE.Object3D, RegistrationEntry>();
+  /** Object3D → subscriber entries (one per `id`). Multiple subscribers can attach to the same object. */
+  private readonly _registry = new Map<THREE.Object3D, RegistrationEntry[]>();
 
-  /** Ordered list of registered objects (for intersectObjects when no scene). */
+  /** Ordered list of registered objects (for intersectObjects when no scene). Each object appears once. */
   private readonly _interaction: THREE.Object3D[] = [];
 
   // ─── Hover state ───────────────────────────────────────────
 
-  /** composite-id → { intersection, stopped }  */
+  /** eventObject.uuid → { intersection, stopped }（按注册对象去重：同一注册对象的子 mesh 间移动不触发 out/over）  */
   private readonly _hovered = new Map<string, { intersection: Intersection; stopped: boolean }>();
 
   // ─── Pointer capture ───────────────────────────────────────
@@ -149,7 +147,6 @@ export class InteractiveManager implements IDisposable {
     this._scene = options.scene;
     this._controls = options.controls;
     this._clickThreshold = options.clickThreshold ?? CLICK_THRESHOLD;
-    this._clickTimeThreshold = options.clickTimeThreshold ?? CLICK_TIME_MS;
     this._doubleClickTimeThreshold =
       options.doubleClickTimeThreshold ?? DOUBLE_CLICK_TIME_MS;
     this._recursive = options.recursive ?? true;
@@ -178,57 +175,117 @@ export class InteractiveManager implements IDisposable {
   // ─── Public API ────────────────────────────────────────────
 
   /**
-   * Register an Object3D with event handlers.
+   * 更新射线投射所用相机。
    *
-   * If the object is already registered, its handlers are replaced.
+   * 数据驱动场景在 applySceneData 阶段会新建相机并替换 app.camera（透视↔正交切换），
+   * InteractiveManager 构造时捕获的相机引用会失效，导致 setFromCamera 仍用旧相机、
+   * 射线与画面错位。相机被替换后调用本方法同步即可。
    */
-  add(object: THREE.Object3D, handlers: EventHandlers): void {
-    if (this._registry.has(object)) {
-      this._registry.get(object)!.handlers = handlers;
-      this._registry.get(object)!.eventCount = this._countHandlers(handlers);
-      return;
-    }
-    this._registry.set(object, {
-      object,
-      handlers,
-      eventCount: this._countHandlers(handlers),
-    });
-    this._interaction.push(object);
+  setCamera(camera: THREE.Camera): void {
+    this._camera = camera;
   }
 
   /**
-   * Unregister an Object3D, removing all its handlers.
+   * Register an Object3D with event handlers.
    *
-   * If the object is currently hovered, fires `onPointerOut` / `onPointerLeave`
-   * before removing it.
+   * Subscriber model:
+   * - With `id`: appends a subscriber entry. Same `id` replaces; different `id`s coexist.
+   *   Lets independent subsystems (selection, cards, declared interactions) attach
+   *   handlers to the same object without overwriting each other.
+   * - Without `id`: anonymous — replaces ALL existing entries for that object (legacy semantics).
+   *
+   * The object is added to the interaction list exactly once regardless of subscriber count.
    */
-  remove(object: THREE.Object3D): void {
-    const entry = this._registry.get(object);
-    if (!entry) {
+  add(object: THREE.Object3D, handlers: EventHandlers, id?: string): void {
+    const entry: RegistrationEntry = {
+      id,
+      object,
+      handlers,
+      eventCount: this._countHandlers(handlers),
+    };
+
+    const existing = this._registry.get(object);
+    if (!existing) {
+      this._registry.set(object, [entry]);
+      this._interaction.push(object);
       return;
     }
 
-    // Clear hover entries for this eventObject
-    for (const [id, hoverEntry] of this._hovered) {
+    if (id === undefined) {
+      // Anonymous add: replace all entries (legacy overwrite semantics)
+      this._registry.set(object, [entry]);
+      return;
+    }
+
+    // Named subscriber: replace same-id entry, append otherwise
+    const idx = existing.findIndex((e) => e.id === id);
+    if (idx !== -1) {
+      existing[idx] = entry;
+    } else {
+      existing.push(entry);
+    }
+  }
+
+  /**
+   * Unregister handlers from an Object3D.
+   *
+   * - With `id`: removes only that subscriber's entry. Other subscribers remain.
+   *   If the last entry is removed, the object is detached from the interaction list.
+   * - Without `id`: removes ALL entries for that object (legacy semantics).
+   *
+   * If the object is currently hovered, fires `onPointerOut` / `onPointerLeave`
+   * on the removed entries before removing them.
+   */
+  remove(object: THREE.Object3D, id?: string): void {
+    const entries = this._registry.get(object);
+    if (!entries || entries.length === 0) {
+      return;
+    }
+
+    const removed = id === undefined
+      ? entries
+      : entries.filter((e) => e.id === id);
+
+    if (removed.length === 0) {
+      return;
+    }
+
+    // Clear hover entries for this eventObject, firing out/leave on removed subscribers
+    for (const [hoverId, hoverEntry] of this._hovered) {
       if (hoverEntry.intersection.eventObject === object) {
         const ev = this._makeEventFromHover(hoverEntry.intersection, [], new PointerEvent('pointerout'));
-        entry.handlers.onPointerOut?.(ev);
-        entry.handlers.onPointerLeave?.(ev);
-        this._hovered.delete(id);
+        for (const e of removed) {
+          e.handlers.onPointerOut?.(ev);
+          e.handlers.onPointerLeave?.(ev);
+        }
+        this._hovered.delete(hoverId);
       }
     }
 
-    // Release any captures
+    // Release any captures held by removed subscribers
     for (const [pointerId, captures] of this._capturedMap) {
       if (captures.has(object)) {
         this._releaseInternalPointerCapture(object, captures, pointerId);
       }
     }
 
-    this._registry.delete(object);
-    const idx = this._interaction.indexOf(object);
-    if (idx !== -1) {
-      this._interaction.splice(idx, 1);
+    if (id === undefined) {
+      this._registry.delete(object);
+    } else {
+      const next = entries.filter((e) => e.id !== id);
+      if (next.length === 0) {
+        this._registry.delete(object);
+      } else {
+        this._registry.set(object, next);
+      }
+    }
+
+    // Drop from interaction list only if fully unregistered
+    if (!this._registry.has(object)) {
+      const idx = this._interaction.indexOf(object);
+      if (idx !== -1) {
+        this._interaction.splice(idx, 1);
+      }
     }
   }
 
@@ -314,8 +371,8 @@ export class InteractiveManager implements IDisposable {
     for (const hit of rawHits) {
       let eventObject: THREE.Object3D | null = hit.object;
       while (eventObject) {
-        const entry = this._registry.get(eventObject);
-        if (entry && entry.eventCount > 0) {
+        const entries = this._registry.get(eventObject);
+        if (entries && entries.some((e) => e.eventCount > 0)) {
           intersections.push({
             object: hit.object,
             eventObject,
@@ -493,28 +550,37 @@ export class InteractiveManager implements IDisposable {
     intersections: Intersection[],
     event: PointerEvent | WheelEvent,
     delta: number,
-    callback: (ev: IntersectionEvent) => void,
+    callback: (ev: IntersectionEvent) => boolean | void,
   ): Intersection[] {
     if (intersections.length === 0) {
       return intersections;
     }
 
     const localState = { stopped: false };
+    // 按注册对象（eventObject）去重：同一注册对象在一次事件中只 dispatch 首次命中点，
+    // 避免 group 多 mesh 命中时 onClick 等事件触发 N 次。
+    const dispatched = new Set<THREE.Object3D>();
 
     for (const hit of intersections) {
-      const entry = this._registry.get(hit.eventObject);
-      if (!entry || !entry.eventCount) {
+      if (dispatched.has(hit.eventObject)) {
         // eslint-disable-next-line no-continue
         continue;
       }
+      const entries = this._registry.get(hit.eventObject);
+      if (!entries || !entries.some((e) => e.eventCount > 0)) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      dispatched.add(hit.eventObject);
 
       const captureTarget = this._buildCaptureTarget(hit);
       const ctx = { stopped: localState.stopped, captureTarget };
       const raycastEvent = this._buildIntersectionEvent(hit, intersections, event, delta, ctx);
 
-      callback(raycastEvent);
+      const ret = callback(raycastEvent);
 
-      if (localState.stopped === true) {
+      // handler 返回 true（或 stopPropagation 标记）则停止冒泡：不再 dispatch 更远命中点 / 其他注册对象
+      if (localState.stopped === true || ret === true) {
         break;
       }
     }
@@ -534,17 +600,20 @@ export class InteractiveManager implements IDisposable {
     for (const [id, hoverEntry] of this._hovered) {
       const hoveredObj = hoverEntry.intersection;
       // Check if this hovered object is still under the cursor
-      const stillHovered = intersections.find((hit) =>
-        hit.object === hoveredObj.object &&
-          (hit.index ?? '') === (hoveredObj.index ?? '') &&
-          (hit.instanceId ?? '') === (hoveredObj.instanceId ?? ''));
+      // 按注册对象（eventObject）比较：同一注册对象的任意子 mesh 仍在命中里 → 仍悬停，
+      // 不触发 out；所有子 mesh 都离开才 out。避免 group 内部 mesh 切换抖动。
+      const stillHovered = intersections.find((hit) => hit.eventObject === hoveredObj.eventObject);
 
       if (!stillHovered) {
-        const entry = this._registry.get(hoveredObj.eventObject);
-        if (entry && entry.eventCount) {
+        const entries = this._registry.get(hoveredObj.eventObject);
+        if (entries) {
           const data = this._makeEventFromHover(hoveredObj, intersections, new PointerEvent('pointerout'));
-          entry.handlers.onPointerOut?.(data);
-          entry.handlers.onPointerLeave?.(data);
+          for (const e of entries) {
+            if (e.eventCount) {
+              e.handlers.onPointerOut?.(data);
+              e.handlers.onPointerLeave?.(data);
+            }
+          }
         }
         this._hovered.delete(id);
       }
@@ -559,36 +628,43 @@ export class InteractiveManager implements IDisposable {
    */
   private _pointerMissed(event: PointerEvent, objects: THREE.Object3D[]): void {
     for (const obj of objects) {
-      const entry = this._registry.get(obj);
-      if (entry?.handlers.onPointerMissed) {
-        const ev: IntersectionEvent = {
-          object: obj,
-          eventObject: obj,
-          distance: Infinity,
-          point: new THREE.Vector3(),
-          ray: this._raycaster.ray,
-          camera: this._camera,
-          pointer: this._ndc.clone(),
-          intersections: [],
-          delta: 0,
-          nativeEvent: event,
-          stopped: false,
-          stopPropagation() {
-            this.stopped = true;
-          },
-          unprojectedPoint: new THREE.Vector3(),
-          target: {
-            hasPointerCapture: () => false,
-            setPointerCapture: () => {},
-            releasePointerCapture: () => {},
-          },
-          currentTarget: {
-            hasPointerCapture: () => false,
-            setPointerCapture: () => {},
-            releasePointerCapture: () => {},
-          },
-        };
-        entry.handlers.onPointerMissed(ev);
+      const entries = this._registry.get(obj);
+      if (!entries) {
+        continue;
+      }
+      const missed = entries.filter((e) => e.handlers.onPointerMissed);
+      if (missed.length === 0) {
+        continue;
+      }
+      const ev: IntersectionEvent = {
+        object: obj,
+        eventObject: obj,
+        distance: Infinity,
+        point: new THREE.Vector3(),
+        ray: this._raycaster.ray,
+        camera: this._camera,
+        pointer: this._ndc.clone(),
+        intersections: [],
+        delta: 0,
+        nativeEvent: event,
+        stopped: false,
+        stopPropagation() {
+          this.stopped = true;
+        },
+        unprojectedPoint: new THREE.Vector3(),
+        target: {
+          hasPointerCapture: () => false,
+          setPointerCapture: () => {},
+          releasePointerCapture: () => {},
+        },
+        currentTarget: {
+          hasPointerCapture: () => false,
+          setPointerCapture: () => {},
+          releasePointerCapture: () => {},
+        },
+      };
+      for (const e of missed) {
+        e.handlers.onPointerMissed?.(ev);
       }
     }
   }
@@ -598,20 +674,20 @@ export class InteractiveManager implements IDisposable {
   /**
    * Dispatch hover tracking and pointermove for a single intersection.
    */
-  private _dispatchPointerMove(data: IntersectionEvent): void {
-    const entry = this._registry.get(data.eventObject);
-    if (!entry || !entry.eventCount) {
+  private _dispatchPointerMove(data: IntersectionEvent): boolean | void {
+    const entries = this._registry.get(data.eventObject);
+    if (!entries) {
       return;
     }
-    const handlers = entry.handlers;
+    const active = entries.filter((e) => e.eventCount > 0);
+    if (active.length === 0) {
+      return;
+    }
 
-    if (
-      handlers.onPointerOver ||
-      handlers.onPointerEnter ||
-      handlers.onPointerOut ||
-      handlers.onPointerLeave
-    ) {
-      const id = makeIntersectionId(data);
+    let shouldStop = false;
+    const hasHover = active.some((e) => hasPointerHandlers(e));
+    if (hasHover) {
+      const id = data.eventObject.uuid;
       const hoveredItem = this._hovered.get(id);
       if (!hoveredItem) {
         this._hovered.set(id, {
@@ -627,14 +703,26 @@ export class InteractiveManager implements IDisposable {
           },
           stopped: false,
         });
-        handlers.onPointerOver?.(data);
-        handlers.onPointerEnter?.(data);
+        for (const e of active) {
+          if (e.handlers.onPointerOver?.(data) === true) {
+            shouldStop = true;
+          }
+          if (e.handlers.onPointerEnter?.(data) === true) {
+            shouldStop = true;
+          }
+        }
       } else if (hoveredItem.stopped) {
         data.stopPropagation();
       }
     }
 
-    handlers.onPointerMove?.(data);
+    for (const e of active) {
+      if (e.handlers.onPointerMove?.(data) === true) {
+        shouldStop = true;
+      }
+    }
+
+    return shouldStop;
   }
 
   private _handlePointerMove(e: PointerEvent): void {
@@ -643,16 +731,57 @@ export class InteractiveManager implements IDisposable {
     }
     this._lastPointerMoveEvent = e;
 
-    const filterFn = (objects: THREE.Object3D[]): THREE.Object3D[] =>
+    // Skip raycast entirely when no registered object has any hover handler.
+    // In scene mode the per-object filterFn below has no effect (the whole tree
+    // is raycast regardless), so this short-circuit is what keeps pointermove
+    // cost-free when no hover interactions are declared.
+    if (!this._hasAnyHoverHandler()) {
+      if (this._hovered.size > 0) {
+        this._cancelPointer([]);
+      }
+      return;
+    }
+
+    const filterFn = this._scene ? undefined : (objects: THREE.Object3D[]): THREE.Object3D[] =>
       objects.filter((obj) => {
-        const entry = this._registry.get(obj);
-        return entry && hasPointerHandlers(entry);
+        const entries = this._registry.get(obj);
+        return !!entries && entries.some((en) => hasPointerHandlers(en));
       });
 
     const hits = this._intersect(e, filterFn);
     this._cancelPointer(hits);
 
     this._handleIntersects(hits, e, 0, (data) => this._dispatchPointerMove(data));
+  }
+
+  /**
+   * Whether any registered subscriber (across all objects) has a hover handler.
+   * Used to short-circuit pointermove raycasting when hover is unused.
+   */
+  private _hasAnyHoverHandler(): boolean {
+    for (const entries of this._registry.values()) {
+      for (const entry of entries) {
+        if (hasPointerHandlers(entry)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whether any registered subscriber declares an `onWheel` handler.
+   * Used to short-circuit wheel raycasting when wheel is unused.
+   */
+  private _hasAnyWheelHandler(): boolean {
+    for (const entries of this._registry.values()) {
+      for (const entry of entries) {
+        if (entry.handlers.onWheel) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private _handlePointerDown(e: PointerEvent): void {
@@ -674,12 +803,20 @@ export class InteractiveManager implements IDisposable {
       }
     }
 
-    this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
-      const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) {
+    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean | void => {
+      const entries = this._registry.get(data.eventObject);
+      if (!entries) {
         return;
       }
-      entry.handlers.onPointerDown?.(data);
+      let shouldStop = false;
+      for (const en of entries) {
+        if (en.eventCount) {
+          if (en.handlers.onPointerDown?.(data) === true) {
+            shouldStop = true;
+          }
+        }
+      }
+      return shouldStop;
     });
 
     // If nothing hit, fire pointerMissed on all registered objects
@@ -695,28 +832,52 @@ export class InteractiveManager implements IDisposable {
     data: IntersectionEvent,
     isLeftButton: boolean,
     delta: number,
-  ): void {
-    const entry = this._registry.get(data.eventObject);
-    if (!entry || !entry.eventCount) {
+  ): boolean | void {
+    const entries = this._registry.get(data.eventObject);
+    if (!entries) {
       return;
     }
-    const handlers = entry.handlers;
+    const active = entries.filter((e) => e.eventCount > 0);
+    if (active.length === 0) {
+      return;
+    }
 
-    handlers.onPointerUp?.(data);
+    // Click / double-click detection is per-eventObject (shared across subscribers),
+    // so a single click triggers onClick on every subscriber, not onClick + onDoubleClick.
+    const inInitial = isLeftButton && delta <= this._clickThreshold && this._initialHits.includes(data.eventObject);
+    let isClick = false;
+    let isDoubleClick = false;
+    if (inInitial) {
+      const now = Date.now();
+      const lastTime = this._lastClickTimes.get(data.eventObject) ?? 0;
+      if (now - lastTime <= this._doubleClickTimeThreshold && lastTime > 0) {
+        isDoubleClick = true;
+        this._lastClickTimes.delete(data.eventObject);
+      } else {
+        isClick = true;
+        this._lastClickTimes.set(data.eventObject, now);
+      }
+    }
 
-    if (isLeftButton && delta <= this._clickThreshold) {
-      if (this._initialHits.includes(data.eventObject)) {
-        const now = Date.now();
-        const lastTime = this._lastClickTimes.get(data.eventObject) ?? 0;
-        if (now - lastTime <= this._doubleClickTimeThreshold && lastTime > 0) {
-          handlers.onDoubleClick?.(data);
-          this._lastClickTimes.delete(data.eventObject);
-        } else {
-          handlers.onClick?.(data);
-          this._lastClickTimes.set(data.eventObject, now);
+    let shouldStop = false;
+    for (const e of active) {
+      const handlers = e.handlers;
+      if (handlers.onPointerUp?.(data) === true) {
+        shouldStop = true;
+      }
+      if (isClick) {
+        if (handlers.onClick?.(data) === true) {
+          shouldStop = true;
+        }
+      }
+      if (isDoubleClick) {
+        if (handlers.onDoubleClick?.(data) === true) {
+          shouldStop = true;
         }
       }
     }
+
+    return shouldStop;
   }
 
   /**
@@ -774,14 +935,29 @@ export class InteractiveManager implements IDisposable {
       return;
     }
 
+    // Skip raycast when no subscriber declares onWheel.
+    // scene mode raycasts the whole tree per wheel tick; without this guard,
+    // scroll-to-zoom would pay a full-tree raycast even when wheel is unused.
+    if (!this._hasAnyWheelHandler()) {
+      return;
+    }
+
     const hits = this._intersect(e);
 
-    this._handleIntersects(hits, e, 0, (data: IntersectionEvent) => {
-      const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) {
+    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean | void => {
+      const entries = this._registry.get(data.eventObject);
+      if (!entries) {
         return;
       }
-      entry.handlers.onWheel?.(data);
+      let shouldStop = false;
+      for (const en of entries) {
+        if (en.eventCount) {
+          if (en.handlers.onWheel?.(data) === true) {
+            shouldStop = true;
+          }
+        }
+      }
+      return shouldStop;
     });
   }
 
@@ -796,12 +972,11 @@ export class InteractiveManager implements IDisposable {
 
     const hits = this._intersect(e);
 
-    this._handleIntersects(hits, e, delta, (data: IntersectionEvent) => {
-      const entry = this._registry.get(data.eventObject);
-      if (!entry || !entry.eventCount) {
+    this._handleIntersects(hits, e, delta, (data: IntersectionEvent): boolean | void => {
+      const entries = this._registry.get(data.eventObject);
+      if (!entries) {
         return;
       }
-      const handlers = entry.handlers;
 
       // Only fire contextMenu on initialHits
       if (this._initialHits.includes(data.eventObject)) {
@@ -810,7 +985,15 @@ export class InteractiveManager implements IDisposable {
           e,
           this._interaction.filter((obj) => !this._initialHits.includes(obj)),
         );
-        handlers.onContextMenu?.(data);
+        let shouldStop = false;
+        for (const en of entries) {
+          if (en.eventCount) {
+            if (en.handlers.onContextMenu?.(data) === true) {
+              shouldStop = true;
+            }
+          }
+        }
+        return shouldStop;
       }
     });
   }
