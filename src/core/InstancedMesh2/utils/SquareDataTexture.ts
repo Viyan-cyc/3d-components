@@ -167,7 +167,7 @@ export class SquareDataTexture extends DataTexture {
     const {
       array, format, size, type,
     } = getSquareTextureInfo(arrayType, resolvedChannels, pixelsPerInstance, capacity);
-    super(array as BufferSource, size, size, format, type);
+    super(array as TypedArray, size, size, format, type);
     this._data = array;
     this._channels = resolvedChannels;
     this._pixelsPerInstance = pixelsPerInstance;
@@ -353,7 +353,7 @@ export class SquareDataTexture extends DataTexture {
     for (const { count, row } of info) {
       gl.texSubImage2D(
         gl.TEXTURE_2D, 0, 0, row, width, count,
-        glFormat, glType, data, row * width * channels,
+        glFormat, glType, data!, row * width * channels,
       );
     }
 
@@ -368,7 +368,7 @@ export class SquareDataTexture extends DataTexture {
     if (size === 1) {
       this._data[id * stride + offset] = value as number;
     } else {
-      (value as UniformValueObj).toArray(this._data, id * stride + offset);
+      (value as unknown as { toArray(array: TypedArray, offset: number): void }).toArray(this._data, id * stride + offset);
     }
   }
 

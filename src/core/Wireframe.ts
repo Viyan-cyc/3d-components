@@ -547,6 +547,7 @@ export class Wireframe extends THREE.Group implements IDisposable {
    *   （`onBeforeCompile` 注入无法安全撤销；如需还原请重建父级材质）。
    */
   dispose(): void {
+    void this.injectedParent;
     if (this.wireGeometry) {
       this.wireGeometry.dispose();
       this.wireGeometry = null;

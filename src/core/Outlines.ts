@@ -346,6 +346,7 @@ export class Outlines extends THREE.Group implements IDisposable {
    * 不会触碰父级网格的资源（几何体 / 材质由父级自行管理）。
    */
   dispose(): void {
+    void this.resizeHandler;
     if (this.outlineGeometry) {
       this.outlineGeometry.dispose();
       this.outlineGeometry = null;

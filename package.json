@@ -117,11 +117,13 @@
         "default": "./dist/cjs/animation.cjs"
       }
     },
+    "./docs": "./docs/components.json",
     "./dist/*": "./dist/*"
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "docs/components.json"
   ],
   "publishConfig": {
     "access": "public"
@@ -163,6 +165,7 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "docs": "typedoc",
+    "gen:component-docs": "node scripts/gen-component-docs.mjs",
     "docs:serve": "vite docs --open --port 7777",
     "prepublishOnly": "npm run build",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",

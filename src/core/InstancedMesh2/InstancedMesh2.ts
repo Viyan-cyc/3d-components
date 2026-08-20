@@ -316,10 +316,10 @@ export class InstancedMesh2<
   // eslint-disable-next-line max-params
   public override onBeforeShadow(
     renderer: WebGLRenderer,
-    scene: Scene,
+    _scene: Scene,
     camera: Camera,
     shadowCamera: Camera,
-    geometry: BufferGeometry,
+    _geometry: BufferGeometry,
     depthMaterial: Material,
     group: unknown,
   ): void {
@@ -344,9 +344,9 @@ export class InstancedMesh2<
   // eslint-disable-next-line max-params
   public override onBeforeRender(
     renderer: WebGLRenderer,
-    scene: Scene,
+    _scene: Scene,
     camera: Camera,
-    geometry: BufferGeometry,
+    _geometry: BufferGeometry,
     material: Material,
     group: unknown,
   ): void {
@@ -375,10 +375,10 @@ export class InstancedMesh2<
   // eslint-disable-next-line max-params
   public override onAfterShadow(
     renderer: WebGLRenderer,
-    scene: Scene,
-    camera: Camera,
-    shadowCamera: Camera,
-    geometry: BufferGeometry,
+    _scene: Scene,
+    _camera: Camera,
+    _shadowCamera: Camera,
+    _geometry: BufferGeometry,
     depthMaterial: Material,
     group: unknown,
   ): void {
@@ -389,9 +389,9 @@ export class InstancedMesh2<
   // eslint-disable-next-line max-params
   public override onAfterRender(
     renderer: WebGLRenderer,
-    scene: Scene,
-    camera: Camera,
-    geometry: BufferGeometry,
+    _scene: Scene,
+    _camera: Camera,
+    _geometry: BufferGeometry,
     material: Material,
     group: unknown,
   ): void {

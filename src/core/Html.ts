@@ -633,6 +633,7 @@ export class Html extends THREE.Group implements IUpdatable, IDisposable {
   }
 
   dispose(): void {
+    void this._style;
     if (this._el.parentNode) {
       this._el.parentNode.removeChild(this._el);
     }

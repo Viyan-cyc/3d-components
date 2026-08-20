@@ -20,7 +20,7 @@ export const getMorphAt = function <
   object = tempMesh,
 ): Mesh {
   const objectInfluences = object.morphTargetInfluences!;
-  const array = this.morphTexture!.source.data.data;
+  const array = this.morphTexture!.source.data.data!;
   const len = objectInfluences.length + 1;
   const dataIndex = id * len + 1;
 
@@ -54,7 +54,7 @@ export const setMorphAt = function <
     );
   }
 
-  const array = this.morphTexture!.source.data.data;
+  const array = this.morphTexture!.source.data.data!;
   let morphInfluencesSum = 0;
 
   for (const objectInfluence of objectInfluences) {

@@ -1,0 +1,1772 @@
+[
+  {
+    "name": "BitmapText",
+    "summary": "SDF 位图文字组件。基于 Canvas 2D 在运行时栅格化字符，经 DistanceTransform 生成 Signed Distance Field 图集，用自定义 GLSL 着色器渲染——任意缩放不锯齿，自带阴影、描边、CJK 自动换行。无需字体文件或第三方插件。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Mesh",
+    "constructor": "new BitmapText(options?: BitmapTextOptions)",
+    "options": [
+      {
+        "name": "text",
+        "type": "string",
+        "default": "''",
+        "description": "要渲染的文字字符串"
+      },
+      {
+        "name": "fontSize",
+        "type": "number",
+        "default": "72",
+        "description": "字体大小（像素），决定 SDF 精度"
+      },
+      {
+        "name": "fontFamily",
+        "type": "string",
+        "default": "'sans-serif'",
+        "description": "CSS font-family"
+      },
+      {
+        "name": "fontWeight",
+        "type": "string",
+        "default": "'normal'",
+        "description": "CSS font-weight"
+      },
+      {
+        "name": "fontStyle",
+        "type": "string",
+        "default": "'normal'",
+        "description": "CSS font-style"
+      },
+      {
+        "name": "atlasWidth",
+        "type": "number",
+        "default": "2048",
+        "description": "SDF 图集宽度"
+      },
+      {
+        "name": "atlasHeight",
+        "type": "number",
+        "default": "2048",
+        "description": "SDF 图集高度"
+      },
+      {
+        "name": "width",
+        "type": "number",
+        "default": "1000",
+        "description": "最大行宽（字体单位），超出自动换行"
+      },
+      {
+        "name": "mode",
+        "type": "'nowrap' | 'pre' | 'word-wrapper'",
+        "default": "'word-wrapper'",
+        "description": "换行模式：'nowrap' 不换行，'pre' 保留空白与换行，'word-wrapper' 英文按词换行 / CJK 逐字换行"
+      },
+      {
+        "name": "align",
+        "type": "'left' | 'center' | 'right'",
+        "default": "'left'",
+        "description": "文本对齐"
+      },
+      {
+        "name": "letterSpacing",
+        "type": "number",
+        "default": "0",
+        "description": "字符间距（字体单位）"
+      },
+      {
+        "name": "lineHeight",
+        "type": "number",
+        "default": "fontSize",
+        "description": "行高（字体单位）"
+      },
+      {
+        "name": "baseline",
+        "type": "number",
+        "default": "fontSize × 0.8",
+        "description": "基线偏移（字体单位）"
+      },
+      {
+        "name": "halo",
+        "type": "number",
+        "default": "0.75",
+        "description": "SDF 阈值，控制笔画粗细"
+      },
+      {
+        "name": "gamma",
+        "type": "number",
+        "default": "1",
+        "description": "SDF 平滑度，越大越模糊"
+      },
+      {
+        "name": "color",
+        "type": "ColorRepresentation",
+        "default": "0xffffff",
+        "description": "文字颜色"
+      },
+      {
+        "name": "opacity",
+        "type": "number",
+        "default": "1",
+        "description": "不透明度（0–1）"
+      },
+      {
+        "name": "shadow",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否启用投影"
+      },
+      {
+        "name": "shadowColor",
+        "type": "ColorRepresentation",
+        "default": "0x4d4d4d",
+        "description": "投影颜色"
+      },
+      {
+        "name": "shadowOffset",
+        "type": "[number, number]",
+        "default": "[0.001, -0.001]",
+        "description": "投影 UV 偏移 [x, y]"
+      },
+      {
+        "name": "shadowGamma",
+        "type": "number",
+        "default": "1",
+        "description": "投影平滑度"
+      },
+      {
+        "name": "outline",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否启用描边"
+      },
+      {
+        "name": "outlineColor",
+        "type": "ColorRepresentation",
+        "default": "0xff0000",
+        "description": "描边颜色"
+      },
+      {
+        "name": "outlineWidth",
+        "type": "number",
+        "default": "0.05",
+        "description": "描边宽度（SDF 单位）"
+      },
+      {
+        "name": "outlineGamma",
+        "type": "number",
+        "default": "1",
+        "description": "描边平滑度"
+      },
+      {
+        "name": "billboard",
+        "type": "boolean",
+        "default": "false",
+        "description": "文字始终朝向相机"
+      },
+      {
+        "name": "scale",
+        "type": "number",
+        "default": "0.01",
+        "description": "世界空间缩放系数"
+      },
+      {
+        "name": "centerX",
+        "type": "number",
+        "default": "0.5",
+        "description": "水平居中偏移（0–1），0.5 = 居中"
+      },
+      {
+        "name": "centerY",
+        "type": "number",
+        "default": "0.5",
+        "description": "垂直居中偏移（0–1），0.5 = 居中"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [
+      {
+        "name": "text",
+        "type": "string",
+        "description": "当前文字内容（只读，用 setText() 修改）"
+      },
+      {
+        "name": "font",
+        "type": "DynamicFont",
+        "description": "底层 DynamicFont 实例（只读）"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".setText(text: string): this",
+        "description": "更新文字内容。若遇到图集中不存在的字符会自动增量添加到图集并刷新纹理。链式调用。"
+      },
+      {
+        "signature": ".setLayout(params: Partial<LayoutOptions>): this",
+        "description": "更新排版参数并重建几何体。params 可包含 width、mode、align、letterSpacing、lineHeight、baseline、centerX、centerY。链式调用。"
+      },
+      {
+        "signature": ".setColor(color: ColorRepresentation): this",
+        "description": "设置文字颜色。链式调用。"
+      },
+      {
+        "signature": ".setOpacity(opacity: number): this",
+        "description": "设置不透明度（0–1）。链式调用。"
+      },
+      {
+        "signature": ".setHalo(halo: number): this",
+        "description": "设置 SDF 阈值（halo），控制笔画粗细。链式调用。"
+      },
+      {
+        "signature": ".setGamma(gamma: number): this",
+        "description": "设置 SDF 平滑度（gamma），越大越模糊。链式调用。"
+      },
+      {
+        "signature": ".setShadow(enabled: boolean): this",
+        "description": "开关投影。切换 USE_SHADOW 宏，首次启用需重新编译着色器（一次性开销）。链式调用。"
+      },
+      {
+        "signature": ".setShadowParams(color, offsetX, offsetY, gamma): this",
+        "description": "设置投影颜色、UV 偏移 [x, y]、平滑度。链式调用。"
+      },
+      {
+        "signature": ".setOutline(enabled: boolean): this",
+        "description": "开关描边。切换 USE_OUTLINE 宏，首次启用需重新编译着色器（一次性开销）。链式调用。"
+      },
+      {
+        "signature": ".setOutlineParams(color, width, gamma): this",
+        "description": "设置描边颜色、宽度（SDF 单位）、平滑度。链式调用。"
+      },
+      {
+        "signature": ".setScale(scale: number): this",
+        "description": "设置世界空间缩放系数。链式调用。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有 GPU 资源（geometry、material、纹理、图集缓冲区）。"
+      }
+    ],
+    "examples": [
+      "import { BitmapText } from '@a3d/a3d-components/core';\n\n// 基础中文文本\nconst text = new BitmapText({\n  text: 'Hello 世界',\n  fontSize: 72,\n  width: 1000,\n  align: 'center',\n});\nscene.add(text);\n\n// 带描边和阴影\nconst fancy = new BitmapText({\n  text: '道可道，非常道',\n  fontSize: 64,\n  outline: true,\n  outlineColor: 0x00bbff,\n  outlineWidth: 0.06,\n  shadow: true,\n  scale: 0.01,\n});\nscene.add(fancy);\n\n// 运行时更新\ntext.setText('新的文字内容');\ntext.setColor(0xffcc00);\nfancy.setOutline(true);\nfancy.setOutlineParams(0xff0000, 0.08, 1);\n\n// 清理\ntext.dispose();"
+    ]
+  },
+  {
+    "name": "Grid",
+    "summary": "无限网格。基于屏幕空间四边形 + 着色器实现，把整屏四边形反投影成世界射线、与网格平面求交来绘制无边界网格——无论相机如何移动或拉远，网格始终铺满屏幕。写入 gl_FragDepth，能被场景中的物体正确遮挡。自带主 / 次双层网格、坐标轴高亮（X 红、Z/Y 蓝）与距离淡出。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Mesh",
+    "constructor": "new Grid(options?: GridOptions)",
+    "options": [
+      {
+        "name": "primaryScale",
+        "type": "number",
+        "default": "5",
+        "description": "主网格（粗线）间距缩放，每隔该距离一条粗线"
+      },
+      {
+        "name": "secondaryScale",
+        "type": "number",
+        "default": "1",
+        "description": "次级网格（细线）间距缩放，叠加在主网格上形成细分"
+      },
+      {
+        "name": "showAxis",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否显示坐标轴高亮（X 轴 + Z/Y 轴）。关闭后仅显示普通网格"
+      },
+      {
+        "name": "primaryFade",
+        "type": "number",
+        "default": "0.7",
+        "description": "主网格淡出系数，乘到主网格线条 alpha 上"
+      },
+      {
+        "name": "secondaryFade",
+        "type": "number",
+        "default": "0.4",
+        "description": "次级网格淡出系数，乘到次级网格线条 alpha 上"
+      },
+      {
+        "name": "linearFade",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否启用基于相机距离的线性淡出（远处网格逐渐消失）"
+      },
+      {
+        "name": "fadeStart",
+        "type": "number",
+        "default": "30",
+        "description": "线性淡出起始距离（世界单位），小于该距离不淡出"
+      },
+      {
+        "name": "fadeEnd",
+        "type": "number",
+        "default": "100",
+        "description": "线性淡出结束距离（世界单位），大于该距离完全透明"
+      },
+      {
+        "name": "plane",
+        "type": "'xz' | 'xy'",
+        "default": "'xz'",
+        "description": "网格平面：'xz' 水平地面（Y=0），'xy' 面向 +Z 的立面（Z=0）"
+      },
+      {
+        "name": "color",
+        "type": "ColorRepresentation",
+        "default": "0x333333",
+        "description": "网格线颜色（直接决定最终线色，颜色越深线越暗）"
+      },
+      {
+        "name": "xAxisColor",
+        "type": "ColorRepresentation",
+        "default": "0xff0000",
+        "description": "X 轴高亮颜色"
+      },
+      {
+        "name": "zAxisColor",
+        "type": "ColorRepresentation",
+        "default": "0x0000ff",
+        "description": "Z 轴（地面模式）/ Y 轴（立面模式）高亮颜色"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [
+      {
+        "name": "plane",
+        "type": "'xz' | 'xy'",
+        "description": "当前网格平面（只读，用 setPlane() 修改）"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".setPlane(plane: 'xz' | 'xy', animate?: boolean): this",
+        "description": "切换网格平面。'xz' → 地面，'xy' → 立面。默认用 GSAP 平滑过渡（约 0.6s），传 animate = false 立即切换。"
+      },
+      {
+        "signature": ".setPrimaryScale(scale: number): this",
+        "description": "设置主网格间距。链式调用。"
+      },
+      {
+        "signature": ".setSecondaryScale(scale: number): this",
+        "description": "设置次级网格间距。链式调用。"
+      },
+      {
+        "signature": ".setShowAxis(show: boolean): this",
+        "description": "开关坐标轴高亮。false 时仅显示普通网格。链式调用。"
+      },
+      {
+        "signature": ".setColor(color: ColorRepresentation): this",
+        "description": "设置网格线颜色（hex / CSS 字符串 / THREE.Color）。链式调用。"
+      },
+      {
+        "signature": ".setXAxisColor(color: ColorRepresentation): this",
+        "description": "设置 X 轴高亮颜色。链式调用。"
+      },
+      {
+        "signature": ".setZAxisColor(color: ColorRepresentation): this",
+        "description": "设置 Z 轴（地面模式）/ Y 轴（立面模式）高亮颜色。链式调用。"
+      },
+      {
+        "signature": ".setFade(start: number, end: number): this",
+        "description": "设置线性淡出起止距离。链式调用。"
+      },
+      {
+        "signature": ".setLinearFade(enabled: boolean): this",
+        "description": "开启 / 关闭距离淡出。通过编译宏 USE_LINEARFADE 控制，切换时重新编译着色器（一次性开销）。链式调用。"
+      },
+      {
+        "signature": ".onBeforeRender(renderer, scene, camera): void",
+        "description": "由 Three.js 渲染前自动调用，按当前相机刷新反投影矩阵。无需手动调用。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放 geometry 与 material，并终止进行中的 GSAP 补间。"
+      }
+    ],
+    "examples": [
+      "import { Grid } from '@a3d/a3d-components/core';\n\n// 作为无限地面参考网，自定义网格与坐标轴颜色\nconst grid = new Grid({\n  primaryScale: 5,\n  secondaryScale: 1,\n  color: '#9aa7b8',       // 网格线颜色\n  xAxisColor: 0xff5555,   // X 轴\n  zAxisColor: 0x55aaff,   // Z / Y 轴\n});\nscene.add(grid);\n\n// 运行时调整样式（所有 setter 链式调用）\ngrid.setShowAxis(false).setLinearFade(true).setFade(20, 80);\ngrid.setColor('#ffffff').setXAxisColor('red');\n\n// 平滑切换到 2D 立面网格（GSAP 动画）\ngrid.setPlane('xy');"
+    ]
+  },
+  {
+    "name": "Html",
+    "summary": "3D 空间中的 HTML 覆盖层组件。将 DOM 元素定位在 Three.js 场景的 3D 坐标上，每帧根据相机投影自动更新屏幕位置。支持两种定位模式：2D 投影（默认）和 CSS3D 变换。纯 Three.js 实现，无 React 依赖。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Html(options?: HtmlOptions)",
+    "options": [
+      {
+        "name": "el",
+        "type": "HTMLElement",
+        "default": "—",
+        "description": "要定位的 DOM 元素。若未提供则自动创建 <div>"
+      },
+      {
+        "name": "as",
+        "type": "string",
+        "default": "'div'",
+        "description": "自动创建元素的标签名（el 已提供时忽略）"
+      },
+      {
+        "name": "portal",
+        "type": "HTMLElement",
+        "default": "—",
+        "description": "挂载目标父元素，默认为 canvas 父节点"
+      },
+      {
+        "name": "prepend",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否插入到 portal 首位而非末尾"
+      },
+      {
+        "name": "center",
+        "type": "boolean",
+        "default": "false",
+        "description": "居中元素 translate3d(-50%,-50%,0)"
+      },
+      {
+        "name": "fullscreen",
+        "type": "boolean",
+        "default": "false",
+        "description": "将元素撑满整个视口"
+      },
+      {
+        "name": "eps",
+        "type": "number",
+        "default": "0.001",
+        "description": "位置/缩放变化阈值，低于此值跳过 DOM 更新以提升性能"
+      },
+      {
+        "name": "distanceFactor",
+        "type": "number",
+        "default": "—",
+        "description": "距离缩放因子。设置后 HTML 元素随距相机的远近自动缩放，典型值 5–20"
+      },
+      {
+        "name": "sprite",
+        "type": "boolean",
+        "default": "false",
+        "description": "始终面向相机（仅 transform 模式）"
+      },
+      {
+        "name": "transform",
+        "type": "boolean",
+        "default": "false",
+        "description": "CSS3D 变换模式。从 Three.js 矩阵构建完整 matrix3d CSS 变换，实现真正 3D 透视"
+      },
+      {
+        "name": "zIndexRange",
+        "type": "[number, number]",
+        "default": "[16777271, 0]",
+        "description": "Z-index 映射范围 [max, min]，近处对象获得更高 z-index"
+      },
+      {
+        "name": "calculatePosition",
+        "type": "(object, camera, w, h) => [x, y]",
+        "default": "—",
+        "description": "自定义位置计算函数"
+      },
+      {
+        "name": "wrapperClass",
+        "type": "string",
+        "default": "—",
+        "description": "包裹元素的 CSS 类名"
+      },
+      {
+        "name": "pointerEvents",
+        "type": "PointerEventsValue",
+        "default": "'auto'",
+        "description": "CSS pointer-events 值"
+      },
+      {
+        "name": "style",
+        "type": "Partial<CSSStyleDeclaration> | string",
+        "default": "—",
+        "description": "内容元素的行内样式"
+      },
+      {
+        "name": "className",
+        "type": "string",
+        "default": "—",
+        "description": "内容元素的 CSS 类名"
+      },
+      {
+        "name": "occlude",
+        "type": "boolean | 'raycast' | 'blending' | Object3D[]",
+        "default": "false",
+        "description": "遮挡模式：true 渲染不可见深度写入网格；'raycast' 射线检测遮挡后隐藏 HTML；'blending' z-index 混合合成；Object3D[] 对指定对象做射线遮挡"
+      },
+      {
+        "name": "onOcclude",
+        "type": "(hidden: boolean) => void",
+        "default": "—",
+        "description": "遮挡状态变化时的回调"
+      },
+      {
+        "name": "occludeGeometry",
+        "type": "BufferGeometry",
+        "default": "PlaneGeometry",
+        "description": "遮挡网格的自定义几何体"
+      },
+      {
+        "name": "occludeMaterial",
+        "type": "Material",
+        "default": "ShaderMaterial",
+        "description": "遮挡网格的自定义材质"
+      },
+      {
+        "name": "castShadow",
+        "type": "boolean",
+        "default": "false",
+        "description": "遮挡网格是否投射阴影"
+      },
+      {
+        "name": "receiveShadow",
+        "type": "boolean",
+        "default": "false",
+        "description": "遮挡网格是否接收阴影"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [
+      {
+        "name": "element",
+        "type": "HTMLElement",
+        "description": "底层 DOM 元素（只读）"
+      },
+      {
+        "name": "transformOuter",
+        "type": "HTMLDivElement | null",
+        "description": "transform 模式下的外层包裹 div（只读）"
+      },
+      {
+        "name": "transformInner",
+        "type": "HTMLDivElement | null",
+        "description": "transform 模式下的内层包裹 div（只读）"
+      },
+      {
+        "name": "occlusionMesh",
+        "type": "THREE.Mesh | null",
+        "description": "遮挡网格（仅 occlude: true 时创建，只读）"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".mount(renderer: WebGLRenderer): void",
+        "description": "将 HTML 元素挂载到 DOM。添加到场景后调用，若未手动调用则首次 update() 时自动挂载。"
+      },
+      {
+        "signature": ".update(delta: number, camera: Camera, renderer: WebGLRenderer): void",
+        "description": "每帧更新 — 投影 3D 位置到屏幕坐标，更新 DOM 元素的 transform、z-index 和可见性。在渲染循环中调用。"
+      },
+      {
+        "signature": ".refreshContent(): void",
+        "description": "重建 DOM 内容结构。修改内部 HTML 或切换 transform 模式后调用。"
+      },
+      {
+        "signature": ".setOcclude(mode: OccludeMode): this",
+        "description": "运行时切换遮挡模式。链式调用。"
+      },
+      {
+        "signature": ".setDistanceFactor(factor: number): this",
+        "description": "设置距离缩放因子。链式调用。"
+      },
+      {
+        "signature": ".setWrapperClass(className: string): this",
+        "description": "设置包裹元素 CSS 类名。链式调用。"
+      },
+      {
+        "signature": ".setClassName(className: string): this",
+        "description": "设置内容元素 CSS 类名。链式调用。"
+      },
+      {
+        "signature": ".setStyle(style: Partial<CSSStyleDeclaration> | string): this",
+        "description": "设置内容元素行内样式。链式调用。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有资源：从 DOM 移除 HTML 元素、恢复 canvas 样式、释放遮挡网格 GPU 资源、清空子对象。"
+      }
+    ],
+    "examples": [
+      "import { Html } from '@a3d/a3d-components/core';\n\n// ── 基础标签 ──\nconst label = new Html({ center: true });\nlabel.position.set(0, 2, 0);\nlabel.element.innerHTML = '<div style=\"background:#fff;padding:8px 16px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.15)\">Hello 3D!</div>';\nscene.add(label);\n\n// ── 带距离缩放 ──\nconst info = new Html({\n  distanceFactor: 10,\n  center: true,\n  style: 'background:rgba(0,0,0,.75);color:#fff;padding:10px;border-radius:6px;',\n});\ninfo.position.set(1, 1.5, -1);\ninfo.element.innerHTML = '距离缩放标签';\nscene.add(info);\n\n// ── CSS3D 变换模式 ──\nconst panel = new Html({\n  transform: true,\n  distanceFactor: 10,\n});\npanel.position.set(0, 1.2, -3);\npanel.element.innerHTML = '<div style=\"width:300px;background:white;padding:20px\">3D 面板</div>';\nscene.add(panel);\n\n// ── 射线遮挡 ──\nconst occluded = new Html({\n  center: true,\n  occlude: 'raycast',\n  onOcclude: (hidden) => console.log('遮挡状态:', hidden),\n});\noccluded.position.set(0, 0.5, 0);\nscene.add(occluded);\n\n// ── 渲染循环 ──\nfunction animate() {\n  requestAnimationFrame(animate);\n  const delta = clock.getDelta();\n  label.update(delta, camera, renderer);\n  info.update(delta, camera, renderer);\n  panel.update(delta, camera, renderer);\n  occluded.update(delta, camera, renderer);\n  renderer.render(scene, camera);\n}\n\n// ── 清理 ──\nlabel.dispose();\ninfo.dispose();"
+    ]
+  },
+  {
+    "name": "InstancedMesh2",
+    "summary": "高性能实例化渲染器。基于间接实例化（Indirect Instancing）架构，通过 instanceIndex 属性索引 DataTexture 中的逐实例矩阵、颜色、骨骼和自定义 Uniform，实现零缓冲区重分配的逐实例视锥裁剪、LOD 切换与部分 GPU 更新。内置 BVH 空间索引加速视锥裁剪、射线检测与 LOD 距离判定；支持逐实例骨骼动画、变形目标与自定义 Uniform。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Mesh",
+    "constructor": "new InstancedMesh2<TData, TGeometry, TMaterial>(geometry, material, params?, LOD?)",
+    "options": [
+      {
+        "name": "capacity",
+        "type": "number",
+        "default": "1000",
+        "description": "缓冲区最大容量（实例数），超出时自动扩容"
+      },
+      {
+        "name": "createEntities",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否创建 instances 实体数组，开启后可通过 InstancedEntity 逐实例操作 position / rotation / scale"
+      },
+      {
+        "name": "allowsEuler",
+        "type": "boolean",
+        "default": "false",
+        "description": "允许 InstancedEntity.rotation（Euler），与 quaternion 双向同步"
+      },
+      {
+        "name": "renderer",
+        "type": "WebGLRenderer",
+        "default": "—",
+        "description": "若提供则立即初始化缓冲区；否则延迟到首次渲染"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [
+      {
+        "name": "count",
+        "type": "number",
+        "description": "上一帧实际渲染的实例数（只读）"
+      },
+      {
+        "name": "capacity",
+        "type": "number",
+        "description": "缓冲区容量（只读）"
+      },
+      {
+        "name": "instancesCount",
+        "type": "number",
+        "description": "当前活跃实例数（只读）"
+      },
+      {
+        "name": "instances",
+        "type": "Entity<TData>[] | null",
+        "description": "逐实例实体数组（仅 createEntities: true 时可用）"
+      },
+      {
+        "name": "instanceIndex",
+        "type": "GLInstancedBufferAttribute | null",
+        "description": "实例索引属性"
+      },
+      {
+        "name": "matricesTexture",
+        "type": "SquareDataTexture",
+        "description": "逐实例 4×4 变换矩阵纹理"
+      },
+      {
+        "name": "colorsTexture",
+        "type": "SquareDataTexture | null",
+        "description": "逐实例 RGBA 颜色纹理（懒创建）"
+      },
+      {
+        "name": "boneTexture",
+        "type": "SquareDataTexture | null",
+        "description": "逐实例骨骼矩阵纹理"
+      },
+      {
+        "name": "uniformsTexture",
+        "type": "SquareDataTexture | null",
+        "description": "逐实例自定义 Uniform 纹理"
+      },
+      {
+        "name": "bvh",
+        "type": "InstancedMeshBVH | null",
+        "description": "BVH 空间索引"
+      },
+      {
+        "name": "LODinfo",
+        "type": "LODInfo | null",
+        "description": "LOD 管理数据"
+      },
+      {
+        "name": "perObjectFrustumCulled",
+        "type": "boolean",
+        "description": "逐实例视锥裁剪（默认 true）"
+      },
+      {
+        "name": "sortObjects",
+        "type": "boolean",
+        "description": "渲染前按深度排序（默认 false）"
+      },
+      {
+        "name": "customSort",
+        "type": "CustomSortCallback | null",
+        "description": "自定义排序函数"
+      },
+      {
+        "name": "raycastOnlyFrustum",
+        "type": "boolean",
+        "description": "射线检测仅对视锥内实例生效（默认 false）"
+      },
+      {
+        "name": "autoUpdate",
+        "type": "boolean",
+        "description": "渲染前自动执行视锥裁剪（默认 true）"
+      },
+      {
+        "name": "autoUpdateBVH",
+        "type": "boolean",
+        "description": "矩阵变更时自动更新 BVH（默认 true）"
+      },
+      {
+        "name": "onFrustumEnter",
+        "type": "OnFrustumEnterCallback | null",
+        "description": "实例进入视锥时的回调"
+      },
+      {
+        "name": "skeleton",
+        "type": "Skeleton | null",
+        "description": "逐实例骨骼动画骨架"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".addInstances(count: number, onCreation?: UpdateEntityCallback): this",
+        "description": "添加实例。可选回调初始化每个新实例的位置/颜色等。返回 this 支持链式调用。"
+      },
+      {
+        "signature": ".removeInstances(...ids: number[]): this",
+        "description": "按 ID 移除实例。ID 被回收复用。"
+      },
+      {
+        "signature": ".clearInstances(): this",
+        "description": "清除所有实例。"
+      },
+      {
+        "signature": ".updateInstances(onUpdate: UpdateEntityCallback): this",
+        "description": "遍历所有活跃实例，调用回调后更新矩阵（position + quaternion + scale）。"
+      },
+      {
+        "signature": ".updateInstancesPosition(onUpdate: UpdateEntityCallback): this",
+        "description": "同上，但仅更新位置（更快，适合纯位移场景）。"
+      },
+      {
+        "signature": ".resizeBuffers(capacity: number): this",
+        "description": "手动调整缓冲区容量。"
+      },
+      {
+        "signature": ".setMatrixAt(id: number, matrix: Matrix4): void",
+        "description": "设置指定实例的变换矩阵。"
+      },
+      {
+        "signature": ".getMatrixAt(id: number, matrix?: Matrix4): Matrix4",
+        "description": "获取指定实例的变换矩阵。"
+      },
+      {
+        "signature": ".getPositionAt(index: number, target?: Vector3): Vector3",
+        "description": "从矩阵中提取实例位置。"
+      },
+      {
+        "signature": ".setVisibilityAt(id: number, visible: boolean): void",
+        "description": "设置实例可见性。"
+      },
+      {
+        "signature": ".getVisibilityAt(id: number): boolean",
+        "description": "获取实例可见性。"
+      },
+      {
+        "signature": ".setActiveAt(id: number, active: boolean): void",
+        "description": "设置实例激活状态（非激活实例不参与裁剪和渲染）。"
+      },
+      {
+        "signature": ".getActiveAt(id: number): boolean",
+        "description": "获取实例激活状态。"
+      },
+      {
+        "signature": ".setColorAt(id: number, color: Color): void",
+        "description": "设置逐实例颜色（首次调用时自动创建 colorsTexture）。"
+      },
+      {
+        "signature": ".getColorAt(id: number, color?: Color): Color",
+        "description": "获取逐实例颜色。"
+      },
+      {
+        "signature": ".setOpacityAt(id: number, value: number): void",
+        "description": "设置逐实例透明度（启用 USE_COLOR_ALPHA 宏）。"
+      },
+      {
+        "signature": ".getOpacityAt(id: number): number",
+        "description": "获取逐实例透明度。"
+      },
+      {
+        "signature": ".computeBVH(config?: BVHParams): void",
+        "description": "创建并计算 BVH 空间索引，加速视锥裁剪、射线检测和 LOD 距离判定。"
+      },
+      {
+        "signature": ".disposeBVH(): void",
+        "description": "销毁 BVH。"
+      },
+      {
+        "signature": ".setFirstLODDistance(distance: number): this",
+        "description": "初始化 LOD 系统，设置 LOD0（基础网格）的切换距离。必须在 addLOD 之前调用。"
+      },
+      {
+        "signature": ".addLOD(geometry: BufferGeometry, material: Material, distance?: number, hysteresis?: number): this",
+        "description": "添加渲染 LOD 级别。每个级别创建一个共享数据纹理的子 InstancedMesh2。distance 为距离阈值（内部取平方），hysteresis 为滞后因子（0-1~1，防止 LOD 抖动）。"
+      },
+      {
+        "signature": ".addShadowLOD(geometry: BufferGeometry, distance?: number, hysteresis?: number): this",
+        "description": "添加阴影专用 LOD 级别（castShadow = true）。"
+      },
+      {
+        "signature": ".updateLOD(levelIndex: number, distance?: number, hysteresis?: number): this",
+        "description": "更新指定渲染 LOD 级别的参数（不可修改 LOD0）。"
+      },
+      {
+        "signature": ".updateAllLOD(distances?: number[], hysteresis?: number): this",
+        "description": "批量更新所有渲染 LOD 距离/滞后。"
+      },
+      {
+        "signature": ".removeLOD(levelIndex: number, removeObject?: boolean): this",
+        "description": "移除 LOD 级别（LOD0 存在时不可移除）。"
+      },
+      {
+        "signature": ".initSkeleton(skeleton: Skeleton, disableMatrixAutoUpdate?: boolean): void",
+        "description": "初始化逐实例骨骼动画。创建 boneTexture，默认禁用骨骼的 matrixAutoUpdate 以提升性能。"
+      },
+      {
+        "signature": ".setBonesAt(id: number, updateBonesMatrices?: boolean, excludeBonesSet?: Set<string>): void",
+        "description": "设置指定实例的骨骼矩阵。可排除特定骨骼不更新。"
+      },
+      {
+        "signature": ".initUniformsPerInstance(schema: UniformSchemaShader): void",
+        "description": "初始化逐实例 Uniform 系统。schema 格式为 { vertex?: { name: UniformType }, fragment?: { name: UniformType } }，类型支持 'float'、'vec2'、'vec3'、'vec4'、'mat3'、'mat4'。"
+      },
+      {
+        "signature": ".setUniformAt(id: number, name: string, value: UniformValue): void",
+        "description": "设置指定实例的 Uniform 值。"
+      },
+      {
+        "signature": ".getUniformAt(id: number, name: string, target?: UniformValueObj): UniformValue",
+        "description": "获取指定实例的 Uniform 值。"
+      },
+      {
+        "signature": ".setMorphAt(id: number, object: Mesh): void",
+        "description": "设置指定实例的变形目标权重。"
+      },
+      {
+        "signature": ".getMorphAt(id: number, object?: Mesh): Mesh",
+        "description": "获取指定实例的变形目标权重。"
+      },
+      {
+        "signature": ".performFrustumCulling(camera: Camera, cameraLOD?: Camera): void",
+        "description": "手动执行视锥裁剪。若存在 LOD 信息，自动使用 LOD 感知裁剪。cameraLOD 为 LOD 距离计算用的相机（默认与渲染相机相同）。"
+      },
+      {
+        "signature": ".raycast(raycaster: Raycaster, result: Intersection[]): void",
+        "description": "重写 Mesh.raycast，支持 BVH 加速和逐实例命中。命中结果包含 instanceId。"
+      },
+      {
+        "signature": ".computeBoundingBox(): void",
+        "description": "从所有活跃实例计算包围盒。"
+      },
+      {
+        "signature": ".computeBoundingSphere(): void",
+        "description": "从所有活跃实例计算包围球。"
+      },
+      {
+        "signature": ".clone(recursive?: boolean): this",
+        "description": "克隆，保留相同参数。"
+      },
+      {
+        "signature": ".copy(source: InstancedMesh2, recursive?: boolean): this",
+        "description": "深拷贝纹理和状态。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有纹理和 GPU 资源。"
+      }
+    ],
+    "examples": [
+      "import { InstancedMesh2 } from '@a3d/a3d-components/core';\nimport * as THREE from 'three';\n\n// 基础用法：创建 5000 个实例\nconst mesh = new InstancedMesh2(\n  new THREE.BoxGeometry(1, 1, 1),\n  new THREE.MeshStandardMaterial({ color: 0x44aa88 }),\n  { capacity: 5000, createEntities: true, allowsEuler: true },\n);\n\nmesh.addInstances(5000, (obj, i) => {\n  obj.position.set(Math.random() * 100 - 50, 0, Math.random() * 100 - 50);\n  obj.rotation.y = Math.random() * Math.PI * 2;\n  obj.updateMatrix();\n});\nscene.add(mesh);\n\n// 启用 BVH 加速视锥裁剪\nmesh.computeBVH({ getBBoxFromBSphere: true });\n\n// LOD：4 级细节，距离越远越简化\nmesh.setFirstLODDistance(0);\nmesh.addLOD(geoL1, matL1, 15);   // 15 单位内用 L1\nmesh.addLOD(geoL2, matL2, 40);   // 40 单位内用 L2\nmesh.addLOD(geoL3, matL3, 80);   // 80 单位内用 L3\n\n// 逐实例颜色\nmesh.setColorAt(0, new THREE.Color('red'));\n\n// 逐实例自定义 Uniform\nmesh.initUniformsPerInstance({\n  vertex: { windStrength: 'float', windDir: 'vec2' },\n});\nmesh.setUniformAt(0, 'windStrength', 0.8);\nmesh.setUniformAt(0, 'windDir', new THREE.Vector2(1, 0));"
+    ]
+  },
+  {
+    "name": "Outlines",
+    "summary": "描边（轮廓）组件。取父级 Mesh 的几何体，按折痕角度分裂法线后生成一个背面渲染的描边网格，在顶点着色器里沿法线把几何外扩 thickness，再叠回父级之下，形成轮廓描边效果。支持普通 Mesh、SkinnedMesh（绑定骨架）、InstancedMesh（复用实例矩阵）。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Outlines(options: OutlinesOptions)",
+    "options": [
+      {
+        "name": "mesh",
+        "type": "Mesh | SkinnedMesh | InstancedMesh",
+        "default": "—",
+        "description": "必填。要描边的父级网格"
+      },
+      {
+        "name": "color",
+        "type": "ColorRepresentation",
+        "default": "'black'",
+        "description": "描边颜色"
+      },
+      {
+        "name": "opacity",
+        "type": "number",
+        "default": "1",
+        "description": "描边不透明度"
+      },
+      {
+        "name": "transparent",
+        "type": "boolean",
+        "default": "false",
+        "description": "描边是否透明"
+      },
+      {
+        "name": "screenspace",
+        "type": "boolean",
+        "default": "false",
+        "description": "线宽是否与缩放无关（屏幕空间恒定）。true = 沿世界法线偏移，与摄像机距离无关；false = 在裁剪空间沿投影法线偏移，近处粗、远处细（体积感更自然）"
+      },
+      {
+        "name": "thickness",
+        "type": "number",
+        "default": "0.05",
+        "description": "描边线宽"
+      },
+      {
+        "name": "angle",
+        "type": "number",
+        "default": "Math.PI",
+        "description": "几何折痕角度（弧度）。0 = 不分裂、直接复用父级法线；Math.PI = 在每个硬边处分裂法线，使描边沿轮廓外扩、平面区域不被描边"
+      },
+      {
+        "name": "renderOrder",
+        "type": "number",
+        "default": "0",
+        "description": "渲染顺序"
+      },
+      {
+        "name": "polygonOffset",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否启用多边形偏移（避免与父级表面 Z-fighting）"
+      },
+      {
+        "name": "polygonOffsetFactor",
+        "type": "number",
+        "default": "0",
+        "description": "多边形偏移因子"
+      },
+      {
+        "name": "toneMapped",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否参与色调映射"
+      },
+      {
+        "name": "clippingPlanes",
+        "type": "THREE.Plane[]",
+        "default": "—",
+        "description": "裁剪平面列表"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".attachRenderer(renderer: THREE.WebGLRenderer): void",
+        "description": "绑定渲染器以读取绘图缓冲尺寸（screenspace 偏移归一化用），并监听 canvas resize。仅在 screenspace = true 时有必要调用；不传则 size 默认为 1×1。"
+      },
+      {
+        "signature": ".setAngle(angle: number): void",
+        "description": "变更折痕角度并重建描边网格（仅当与当前值不同时才重建）。0 = 不分裂法线。"
+      },
+      {
+        "signature": ".refresh(): void",
+        "description": "父级几何体被替换后，调用此方法重建描边（旧的自建几何体会被释放）。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放描边几何体与材质，并断开 resize 监听。不会触碰父级网格的资源（几何体 / 材质由父级自行管理）。"
+      }
+    ],
+    "examples": [
+      "import { Outlines } from '@a3d/a3d-components/core';\n\n// 给一个普通网格加描边\nconst mesh = new THREE.Mesh(geometry, material);\nconst outline = new Outlines({ mesh, color: 'red', thickness: 0.05 });\nmesh.add(outline); // 描边作为 mesh 的子级，自动跟随变换 / 骨架\nscene.add(mesh);\n\n// 屏幕空间恒定线宽（卡通描边风格）\nconst toon = new Outlines({\n  mesh, color: 'black', thickness: 0.01, screenspace: true,\n});\ntoon.attachRenderer(renderer); // 让组件读取画布尺寸做归一化\nmesh.add(toon);\n\n// 切换折痕角度（运行时重建）\noutline.setAngle(Math.PI / 4);"
+    ]
+  },
+  {
+    "name": "Path",
+    "summary": "路径绘制组件。把一组 3D 顶点先经「直线段 + 二次贝塞尔圆角」构造曲线，再经 Frenet 标架采样，最后扫掠成管道（tube）或扁平带（plane）两种几何体。适合管线、电路走线、路网导航带、3D 路径动画轨道等场景。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Path(options: PathOptions)",
+    "options": [
+      {
+        "name": "paths",
+        "type": "PathData[]",
+        "default": "—",
+        "description": "必填。一组路径数据，每个元素生成一条管道或扁平带"
+      },
+      {
+        "name": "material",
+        "type": "THREE.Material",
+        "default": "—",
+        "description": "共享材质（所有路径复用）。不传则使用默认 MeshStandardMaterial（dispose() 时一并释放）"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()"
+      },
+      {
+        "name": "flow",
+        "type": "FlowOptions",
+        "default": "—",
+        "description": "流光效果配置。开启后一条带拖尾的高亮光带贯穿整组 paths（从第一条流向最后一条）。流光材质由组件 clone 生成并独立释放"
+      }
+    ],
+    "dataTypes": [
+      {
+        "name": "FlowOptions",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "default": "false",
+            "description": "是否开启流光"
+          },
+          {
+            "name": "color",
+            "type": "ColorRepresentation",
+            "default": "0xffffff",
+            "description": "流光颜色"
+          },
+          {
+            "name": "speed",
+            "type": "number",
+            "default": "1",
+            "description": "流动速度（全局圈/秒）"
+          },
+          {
+            "name": "direction",
+            "type": "1 | -1",
+            "default": "1",
+            "description": "流动方向：1 = 第一条 → 最后一条，-1 = 反向"
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "default": "0.25",
+            "description": "光头亮带占流光总长度的比例（0-1，越大光头越宽、拖尾越短）"
+          },
+          {
+            "name": "tailLength",
+            "type": "number",
+            "default": "0.4",
+            "description": "流光总长度（归一化到全局 [0,1]）；光头与拖尾按 width 比例分配，长度变化时拖尾始终可见"
+          },
+          {
+            "name": "intensity",
+            "type": "number",
+            "default": "2",
+            "description": "流光强度（emissive 叠加倍率，可 >1 求 HDR 发光）"
+          },
+          {
+            "name": "repeat",
+            "type": "number",
+            "default": "1",
+            "description": "全局流光个数（沿整组 paths 等间距分布）"
+          }
+        ]
+      },
+      {
+        "name": "PathData",
+        "fields": [
+          {
+            "name": "path",
+            "type": "[number, number, number][]",
+            "default": "—",
+            "description": "必填。路径顶点（3D）。相邻重复点自动去重；少于 2 个有效点时该条跳过"
+          },
+          {
+            "name": "mode",
+            "type": "'tube' | 'plane'",
+            "default": "'tube'",
+            "description": "生成模式：'tube' = 圆管扫掠；'plane' = 扁平带状面"
+          },
+          {
+            "name": "bevelRadius",
+            "type": "number",
+            "default": "0",
+            "description": "拐角圆角半径。> 0 时拐角用二次贝塞尔曲线倒圆角；0 时为纯折线（直角拐角）"
+          },
+          {
+            "name": "close",
+            "type": "boolean",
+            "default": "false",
+            "description": "路径是否自动闭合（首尾相连成环，需 ≥ 3 个顶点）"
+          },
+          {
+            "name": "up",
+            "type": "[number, number, number]",
+            "default": "—",
+            "description": "up 向量，决定标架法向（进而决定平面带朝向与管道截面起始朝向）。不传则用 Frenet 自动选取（与 three.js TubeGeometry 一致）"
+          },
+          {
+            "name": "divisions",
+            "type": "number",
+            "default": "12",
+            "description": "非直线段（贝塞尔曲线）的采样分段数"
+          },
+          {
+            "name": "uvMode",
+            "type": "'repeat' | 'stretch'",
+            "default": "'repeat'",
+            "description": "贴图沿路径方向的映射：'repeat' = 按物理长度平铺（u = 弧长 / 截面周长或带宽，配合 RepeatWrapping 可重复贴图）；'stretch' = 一张贴图从头铺到尾（u 归一化到 [0,1]）"
+          },
+          {
+            "name": "radius",
+            "type": "number",
+            "default": "0.1",
+            "description": "管道半径（≤ 0 时该条跳过）"
+          },
+          {
+            "name": "radialSegments",
+            "type": "number",
+            "default": "8",
+            "description": "圆周分段数（越大越圆滑，最小 2）"
+          },
+          {
+            "name": "startRad",
+            "type": "number",
+            "default": "0",
+            "description": "截面起始角偏移（弧度）"
+          },
+          {
+            "name": "generateStartCap",
+            "type": "boolean",
+            "default": "false",
+            "description": "是否生成起点封盖（需 radialSegments ≥ 3）"
+          },
+          {
+            "name": "generateEndCap",
+            "type": "boolean",
+            "default": "false",
+            "description": "是否生成终点封盖（需 radialSegments ≥ 3）"
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "default": "0.1",
+            "description": "带宽（≤ 0 时该条跳过）"
+          },
+          {
+            "name": "side",
+            "type": "'both' | 'left' | 'right'",
+            "default": "'both'",
+            "description": "带相对中心线的偏侧：'both' 居中、'left' / 'right' 仅一侧"
+          },
+          {
+            "name": "sharp",
+            "type": "boolean",
+            "default": "false",
+            "description": "是否在锐角拐角做几何修补（避免带面撕裂）"
+          },
+          {
+            "name": "arrow",
+            "type": "boolean",
+            "default": "false",
+            "description": "末端是否生成箭头"
+          }
+        ]
+      }
+    ],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有路径几何体与流光资源；若材质由本组件创建则一并释放（外部传入的 material 不会被释放）。"
+      },
+      {
+        "signature": ".setFlowColor(color): this · .setFlowSpeed(speed): this · .setFlowDirection(direction): this · .setFlowIntensity(intensity): this",
+        "description": "运行时调整流光外观（链式）。颜色/强度改共享 uniform 即时生效；速度/方向改内部相位推进。"
+      },
+      {
+        "signature": ".setFlowWidth(width): this · .setFlowTailLength(tailLength): this · .setFlowRepeat(repeat): this",
+        "description": "运行时调整光头宽度、拖尾长度、流光个数（链式）。"
+      },
+      {
+        "signature": ".startFlow(): this · .stopFlow(): this",
+        "description": "开始/恢复、暂停流光动画。构造时若 flow.enabled 为真会自动 startFlow()。"
+      }
+    ],
+    "examples": [
+      "import { Path } from '@a3d/a3d-components/core';\n\n// 3D 折线 → 圆管（拐角倒圆角 + 起终点封盖）\nconst tube = new Path({\n  paths: [{\n    path: [[0,0,0],[3,0,0],[3,3,0],[0,3,0]],\n    mode: 'tube', bevelRadius: 0.5, radius: 0.15,\n    generateStartCap: true, generateEndCap: true,\n  }],\n});\nscene.add(tube);\n\n// 2D 折线 → 扁平带（锐角修补 + 末端箭头）\nconst route = new Path({\n  paths: [{\n    path: [[0,0,0],[3,0,0],[3,0,3],[0,0,3]],\n    mode: 'plane', bevelRadius: 0, width: 0.5,\n    side: 'both', sharp: true, arrow: true, up: [0,1,0],\n  }],\n});\nscene.add(route);\n\n// 闭合环形管道（首尾自动相连，标架同步）\nconst ring = new Path({\n  paths: [{\n    path: [[2,0,0],[0,0,2],[-2,0,0],[0,0,-2]],\n    mode: 'tube', close: true, radius: 0.1, radialSegments: 12,\n  }],\n});\nscene.add(ring);\n\n// 带流光的管道（青色光带 + 拖尾，从起点流向终点）\nconst flow = new Path({\n  paths: [{\n    path: [[0,0,0],[3,0,0],[3,0,3],[0,0,3]],\n    mode: 'tube', bevelRadius: 0.4, radius: 0.12,\n  }],\n  flow: { enabled: true, color: 0x00ffff, speed: 0.5, tailLength: 0.5, intensity: 2.5 },\n});\nscene.add(flow);\n// 运行时调整：flow.setFlowDirection(-1).setFlowRepeat(3);"
+    ]
+  },
+  {
+    "name": "Shape",
+    "summary": "异形面绘制组件。接收 XZ 平面上的轮廓点，挤出指定高度，生成带圆角拐角的实心几何体。轮廓总是闭合（首尾自动相连）。适合台面、地板异形区域、建筑平台等场景。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Shape(options: ShapeOptions)",
+    "options": [
+      {
+        "name": "shapes",
+        "type": "ShapeData[]",
+        "default": "—",
+        "description": "必填。一组异形面数据，每个元素生成一个挤出几何体"
+      },
+      {
+        "name": "material",
+        "type": "THREE.Material",
+        "default": "—",
+        "description": "共享材质（所有异形面复用）。不传则使用默认 MeshStandardMaterial"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()"
+      }
+    ],
+    "dataTypes": [
+      {
+        "name": "ShapeData",
+        "fields": [
+          {
+            "name": "path",
+            "type": "[number, number, number][]",
+            "default": "—",
+            "description": "XZ 平面轮廓点 [x, y, z]（y 被忽略），首尾自动闭合。至少 3 个点"
+          },
+          {
+            "name": "height",
+            "type": "number",
+            "default": "—",
+            "description": "挤出高度（沿 Y 轴）"
+          },
+          {
+            "name": "radius",
+            "type": "number | (number | undefined)[]",
+            "default": "0",
+            "description": "拐角圆角半径。数值 ⇒ 所有拐角统一；数组 ⇒ 按 path 顶点索引逐拐角指定，undefined 回退到全局值"
+          },
+          {
+            "name": "radiusSegments",
+            "type": "number",
+            "default": "8",
+            "description": "圆角分段数（越大越圆滑）"
+          },
+          {
+            "name": "uvMode",
+            "type": "'repeat' | 'stretch'",
+            "default": "'repeat'",
+            "description": "UV 映射方式：'repeat' = 按米平铺，'stretch' = 一张贴图铺满"
+          }
+        ]
+      }
+    ],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有异形面几何体；若材质由本组件创建则一并释放（外部传入的 material 不会被释放）。"
+      }
+    ],
+    "examples": [
+      "import { Shape } from '@a3d/a3d-components/core';\n\n// L 形异形台面，统一圆角\nconst shape = new Shape({\n  shapes: [{\n    path: [[0,0,0], [4,0,0], [4,0,2], [2,0,2], [2,0,5], [0,0,5]],\n    height: 0.6,\n    radius: 0.3,\n    radiusSegments: 12,\n    uvMode: 'repeat',\n  }],\n});\nscene.add(shape);\n\n// 混合圆角：第 0、3 个拐角 0.5，其余用全局值 0\nconst shape2 = new Shape({\n  shapes: [{\n    path: [[0,0,0], [3,0,0], [3,0,3], [0,0,3]],\n    height: 0.4,\n    radius: [0.5, undefined, undefined, 0.5],\n    radiusSegments: 12,\n  }],\n});\nscene.add(shape2);"
+    ]
+  },
+  {
+    "name": "Sky",
+    "summary": "天空穹顶。基于内翻球体（BackSide）+ 着色器实现，通过从地平线到天顶的幂次渐变模拟天空大气效果。球体始终从内部可见，相机应位于球体内部。天顶与地平线颜色可独立配置，渐变指数与偏移量可灵活调整渐变曲线。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Mesh",
+    "constructor": "new Sky(options?: SkyOptions)",
+    "options": [
+      {
+        "name": "size",
+        "type": "number",
+        "default": "1000",
+        "description": "天空球半径（世界单位），应足够大以包围场景但不超过相机远裁剪面"
+      },
+      {
+        "name": "topColor",
+        "type": "ColorRepresentation",
+        "default": "0x109df4",
+        "description": "天顶颜色（球体最高处的颜色），天蓝"
+      },
+      {
+        "name": "bottomColor",
+        "type": "ColorRepresentation",
+        "default": "0xf5f5f5",
+        "description": "地平线 / 底部颜色，浅灰白"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": "0",
+        "description": "世界坐标偏移量，增大使渐变整体上移，地平线附近更偏 bottomColor"
+      },
+      {
+        "name": "exponent",
+        "type": "number",
+        "default": "0.6",
+        "description": "渐变指数，值越大过渡越陡峭（天顶色区域更集中），值越小过渡越平缓"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".setColors(top: ColorRepresentation, bottom: ColorRepresentation): this",
+        "description": "同时设置天顶与地平线颜色。链式调用。"
+      },
+      {
+        "signature": ".setTopColor(color: ColorRepresentation): this",
+        "description": "设置天顶颜色（hex / CSS 字符串 / THREE.Color）。链式调用。"
+      },
+      {
+        "signature": ".setBottomColor(color: ColorRepresentation): this",
+        "description": "设置地平线 / 底部颜色。链式调用。"
+      },
+      {
+        "signature": ".setOffset(value: number): this",
+        "description": "设置世界坐标偏移量。增大该值使渐变整体上移。链式调用。"
+      },
+      {
+        "signature": ".setExponent(value: number): this",
+        "description": "设置渐变指数。值越大天顶色区域越集中，值越小过渡越平缓。链式调用。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放 geometry 与 material。"
+      }
+    ],
+    "examples": [
+      "import { Sky } from '@a3d/a3d-components/core';\n\n// 天空穹顶\nconst sky = new Sky({\n  size: 500,\n  topColor: 0x109df4,\n  bottomColor: 0xf5f5f5,\n  offset: 0,\n  exponent: 0.6,\n});\nscene.add(sky);\n\n// 运行时调整颜色（所有 setter 链式调用）\nsky.setTopColor(0x1a8af4).setBottomColor(0xe0e0e0);\nsky.setOffset(10).setExponent(0.8);\n\n// 同时设置天顶与地平线颜色\nsky.setColors(0x109df4, 0xf5f5f5);"
+    ]
+  },
+  {
+    "name": "Wall",
+    "summary": "墙体绘制组件。接收一组墙体数据，为每面墙生成带圆角拐角、可选墙洞的挤出几何体。路径定义在 XZ 平面（y 被忽略），墙体从 y = 0 向上生长。适合建筑户型、园区围栏、室内隔墙等场景。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Wall(options: WallOptions)",
+    "options": [
+      {
+        "name": "walls",
+        "type": "WallData[]",
+        "default": "—",
+        "description": "必填。一组墙体数据，每个元素绘制一面墙"
+      },
+      {
+        "name": "material",
+        "type": "THREE.Material",
+        "default": "—",
+        "description": "共享材质（所有墙体复用）。不传则使用默认 MeshStandardMaterial"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()"
+      }
+    ],
+    "dataTypes": [
+      {
+        "name": "WallData",
+        "fields": [
+          {
+            "name": "path",
+            "type": "[number, number, number][]",
+            "default": "—",
+            "description": "墙体中心线路径，XZ 平面坐标 [x, y, z]（y 被忽略）。路径定义走向，墙体按 width 向两侧加厚"
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "default": "—",
+            "description": "墙体厚度（向路径两侧各加厚 width / 2）"
+          },
+          {
+            "name": "height",
+            "type": "number",
+            "default": "—",
+            "description": "墙体高度（沿 Y 轴挤出）"
+          },
+          {
+            "name": "radius",
+            "type": "number | (number | undefined)[]",
+            "default": "0",
+            "description": "拐角圆角半径。数值 ⇒ 所有拐角统一（全局值）；数组 ⇒ 按 path 顶点索引逐拐角指定，undefined 回退到全局值。小于 width/2 的半径自动按直角处理"
+          },
+          {
+            "name": "radiusSegments",
+            "type": "number",
+            "default": "8",
+            "description": "圆角分段数（越大越圆滑）"
+          },
+          {
+            "name": "close",
+            "type": "boolean",
+            "default": "false",
+            "description": "首尾是否闭合（闭合时形成环形墙体）"
+          },
+          {
+            "name": "hole",
+            "type": "WallHole[]",
+            "default": "—",
+            "description": "墙洞（窗 / 门）列表，画在墙的立面上，按 segment 归属到对应墙段并贯通墙体厚度"
+          }
+        ]
+      },
+      {
+        "name": "WallHole",
+        "fields": [
+          {
+            "name": "segment",
+            "type": "number",
+            "default": "—",
+            "description": "所属墙段索引（段 i = path[i] → path[i+1]）"
+          },
+          {
+            "name": "path",
+            "type": "[number, number][]",
+            "default": "—",
+            "description": "轮廓，该段局部坐标 [x, y]：x = 沿直墙段距离（从段起点计），y = 高度（0 为墙底）。首尾自动闭合"
+          },
+          {
+            "name": "radius",
+            "type": "number",
+            "default": "0",
+            "description": "拐角圆角半径"
+          },
+          {
+            "name": "radiusSegments",
+            "type": "number",
+            "default": "8",
+            "description": "圆角分段数"
+          }
+        ]
+      }
+    ],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有墙体几何体；若材质由本组件创建则一并释放（外部传入的 material 不会被释放）。"
+      }
+    ],
+    "examples": [
+      "import { Wall } from '@a3d/a3d-components/core';\n\nconst wall = new Wall({\n  walls: [\n    {\n      // 闭合矩形房间，带圆角\n      path: [[0, 0, 0], [6, 0, 0], [6, 0, 5], [0, 0, 5]],\n      width: 0.25,\n      height: 3,\n      radius: 1,\n      radiusSegments: 16,\n      close: true,\n      hole: [\n        // 第 0 段（[0,0,0]→[6,0,0]）上的一扇门：沿墙 2~4m、高 0~2.1m\n        { segment: 0, path: [[2, 0], [4, 0], [4, 2.1], [2, 2.1]] },\n        // 第 1 段（[6,0,0]→[6,0,5]）上的一扇窗：沿墙 1.5~3.5m、离地 1~1.8m\n        { segment: 1, path: [[1.5, 1], [3.5, 1], [3.5, 1.8], [1.5, 1.8]], radius: 0.15 },\n      ],\n    },\n    {\n      // 开放隔墙，圆角拐角（首尾不闭合）\n      path: [[-2, 0, 8], [2, 0, 8], [2, 0, 11]],\n      width: 0.2,\n      height: 2.5,\n      radius: 0.8,\n    },\n  ],\n});\nscene.add(wall);"
+    ]
+  },
+  {
+    "name": "Wireframe",
+    "summary": "线框化组件。基于重心坐标（barycentric）在每个三角形内计算到三条边的最小距离，用 fwidth 抗锯齿画出线条；支持虚线、收窄、正反面不同色、半透明填充。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Wireframe(options: WireframeOptions)",
+    "options": [
+      {
+        "name": "mesh",
+        "type": "THREE.Mesh",
+        "default": "—",
+        "description": "必填。要线框化的父级网格"
+      },
+      {
+        "name": "stroke",
+        "type": "ColorRepresentation",
+        "default": "'#ff0000'",
+        "description": "线条（描边）颜色"
+      },
+      {
+        "name": "backfaceStroke",
+        "type": "ColorRepresentation",
+        "default": "'#0000ff'",
+        "description": "背面线条颜色（仅在 colorBackfaces 为真时用于背面）"
+      },
+      {
+        "name": "fill",
+        "type": "ColorRepresentation",
+        "default": "'#00ff00'",
+        "description": "填充颜色（三角形内部）"
+      },
+      {
+        "name": "strokeOpacity",
+        "type": "number",
+        "default": "1",
+        "description": "线条不透明度"
+      },
+      {
+        "name": "fillOpacity",
+        "type": "number",
+        "default": "0.25",
+        "description": "填充不透明度"
+      },
+      {
+        "name": "fillMix",
+        "type": "number",
+        "default": "0",
+        "description": "填充色与原材质 diffuse 的混合比例（仅 overrideMaterial 模式有效）。0 = 完全用 fill；1 = 完全用原材质漫反射色"
+      },
+      {
+        "name": "thickness",
+        "type": "number",
+        "default": "0.05",
+        "description": "线条粗细（0–1，经 map(0,1,0,0.34) 映射为实际像素厚度）"
+      },
+      {
+        "name": "colorBackfaces",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否给背面单独着色（用 backfaceStroke）"
+      },
+      {
+        "name": "dash",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否启用虚线"
+      },
+      {
+        "name": "dashInvert",
+        "type": "boolean",
+        "default": "true",
+        "description": "虚线是否反转（亮 / 暗段互换）"
+      },
+      {
+        "name": "dashRepeats",
+        "type": "number",
+        "default": "4",
+        "description": "虚线重复次数（每条边重复几段）"
+      },
+      {
+        "name": "dashLength",
+        "type": "number",
+        "default": "0.5",
+        "description": "虚线一段中「亮」的占比（0–1）"
+      },
+      {
+        "name": "squeeze",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否启用中间收窄（线条向段中心变细）"
+      },
+      {
+        "name": "squeezeMin",
+        "type": "number",
+        "default": "0.2",
+        "description": "收窄最小值"
+      },
+      {
+        "name": "squeezeMax",
+        "type": "number",
+        "default": "1",
+        "description": "收窄最大值"
+      },
+      {
+        "name": "renderOrder",
+        "type": "number",
+        "default": "0",
+        "description": "渲染顺序"
+      },
+      {
+        "name": "toneMapped",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否参与色调映射"
+      },
+      {
+        "name": "overrideMaterial",
+        "type": "boolean",
+        "default": "false",
+        "description": "是否覆盖父级材质（onBeforeCompile 注入），而非生成独立线框网格。true = 把线框融入原 PBR 渲染，适合「带光照的线框化模型」，此模式下 fillMix 生效"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".setUniform(key: keyof WireframeOptions, value: unknown): this",
+        "description": "运行时更新某个 uniform（链式）。key 如 'thickness'、'stroke'、'dash'；颜色项接受 ColorRepresentation。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放资源。独立模式：释放线框几何体副本与线框材质；覆盖模式：仅释放线框材质（uniform 容器），不还原父级材质 / 几何体（onBeforeCompile 注入无法安全撤销；如需还原请重建父级材质）。"
+      }
+    ],
+    "examples": [
+      "import { Wireframe } from '@a3d/a3d-components/core';\n\n// 独立线框（父级材质不受影响）\nconst mesh = new THREE.Mesh(geometry, standardMaterial);\nconst wf = new Wireframe({\n  mesh, stroke: '#ff0000', thickness: 0.1, dash: true,\n});\nmesh.add(wf); // 作为子级，自动跟随父级变换\nscene.add(mesh);\n\n// 带光照的线框模型（注入 PBR 材质）\nconst lit = new Wireframe({\n  mesh, overrideMaterial: true,\n  fillMix: 0.5,    // 一半原色 / 一半 fill\n  stroke: '#111111', fill: '#88ccff',\n});\nmesh.add(lit);\n\n// 运行时调参（链式）\nwf.setUniform('thickness', 0.2).setUniform('stroke', 'blue');"
+    ]
+  }
+]

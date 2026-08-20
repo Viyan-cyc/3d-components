@@ -1730,6 +1730,7 @@ export class BitmapText extends THREE.Mesh implements IDisposable {
    * Release all GPU resources (geometry, material, texture, font atlas).
    */
   dispose(): void {
+    void this._scale;
     this.geometry?.dispose();
     this.mat.dispose();
     (this.mat.uniforms.u_DiffuseMap.value as THREE.DataTexture).dispose();
