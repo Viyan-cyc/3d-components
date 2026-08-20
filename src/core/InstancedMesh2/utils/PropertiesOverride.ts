@@ -5,9 +5,9 @@ import type { MeshDistanceMaterial, WebGLRenderer } from 'three';
  * shader conflicts between `InstancedMesh` and `InstancedMesh2` sharing the same material.
  */
 
-let propertiesGetBase: (obj: unknown) => unknown = null as unknown as (obj: unknown) => unknown;
+let propertiesGetBase: (obj: unknown) => unknown = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let propertiesGet: WeakMap<any, () => unknown> = null as unknown as WeakMap<any, () => unknown>;
+let propertiesGet: WeakMap<any, () => unknown> = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const propertiesGetMap: { [x: string]: WeakMap<any, () => unknown> } = {};
 
@@ -24,8 +24,8 @@ const addProperties = (material: unknown): void => {
 
   propertiesGet.set(material, () => {
     if ((material as MeshDistanceMaterial).isMeshDistanceMaterial) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const base = propertiesGetBase(material) as { [x: string]: any };
+
+      const base = propertiesGetBase(material);
       materialProperties.light = base.light;
     }
 

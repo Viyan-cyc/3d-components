@@ -11,13 +11,11 @@ import {
   type DataTexture,
   DetachedBindMode,
   InstancedBufferAttribute,
-  type Intersection,
   type Material,
   Matrix4,
   Mesh,
   type Object3D,
   type Object3DEventMap,
-  type Raycaster,
   type Scene,
   type Skeleton,
   Sphere,
@@ -58,7 +56,6 @@ import {
 import { SquareDataTexture, type UniformValue, type UniformValueObj } from './utils/SquareDataTexture';
 import { getMorphAt, setMorphAt } from './feature/Morph';
 import {
-  type UniformSchemaShader,
   getUniformAt,
   initUniformsPerInstance,
   setUniformAt,
@@ -337,7 +334,7 @@ export class InstancedMesh2<
       return;
     }
 
-    this.instanceIndex!.update(this._renderer!, this.count);
+    this.instanceIndex.update(this._renderer, this.count);
     this.bindTextures(renderer, depthMaterial);
   }
 
@@ -368,7 +365,7 @@ export class InstancedMesh2<
       return;
     }
 
-    this.instanceIndex.update(this._renderer!, this.count);
+    this.instanceIndex.update(this._renderer, this.count);
     this.bindTextures(renderer, material);
   }
 
@@ -406,32 +403,32 @@ export class InstancedMesh2<
 
   /** Adds new instances. Optionally initializes them via callback. */
   public addInstances(count: number, onCreation?: UpdateEntityCallback<Entity<TData>>): this {
-    return addInstances.call(this, count, onCreation as UpdateEntityCallback) as unknown as this;
+    return addInstances.call(this, count, onCreation);
   }
 
   /** Removes instances by their ids. */
   public removeInstances(...ids: number[]): this {
-    return removeInstances.call(this, ...ids) as unknown as this;
+    return removeInstances.call(this, ...ids);
   }
 
   /** Clears all instances and resets count. */
   public clearInstances(): this {
-    return clearInstances.call(this) as unknown as this;
+    return clearInstances.call(this);
   }
 
   /** Updates instances by applying a callback to each. Calls `updateMatrix` for each. */
   public updateInstances(onUpdate: UpdateEntityCallback<Entity<TData>>): this {
-    return updateInstances.call(this, onUpdate as UpdateEntityCallback) as unknown as this;
+    return updateInstances.call(this, onUpdate);
   }
 
   /** Updates instances position only. Calls `updateMatrixPosition` for each. */
   public updateInstancesPosition(onUpdate: UpdateEntityCallback<Entity<TData>>): this {
-    return updateInstancesPosition.call(this, onUpdate as UpdateEntityCallback) as unknown as this;
+    return updateInstancesPosition.call(this, onUpdate);
   }
 
   /** Resizes internal buffers to accommodate the specified capacity. */
   public resizeBuffers(capacity: number): this {
-    return resizeBuffers.call(this, capacity) as unknown as this;
+    return resizeBuffers.call(this, capacity);
   }
 
   // ─── BVH ──────────────────────────────────────────────────────────
@@ -594,16 +591,16 @@ export class InstancedMesh2<
     }
 
     if ((color as Color).isColor) {
-      (color as Color).toArray(this.colorsTexture!._data, id * COLOR_ELEMENTS);
+      (color as Color).toArray(this.colorsTexture._data, id * COLOR_ELEMENTS);
     } else {
-      tempCol.set(color).toArray(this.colorsTexture!._data, id * COLOR_ELEMENTS);
+      tempCol.set(color).toArray(this.colorsTexture._data, id * COLOR_ELEMENTS);
     }
 
-    this.colorsTexture!.enqueueUpdate(id);
+    this.colorsTexture.enqueueUpdate(id);
   }
 
   public getColorAt(id: number, color = tempCol): Color {
-    return color.fromArray(this.colorsTexture!._data, id * COLOR_ELEMENTS);
+    return color.fromArray(this.colorsTexture._data, id * COLOR_ELEMENTS);
   }
 
   public setOpacityAt(id: number, value: number): void {
@@ -616,15 +613,15 @@ export class InstancedMesh2<
       this._useOpacity = true;
     }
 
-    this.colorsTexture!._data[id * COLOR_ELEMENTS + ALPHA_OFFSET] = value;
-    this.colorsTexture!.enqueueUpdate(id);
+    this.colorsTexture._data[id * COLOR_ELEMENTS + ALPHA_OFFSET] = value;
+    this.colorsTexture.enqueueUpdate(id);
   }
 
   public getOpacityAt(id: number): number {
     if (!this._useOpacity) {
       return 1;
     }
-    return this.colorsTexture!._data[id * COLOR_ELEMENTS + ALPHA_OFFSET];
+    return this.colorsTexture._data[id * COLOR_ELEMENTS + ALPHA_OFFSET];
   }
 
   // ─── Copy To ──────────────────────────────────────────────────────
@@ -644,7 +641,7 @@ export class InstancedMesh2<
       geometry.computeBoundingBox();
     }
 
-    const geoBoundingBox = geometry.boundingBox!;
+    const geoBoundingBox = geometry.boundingBox;
     const boundingBox = this.boundingBox;
     boundingBox.makeEmpty();
 
@@ -667,7 +664,7 @@ export class InstancedMesh2<
       geometry.computeBoundingSphere();
     }
 
-    const geoBoundingSphere = geometry.boundingSphere!;
+    const geoBoundingSphere = geometry.boundingSphere;
     const boundingSphere = this.boundingSphere;
     boundingSphere.makeEmpty();
 
@@ -684,7 +681,7 @@ export class InstancedMesh2<
   // ─── LOD ──────────────────────────────────────────────────────────
 
   public setFirstLODDistance(distance: number): this {
-    return setFirstLODDistance.call(this, distance) as unknown as this;
+    return setFirstLODDistance.call(this, distance);
   }
 
   public addLOD(
@@ -693,31 +690,31 @@ export class InstancedMesh2<
     distance?: number,
     hysteresis?: number,
   ): this {
-    return addLOD.call(this, geometry, material, distance, hysteresis) as unknown as this;
+    return addLOD.call(this, geometry, material, distance, hysteresis);
   }
 
   public addShadowLOD(geometry: BufferGeometry, distance?: number, hysteresis?: number): this {
-    return addShadowLOD.call(this, geometry, distance, hysteresis) as unknown as this;
+    return addShadowLOD.call(this, geometry, distance, hysteresis);
   }
 
   public updateLOD(levelIndex: number, distance?: number, hysteresis?: number): this {
-    return updateLOD.call(this, levelIndex, distance, hysteresis) as unknown as this;
+    return updateLOD.call(this, levelIndex, distance, hysteresis);
   }
 
   public updateShadowLOD(levelIndex: number, distance?: number, hysteresis?: number): this {
-    return updateShadowLOD.call(this, levelIndex, distance, hysteresis) as unknown as this;
+    return updateShadowLOD.call(this, levelIndex, distance, hysteresis);
   }
 
   public updateAllLOD(distances?: number[], hysteresis?: number | number[]): this {
-    return updateAllLOD.call(this, distances, hysteresis) as unknown as this;
+    return updateAllLOD.call(this, distances, hysteresis);
   }
 
   public updateAllShadowLOD(distances?: number[], hysteresis?: number | number[]): this {
-    return updateAllShadowLOD.call(this, distances, hysteresis) as unknown as this;
+    return updateAllShadowLOD.call(this, distances, hysteresis);
   }
 
   public removeLOD(levelIndex: number, removeObject?: boolean): this {
-    return removeLOD.call(this, levelIndex, removeObject) as unknown as this;
+    return removeLOD.call(this, levelIndex, removeObject);
   }
 
   // ─── Skeleton ─────────────────────────────────────────────────────
@@ -733,7 +730,7 @@ export class InstancedMesh2<
   // ─── Uniforms ─────────────────────────────────────────────────────
 
   public initUniformsPerInstance(schema: unknown): void {
-    initUniformsPerInstance.call(this, schema as UniformSchemaShader);
+    initUniformsPerInstance.call(this, schema);
   }
 
   public getUniformAt(id: number, name: string, target?: UniformValueObj): UniformValue {
@@ -747,17 +744,17 @@ export class InstancedMesh2<
   // ─── Morph ────────────────────────────────────────────────────────
 
   public getMorphAt(id: number, object?: unknown): unknown {
-    return getMorphAt.call(this, id, object as Mesh);
+    return getMorphAt.call(this, id, object);
   }
 
   public setMorphAt(id: number, object: unknown): void {
-    setMorphAt.call(this, id, object as Mesh);
+    setMorphAt.call(this, id, object);
   }
 
   // ─── Raycasting ───────────────────────────────────────────────────
 
   public override raycast(raycaster: unknown, result: unknown[]): void {
-    raycast.call(this, raycaster as Raycaster, result as Intersection[]);
+    raycast.call(this, raycaster, result);
   }
 
   // ─── Frustum Culling (public) ─────────────────────────────────────
@@ -845,9 +842,9 @@ export class InstancedMesh2<
     if (this.bindMode === AttachedBindMode) {
       this.bindMatrixInverse.copy(this.matrixWorld).invert();
     } else if (this.bindMode === DetachedBindMode) {
-      this.bindMatrixInverse.copy(this.bindMatrix!).invert();
+      this.bindMatrixInverse.copy(this.bindMatrix).invert();
     } else {
-      // eslint-disable-next-line no-console
+
       console.warn(`Unrecognized bindMode: ${ this.bindMode}`);
     }
   }
@@ -959,7 +956,6 @@ export class InstancedMesh2<
         return;
       }
 
-      // eslint-disable-next-line no-console
       console.warn('The geometry has been cloned because it was already used.');
       geom = geom.clone();
       geom.deleteAttribute('instanceIndex');
@@ -1013,7 +1009,7 @@ export class InstancedMesh2<
       shader.defines.USE_INSTANCING_SKINNING = '';
       shader.uniforms.bindMatrix = { value: this.bindMatrix };
       shader.uniforms.bindMatrixInverse = { value: this.bindMatrixInverse };
-      shader.uniforms.bonesPerInstance = { value: this.skeleton!.bones.length };
+      shader.uniforms.bonesPerInstance = { value: this.skeleton.bones.length };
       shader.uniforms.boneTexture = { value: this.boneTexture };
     }
   };

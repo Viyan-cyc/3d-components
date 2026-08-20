@@ -100,7 +100,7 @@ export class AnimationControllerImpl implements IAnimationController {
   to(properties: PropertyTarget, config?: Partial<AnimationConfig>): this {
     this.assertNotDestroyed();
     if (this._built) {
-      // eslint-disable-next-line no-console
+
       console.warn('[animation] Timeline 已构建，无法再添加步骤');
       return this;
     }
@@ -119,7 +119,7 @@ export class AnimationControllerImpl implements IAnimationController {
   parallel(groups: ((group: IAnimationStepBuilder) => void)[]): this {
     this.assertNotDestroyed();
     if (this._built) {
-      // eslint-disable-next-line no-console
+
       console.warn('[animation] Timeline 已构建，无法再添加步骤');
       return this;
     }
@@ -155,9 +155,9 @@ export class AnimationControllerImpl implements IAnimationController {
     }
 
     if (this._state === 'stopped') {
-      this._timeline!.restart();
+      this._timeline.restart();
     } else {
-      this._timeline!.play();
+      this._timeline.play();
     }
 
     this._state = 'playing';

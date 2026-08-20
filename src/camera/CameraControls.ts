@@ -752,11 +752,11 @@ export class CameraControls implements IUpdatable, IDisposable {
       };
       this._activePointers.push(pointer);
 
-      this._domElement.ownerDocument.removeEventListener('pointermove', this._onPointerMove!);
-      this._domElement.ownerDocument.removeEventListener('pointerup', this._onPointerUp!);
+      this._domElement.ownerDocument.removeEventListener('pointermove', this._onPointerMove);
+      this._domElement.ownerDocument.removeEventListener('pointerup', this._onPointerUp);
 
-      this._domElement.ownerDocument.addEventListener('pointermove', this._onPointerMove!);
-      this._domElement.ownerDocument.addEventListener('pointerup', this._onPointerUp!);
+      this._domElement.ownerDocument.addEventListener('pointermove', this._onPointerMove);
+      this._domElement.ownerDocument.addEventListener('pointerup', this._onPointerUp);
 
       this._isDragging = true;
       this._startDragging(event);
@@ -1237,8 +1237,8 @@ export class CameraControls implements IUpdatable, IDisposable {
 
       if (this._activePointers.length === 0 && this._domElement) {
 
-        this._domElement.ownerDocument.removeEventListener('pointermove', this._onPointerMove!);
-        this._domElement.ownerDocument.removeEventListener('pointerup', this._onPointerUp!);
+        this._domElement.ownerDocument.removeEventListener('pointermove', this._onPointerMove);
+        this._domElement.ownerDocument.removeEventListener('pointerup', this._onPointerUp);
         this._dispatcher.dispatchEvent({ type: 'controlend' });
 
       }
@@ -1277,8 +1277,8 @@ export class CameraControls implements IUpdatable, IDisposable {
       this._domElement.ownerDocument.removeEventListener('pointerup', onPointerUp);
 
       this._domElement.requestPointerLock();
-      this._domElement.ownerDocument.addEventListener('pointerlockchange', this._onPointerLockChange!);
-      this._domElement.ownerDocument.addEventListener('pointerlockerror', this._onPointerLockError!);
+      this._domElement.ownerDocument.addEventListener('pointerlockchange', this._onPointerLockChange);
+      this._domElement.ownerDocument.addEventListener('pointerlockerror', this._onPointerLockError);
 
       this._domElement.ownerDocument.addEventListener('pointermove', onPointerMove);
       this._domElement.ownerDocument.addEventListener('pointerup', onPointerUp);
@@ -1302,8 +1302,8 @@ export class CameraControls implements IUpdatable, IDisposable {
       }
 
       this._domElement?.ownerDocument.exitPointerLock();
-      this._domElement?.ownerDocument.removeEventListener('pointerlockchange', this._onPointerLockChange!);
-      this._domElement?.ownerDocument.removeEventListener('pointerlockerror', this._onPointerLockError!);
+      this._domElement?.ownerDocument.removeEventListener('pointerlockchange', this._onPointerLockChange);
+      this._domElement?.ownerDocument.removeEventListener('pointerlockerror', this._onPointerLockError);
       this.cancel();
 
     };
@@ -2036,7 +2036,6 @@ export class CameraControls implements IUpdatable, IDisposable {
 
     if (aabb.isEmpty()) {
 
-      // eslint-disable-next-line no-console
       console.warn('camera-controls: fitToBox() cannot be used with an empty box. Aborting');
       return Promise.resolve([]);
 
@@ -2231,7 +2230,6 @@ export class CameraControls implements IUpdatable, IDisposable {
 
     if (! isPerspectiveCamera(this._camera)) {
 
-      // eslint-disable-next-line no-console
       console.warn('getDistanceToFitBox() is not supported by OrthographicCamera.');
       return this._spherical.radius;
 
@@ -2256,7 +2254,6 @@ export class CameraControls implements IUpdatable, IDisposable {
 
     if (! isPerspectiveCamera(this._camera)) {
 
-      // eslint-disable-next-line no-console
       console.warn('getDistanceToFitSphere() is not supported by OrthographicCamera.');
       return this._spherical.radius;
 
@@ -2823,7 +2820,6 @@ export class CameraControls implements IUpdatable, IDisposable {
 
     if (this._domElement) {
 
-      // eslint-disable-next-line no-console
       console.warn('CameraControls is already connected.');
       return;
 
@@ -3168,7 +3164,6 @@ export class CameraControls implements IUpdatable, IDisposable {
 
     if (! isPerspectiveCamera(this._camera)) {
 
-      // eslint-disable-next-line no-console
       console.warn('_collisionTest() is not supported by OrthographicCamera.');
       return distance;
 

@@ -731,7 +731,7 @@ export class Html extends THREE.Group implements IUpdatable, IDisposable {
     }
 
     const outerRef = this._transformOuterRef;
-    const innerRef = this._transformInnerRef!;
+    const innerRef = this._transformInnerRef;
 
     outerRef.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:100%;'
@@ -855,15 +855,15 @@ export class Html extends THREE.Group implements IUpdatable, IDisposable {
     if (isOrthographic) {
       const s = this.scale;
       if (s.x === s.y && s.y === s.z) {
-        this._occlusionMesh!.scale.setScalar(1 / s.x);
+        this._occlusionMesh.scale.setScalar(1 / s.x);
       } else {
-        this._occlusionMesh!.scale.set(1 / s.x, 1 / s.y, 1 / s.z);
+        this._occlusionMesh.scale.set(1 / s.x, 1 / s.y, 1 / s.z);
       }
     } else {
       const ratio = (this._distanceFactor ?? DEFAULT_DISTANCE_FACTOR_NUM) / DISTANCE_FACTOR_DIVISOR;
       const w = this._contentRef.clientWidth * ratio;
       const h = this._contentRef.clientHeight * ratio;
-      this._occlusionMesh!.scale.set(w, h, 1);
+      this._occlusionMesh.scale.set(w, h, 1);
     }
 
     this._isMeshSizeSet = true;
@@ -879,10 +879,10 @@ export class Html extends THREE.Group implements IUpdatable, IDisposable {
     const ratio = 1 / factor;
     const w = this._contentRef.clientWidth * ratio;
     const h = this._contentRef.clientHeight * ratio;
-    this._occlusionMesh!.scale.set(w, h, 1);
+    this._occlusionMesh.scale.set(w, h, 1);
 
     this._isMeshSizeSet = true;
-    this._occlusionMesh!.lookAt(camera.position);
+    this._occlusionMesh.lookAt(camera.position);
   }
 
   /** Compute the occlusion scale factor based on camera type. */

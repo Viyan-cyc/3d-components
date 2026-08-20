@@ -641,7 +641,7 @@ export class GizmoHelper implements IUpdatable, IDisposable {
       if (mesh.geometry) {
         mesh.geometry.dispose();
       }
-      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      const mat = mesh.material;
       if (Array.isArray(mat)) {
         mat.forEach((m) => disposeMaterial(m));
       } else if (mat) {

@@ -148,7 +148,7 @@ const createGradientPalette = (gradient: HeatMapGradient): HTMLCanvasElement => 
   const canvas = document.createElement('canvas');
   canvas.width = PALETTE_SIZE;
   canvas.height = 1;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
 
   // Build a linear gradient across the 256-pixel width
   const linear = ctx.createLinearGradient(0, 0, PALETTE_SIZE, 0);
@@ -206,7 +206,7 @@ const colourise = (
   const pixels = shadowData.data;
 
   // Read the palette once
-  const paletteCtx = palette.getContext('2d')!;
+  const paletteCtx = palette.getContext('2d');
   const paletteData = paletteCtx.getImageData(0, 0, PALETTE_SIZE, 1).data;
 
   // Write coloured output

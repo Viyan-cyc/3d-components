@@ -219,10 +219,10 @@ export class InteractiveManager implements IDisposable {
 
     // Named subscriber: replace same-id entry, append otherwise
     const idx = existing.findIndex((e) => e.id === id);
-    if (idx !== -1) {
-      existing[idx] = entry;
-    } else {
+    if (idx === -1) {
       existing.push(entry);
+    } else {
+      existing[idx] = entry;
     }
   }
 
@@ -629,42 +629,38 @@ export class InteractiveManager implements IDisposable {
   private _pointerMissed(event: PointerEvent, objects: THREE.Object3D[]): void {
     for (const obj of objects) {
       const entries = this._registry.get(obj);
-      if (!entries) {
-        continue;
-      }
-      const missed = entries.filter((e) => e.handlers.onPointerMissed);
-      if (missed.length === 0) {
-        continue;
-      }
-      const ev: IntersectionEvent = {
-        object: obj,
-        eventObject: obj,
-        distance: Infinity,
-        point: new THREE.Vector3(),
-        ray: this._raycaster.ray,
-        camera: this._camera,
-        pointer: this._ndc.clone(),
-        intersections: [],
-        delta: 0,
-        nativeEvent: event,
-        stopped: false,
-        stopPropagation() {
-          this.stopped = true;
-        },
-        unprojectedPoint: new THREE.Vector3(),
-        target: {
-          hasPointerCapture: () => false,
-          setPointerCapture: () => {},
-          releasePointerCapture: () => {},
-        },
-        currentTarget: {
-          hasPointerCapture: () => false,
-          setPointerCapture: () => {},
-          releasePointerCapture: () => {},
-        },
-      };
-      for (const e of missed) {
-        e.handlers.onPointerMissed?.(ev);
+      const missed = entries?.filter((e) => e.handlers.onPointerMissed) ?? [];
+      if (missed.length > 0) {
+        const ev: IntersectionEvent = {
+          object: obj,
+          eventObject: obj,
+          distance: Infinity,
+          point: new THREE.Vector3(),
+          ray: this._raycaster.ray,
+          camera: this._camera,
+          pointer: this._ndc.clone(),
+          intersections: [],
+          delta: 0,
+          nativeEvent: event,
+          stopped: false,
+          stopPropagation() {
+            this.stopped = true;
+          },
+          unprojectedPoint: new THREE.Vector3(),
+          target: {
+            hasPointerCapture: () => false,
+            setPointerCapture: () => {},
+            releasePointerCapture: () => {},
+          },
+          currentTarget: {
+            hasPointerCapture: () => false,
+            setPointerCapture: () => {},
+            releasePointerCapture: () => {},
+          },
+        };
+        for (const e of missed) {
+          e.handlers.onPointerMissed?.(ev);
+        }
       }
     }
   }
@@ -674,14 +670,14 @@ export class InteractiveManager implements IDisposable {
   /**
    * Dispatch hover tracking and pointermove for a single intersection.
    */
-  private _dispatchPointerMove(data: IntersectionEvent): boolean | void {
+  private _dispatchPointerMove(data: IntersectionEvent): boolean {
     const entries = this._registry.get(data.eventObject);
     if (!entries) {
-      return;
+      return false;
     }
     const active = entries.filter((e) => e.eventCount > 0);
     if (active.length === 0) {
-      return;
+      return false;
     }
 
     let shouldStop = false;
@@ -745,7 +741,7 @@ export class InteractiveManager implements IDisposable {
     const filterFn = this._scene ? undefined : (objects: THREE.Object3D[]): THREE.Object3D[] =>
       objects.filter((obj) => {
         const entries = this._registry.get(obj);
-        return !!entries && entries.some((en) => hasPointerHandlers(en));
+        return Boolean(entries) && entries.some((en) => hasPointerHandlers(en));
       });
 
     const hits = this._intersect(e, filterFn);
@@ -803,10 +799,10 @@ export class InteractiveManager implements IDisposable {
       }
     }
 
-    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean | void => {
+    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean => {
       const entries = this._registry.get(data.eventObject);
       if (!entries) {
-        return;
+        return false;
       }
       let shouldStop = false;
       for (const en of entries) {
@@ -832,14 +828,14 @@ export class InteractiveManager implements IDisposable {
     data: IntersectionEvent,
     isLeftButton: boolean,
     delta: number,
-  ): boolean | void {
+  ): boolean {
     const entries = this._registry.get(data.eventObject);
     if (!entries) {
-      return;
+      return false;
     }
     const active = entries.filter((e) => e.eventCount > 0);
     if (active.length === 0) {
-      return;
+      return false;
     }
 
     // Click / double-click detection is per-eventObject (shared across subscribers),
@@ -944,10 +940,10 @@ export class InteractiveManager implements IDisposable {
 
     const hits = this._intersect(e);
 
-    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean | void => {
+    this._handleIntersects(hits, e, 0, (data: IntersectionEvent): boolean => {
       const entries = this._registry.get(data.eventObject);
       if (!entries) {
-        return;
+        return false;
       }
       let shouldStop = false;
       for (const en of entries) {
@@ -972,29 +968,30 @@ export class InteractiveManager implements IDisposable {
 
     const hits = this._intersect(e);
 
-    this._handleIntersects(hits, e, delta, (data: IntersectionEvent): boolean | void => {
+    this._handleIntersects(hits, e, delta, (data: IntersectionEvent): boolean => {
       const entries = this._registry.get(data.eventObject);
       if (!entries) {
-        return;
+        return false;
       }
 
       // Only fire contextMenu on initialHits
-      if (this._initialHits.includes(data.eventObject)) {
-        // Fire pointerMissed on non-initial-hit objects
-        this._pointerMissed(
-          e,
-          this._interaction.filter((obj) => !this._initialHits.includes(obj)),
-        );
-        let shouldStop = false;
-        for (const en of entries) {
-          if (en.eventCount) {
-            if (en.handlers.onContextMenu?.(data) === true) {
-              shouldStop = true;
-            }
+      if (!this._initialHits.includes(data.eventObject)) {
+        return false;
+      }
+      // Fire pointerMissed on non-initial-hit objects
+      this._pointerMissed(
+        e,
+        this._interaction.filter((obj) => !this._initialHits.includes(obj)),
+      );
+      let shouldStop = false;
+      for (const en of entries) {
+        if (en.eventCount) {
+          if (en.handlers.onContextMenu?.(data) === true) {
+            shouldStop = true;
           }
         }
-        return shouldStop;
       }
+      return shouldStop;
     });
   }
 

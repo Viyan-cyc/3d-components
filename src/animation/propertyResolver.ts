@@ -58,7 +58,7 @@ const resolveDotPath = (obj: object, path: string): DotPathResult => {
 
   for (let i = 0; i < segments.length - 1; i++) {
     if (current === null || current === undefined || typeof current !== 'object') {
-      // eslint-disable-next-line no-console
+
       console.warn(`[animation] 无法解析路径 "${path}"："${segments[i]}" 为 ${current}`);
       return null;
     }
@@ -66,7 +66,7 @@ const resolveDotPath = (obj: object, path: string): DotPathResult => {
   }
 
   if (current === null || current === undefined || typeof current !== 'object') {
-    // eslint-disable-next-line no-console
+
     console.warn(`[animation] 无法解析路径 "${path}"：父对象为 null`);
     return null;
   }

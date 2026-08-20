@@ -528,7 +528,7 @@ export class PivotControls extends THREE.Group implements IUpdatable, IDisposabl
         mesh.geometry.computeBoundingBox();
       }
       mLanchor.copy(mesh.matrixWorld).premultiply(mPInvAnchor);
-      bbObj.copy(mesh.geometry.boundingBox!).applyMatrix4(mLanchor);
+      bbObj.copy(mesh.geometry.boundingBox).applyMatrix4(mLanchor);
       bb.union(bbObj);
     });
     if (bb.isEmpty()) {

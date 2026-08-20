@@ -169,7 +169,7 @@ const buildGroupedLayers = function (
   }
   const result: NodePos3D[] = [];
   groupOrder.forEach((key, layerIndex) => {
-    result.push(...honeycombLayer(buckets.get(key)!, size, orientation, layerIndex, cfg));
+    result.push(...honeycombLayer(buckets.get(key), size, orientation, layerIndex, cfg));
   });
   return result;
 };

@@ -109,7 +109,7 @@ export const getSquareTextureInfo = (
 ): TextureInfo => {
   let resolvedChannels = channels;
   if (channels === CHANNEL_SIZE_3) {
-    // eslint-disable-next-line no-console
+
     console.warn('"channels" cannot be 3. Set to 4.'
       + ' More info: https://github.com/mrdoob/three.js/pull/23228');
     resolvedChannels = CHANNEL_SIZE_4;
@@ -147,7 +147,7 @@ export class SquareDataTexture extends DataTexture {
   protected _rowToUpdate: boolean[];
   protected _uniformMap: UniformMap;
   protected _fetchUniformsInFragmentShader: boolean;
-  protected _utils: WebGLUtils = null as unknown as WebGLUtils;
+  protected _utils: WebGLUtils = null;
   protected _needsUpdate = true;
   protected _lastWidth = -1;
 
@@ -167,7 +167,7 @@ export class SquareDataTexture extends DataTexture {
     const {
       array, format, size, type,
     } = getSquareTextureInfo(arrayType, resolvedChannels, pixelsPerInstance, capacity);
-    super(array as TypedArray, size, size, format, type);
+    super(array, size, size, format, type);
     this._data = array;
     this._channels = resolvedChannels;
     this._pixelsPerInstance = pixelsPerInstance;
@@ -200,7 +200,7 @@ export class SquareDataTexture extends DataTexture {
     data.set(view);
 
     this.dispose();
-    this.image = { data: data as Uint8Array, height: size, width: size };
+    this.image = { data: data, height: size, width: size };
     this._data = data;
   }
 
@@ -329,8 +329,8 @@ export class SquareDataTexture extends DataTexture {
     const gl = renderer.getContext() as WebGL2RenderingContext;
     // @ts-expect-error third argument needed for older three versions
     this._utils ??= new WebGLUtils(gl, renderer.extensions, renderer.capabilities);
-    const glFormat = this._utils.convert(this.format)!;
-    const glType = this._utils.convert(this.type)!;
+    const glFormat = this._utils.convert(this.format);
+    const glType = this._utils.convert(this.type);
     const { data, width } = this.image;
     const channels = this._channels;
 
@@ -353,11 +353,11 @@ export class SquareDataTexture extends DataTexture {
     for (const { count, row } of info) {
       gl.texSubImage2D(
         gl.TEXTURE_2D, 0, 0, row, width, count,
-        glFormat, glType, data!, row * width * channels,
+        glFormat, glType, data, row * width * channels,
       );
     }
 
-    (this.onUpdate as ((texture: DataTexture) => void) | undefined)?.(this);
+    (this.onUpdate)?.(this);
   }
 
   /** Sets a uniform value at the specified instance ID in the texture. */
@@ -368,7 +368,8 @@ export class SquareDataTexture extends DataTexture {
     if (size === 1) {
       this._data[id * stride + offset] = value as number;
     } else {
-      (value as unknown as { toArray(array: TypedArray, offset: number): void }).toArray(this._data, id * stride + offset);
+      const carrier = value as unknown as { toArray(array: TypedArray, offset: number): void };
+      carrier.toArray(this._data, id * stride + offset);
     }
   }
 
@@ -381,7 +382,7 @@ export class SquareDataTexture extends DataTexture {
       return this._data[id * stride + offset];
     }
 
-    return target!.fromArray(this._data, id * stride + offset);
+    return target.fromArray(this._data, id * stride + offset);
   }
 
   /** Generates GLSL code for accessing uniform data stored in the texture. */

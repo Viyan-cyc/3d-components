@@ -124,7 +124,7 @@ export class ScalingSphere extends PivotHandle {
   }
 
   onPointerDown(sample: PointerSample): void {
-    const gizmo = this.parent as THREE.Object3D;
+    const gizmo = this.parent;
     rotMatrix.extractRotation(gizmo.matrixWorld);
     const clickPoint = sample.point.clone();
     const origin = originTmp.setFromMatrixPosition(gizmo.matrixWorld).clone();

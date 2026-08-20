@@ -60,7 +60,7 @@ export const updateIndexArray = function <
     return;
   }
 
-  const array = this.instanceIndex!.array;
+  const array = this.instanceIndex.array;
   const instancesArrayCount = this._instancesArrayCount;
   let count = 0;
 
@@ -98,13 +98,13 @@ const bvhCulling = function <
   TMaterial extends Material | Material[],
   TEventMap extends Object3DEventMap
 >(this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>, camera: Camera): void {
-  const array = this.instanceIndex!.array;
+  const array = this.instanceIndex.array;
   const instancesArrayCount = this._instancesArrayCount;
   const sortObjects = this._sortObjects;
   const onFrustumEnter = this.onFrustumEnter;
   let count = 0;
 
-  this.bvh!.frustumCulling(
+  this.bvh.frustumCulling(
     projScreenMatrixLocal,
     (node: BVHNode<Record<string, never>, number>) => {
       const index = node.object;
@@ -163,11 +163,11 @@ const linearCulling = function <
   TMaterial extends Material | Material[],
   TEventMap extends Object3DEventMap
 >(this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>, camera: Camera): void {
-  const array = this.instanceIndex!.array;
+  const array = this.instanceIndex.array;
   if (!this.geometry.boundingSphere) {
     this.geometry.computeBoundingSphere();
   }
-  const bSphere = this._geometry.boundingSphere!;
+  const bSphere = this._geometry.boundingSphere;
   const radius = bSphere.radius;
   const center = bSphere.center;
   const instancesArrayCount = this._instancesArrayCount;
@@ -219,9 +219,9 @@ export const frustumCulling = function <
 >(this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>, camera: Camera): void {
   const sortObjects = this._sortObjects;
   const perObjectFrustumCulled = this._perObjectFrustumCulled;
-  const array = this.instanceIndex!.array;
+  const array = this.instanceIndex.array;
 
-  this.instanceIndex!._needsUpdate = true;
+  this.instanceIndex._needsUpdate = true;
 
   if (!perObjectFrustumCulled && !sortObjects) {
     updateIndexArray.call(this);
@@ -257,7 +257,7 @@ export const frustumCulling = function <
   }
 
   if (sortObjects) {
-    applySortToIndexArray.call(this, array as Uint32Array);
+    applySortToIndexArray.call(this, array);
   }
 };
 
@@ -321,7 +321,7 @@ const linearCullingLOD = function <
   if (!this.geometry.boundingSphere) {
     this.geometry.computeBoundingSphere();
   }
-  const bSphere = this._geometry.boundingSphere!;
+  const bSphere = this._geometry.boundingSphere;
   const radius = bSphere.radius;
   const center = bSphere.center;
   const instancesArrayCount = this._instancesArrayCount;
@@ -354,7 +354,7 @@ const linearCullingLOD = function <
         levels,
         count,
         indexes,
-        onFrustumEnter: onFrustumEnter!,
+        onFrustumEnter: onFrustumEnter,
       });
     }
   }
@@ -372,7 +372,7 @@ const handleBvhCullingLODSorted = function <
   camera: Camera,
   cameraLOD: Camera,
 ): void {
-  this.bvh!.frustumCulling(
+  this.bvh.frustumCulling(
     projScreenMatrixLocal,
     (node: BVHNode<Record<string, never>, number>) => {
       const index = node.object;
@@ -414,7 +414,7 @@ const handleBvhCullingLODUnsorted = function <
   const {
     instancesArrayCount, onFrustumEnter, camera, cameraLOD, levels, count, indexes,
   } = ctx;
-  this.bvh!.frustumCullingLOD(
+  this.bvh.frustumCullingLOD(
     projScreenMatrixLocal,
     cameraLODPosLocal,
     levels,
@@ -459,10 +459,10 @@ const bvhCullingLOD = function <
   const onFrustumEnter = this.onFrustumEnter;
 
   if (sortObjects) {
-    handleBvhCullingLODSorted.call(this, instancesArrayCount, onFrustumEnter!, camera, cameraLOD);
+    handleBvhCullingLODSorted.call(this, instancesArrayCount, onFrustumEnter, camera, cameraLOD);
   } else {
     handleBvhCullingLODUnsorted.call(this, {
-      instancesArrayCount, onFrustumEnter: onFrustumEnter!, camera, cameraLOD, levels, count, indexes,
+      instancesArrayCount, onFrustumEnter: onFrustumEnter, camera, cameraLOD, levels, count, indexes,
     });
   }
 };
@@ -531,7 +531,7 @@ const resetLODLevels = function (levels: LODLevel[], count: number[]): boolean {
       return false;
     }
     count[i] = 0;
-    levels[i].object.instanceIndex!._needsUpdate = true;
+    levels[i].object.instanceIndex._needsUpdate = true;
   }
   return true;
 };
@@ -564,7 +564,7 @@ export const frustumCullingLOD = function <
 
   setupCullingMatrices.call(this, camera, cameraLOD);
 
-  const indexes = lodRenderList.levels.map((x) => x.object.instanceIndex!.array) as Uint32Array[];
+  const indexes = lodRenderList.levels.map((x) => x.object.instanceIndex.array) as Uint32Array[];
   const cullingParams: LODCullingParams = {
     lodRenderList, indexes, sortObjects, camera, cameraLOD,
   };
@@ -613,13 +613,13 @@ export const performFrustumCulling = function <
 
   if (lodRenderList && lodRenderList.levels.length > 0) {
     frustumCullingLOD.call(
-      mainMesh as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>,
+      mainMesh,
       lodRenderList,
       camera,
       cameraLOD,
     );
   } else {
-    frustumCulling.call(mainMesh as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>, camera);
+    frustumCulling.call(mainMesh, camera);
   }
 };
 

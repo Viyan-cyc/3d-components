@@ -244,10 +244,10 @@ const insert = function (
 
   // 内部节点：递归进入新质点所在象限。
   const idx = octantOf(node, bx, by, bz);
-  if (node.children![idx] === null) {
-    node.children![idx] = makeNode(...childCorner(node, idx), node.size * HALF);
+  if (node.children[idx] === null) {
+    node.children[idx] = makeNode(...childCorner(node, idx), node.size * HALF);
   }
-  insert(node.children![idx], bodyIdx, depth + 1, buf);
+  insert(node.children[idx], bodyIdx, depth + 1, buf);
 
   // 回溯：并入本层。
   aggregate(node, bx, by, bz);
@@ -327,7 +327,7 @@ const repulsionFrom = function (p: RepulsionParams): void {
   }
 
   // 不满足开角判据：递归进入 8 个子节点。
-  const children = p.node.children!;
+  const children = p.node.children;
   for (let i = 0; i < OCTANT_COUNT; i++) {
     const c = children[i];
     if (c) {

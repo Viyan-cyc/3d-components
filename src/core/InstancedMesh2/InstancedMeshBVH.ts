@@ -91,14 +91,14 @@ export class InstancedMeshBVH {
         geometry.computeBoundingSphere();
       }
 
-      const center = geometry.boundingSphere!.center;
+      const center = geometry.boundingSphere.center;
       if (center.x === 0 && center.y === 0 && center.z === 0) {
         this._geoBoundingSphere = geometry.boundingSphere!;
         this._sphereTarget = {
           centerX: 0, centerY: 0, centerZ: 0, maxScale: 0,
         };
       } else {
-        // eslint-disable-next-line no-console
+
         console.warn('"getBoxFromSphere" is ignored because geometry is not centered.');
         useBoxFromSphere = false;
       }
@@ -132,7 +132,7 @@ export class InstancedMeshBVH {
     }
 
     this.bvh.createFromArray(objects as unknown as number[], boxes, (node) => {
-      this.nodesMap.set(node.object!, node);
+      this.nodesMap.set(node.object, node);
     }, this._margin);
   }
 
@@ -152,7 +152,7 @@ export class InstancedMeshBVH {
     }
 
     this.bvh.insertRange(ids, boxes, this._margin, (node) => {
-      this.nodesMap.set(node.object!, node);
+      this.nodesMap.set(node.object, node);
     });
   }
 
@@ -257,8 +257,8 @@ export class InstancedMeshBVH {
       const matrixArray = this.target.matricesTexture._data as Float32Array;
       const {
         centerX, centerY, centerZ, maxScale,
-      } = this.getSphereFromMatrixCenteredGeometry(id, matrixArray, this._sphereTarget!);
-      const radius = this._geoBoundingSphere!.radius * maxScale;
+      } = this.getSphereFromMatrixCenteredGeometry(id, matrixArray, this._sphereTarget);
+      const radius = this._geoBoundingSphere.radius * maxScale;
       array[0] = centerX - radius;
       array[1] = centerX + radius;
       array[2] = centerY - radius;

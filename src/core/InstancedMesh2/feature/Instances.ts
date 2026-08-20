@@ -288,7 +288,7 @@ export const addInstances = function <
   onCreation?: UpdateEntityCallback,
 ): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
   if (!onCreation && this.bvh) {
-    // eslint-disable-next-line no-console
+
     console.warn('InstancedMesh2: if `computeBVH()` has already been called,'
       + ' it is better to valorize the instances in the `onCreation`'
       + ' callback for better performance.');

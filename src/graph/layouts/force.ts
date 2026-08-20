@@ -349,7 +349,7 @@ const resolveConfig = function (cfg: ForceLayoutConfig, n: number): ResolvedConf
   let iterations = cfg.iterations ?? DEFAULT_ITERATIONS;
   if (n > NODE_WARN && useBH === false) {
     iterations = Math.max(1, Math.floor(iterations / 2));
-    // eslint-disable-next-line no-console
+
     console.warn(`[graph/force] 节点数 ${n} > ${NODE_WARN}，斥力 O(n²)；` +
         `已自动将 iterations 减半为 ${iterations}。` +
         '建议开启 barnesHut:true（八叉树 O(n log n)）加速；' +

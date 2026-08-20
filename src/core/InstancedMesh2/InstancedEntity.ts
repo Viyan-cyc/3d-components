@@ -180,7 +180,7 @@ export class InstancedEntity {
     const id = this.id;
     const offset = id * MATRIX_ELEMENTS;
 
-    writeMatrixFromTransform(te as Float32Array, offset, quaternion, scale, position);
+    writeMatrixFromTransform(te, offset, quaternion, scale, position);
 
     owner.matricesTexture.enqueueUpdate(id);
 

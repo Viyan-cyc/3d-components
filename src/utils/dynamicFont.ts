@@ -140,7 +140,7 @@ class IndexManager {
   }
 
   allocate(): number {
-    return this.available.pop()!;
+    return this.available.pop();
   }
 
   free(index: number): void {
@@ -267,7 +267,7 @@ class CharacterCanvas {
     canvas.width = size;
     canvas.height = size;
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
@@ -431,7 +431,7 @@ export class DynamicFont {
         if (this.addCharInternal(char)) {
           modified = true;
         } else {
-          // eslint-disable-next-line no-console
+
           console.warn(`DynamicFont: Failed to add char '${char}', the atlas is full.`);
         }
       }
@@ -460,7 +460,7 @@ export class DynamicFont {
       return false;
     }
 
-    const charInfo = fontAtlas.getChar(char)!;
+    const charInfo = fontAtlas.getChar(char);
 
     // 'j' scaler to avoid zero-width artifacts
     const scaler = char === 'j' ? J_SCALER : 1;

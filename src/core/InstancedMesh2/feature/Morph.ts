@@ -19,8 +19,8 @@ export const getMorphAt = function <
   id: number,
   object = tempMesh,
 ): Mesh {
-  const objectInfluences = object.morphTargetInfluences!;
-  const array = this.morphTexture!.source.data.data!;
+  const objectInfluences = object.morphTargetInfluences;
+  const array = this.morphTexture.source.data.data;
   const len = objectInfluences.length + 1;
   const dataIndex = id * len + 1;
 
@@ -41,7 +41,7 @@ export const setMorphAt = function <
   id: number,
   object: Mesh,
 ): void {
-  const objectInfluences = object.morphTargetInfluences!;
+  const objectInfluences = object.morphTargetInfluences;
   const len = objectInfluences.length + 1;
 
   if (this.morphTexture === null && !this._parentLOD) {
@@ -54,7 +54,7 @@ export const setMorphAt = function <
     );
   }
 
-  const array = this.morphTexture!.source.data.data!;
+  const array = this.morphTexture.source.data.data;
   let morphInfluencesSum = 0;
 
   for (const objectInfluence of objectInfluences) {
@@ -67,5 +67,5 @@ export const setMorphAt = function <
   const dataIndex = len * id;
   array[dataIndex] = morphBaseInfluence;
   array.set(objectInfluences, dataIndex + 1);
-  this.morphTexture!.needsUpdate = true;
+  this.morphTexture.needsUpdate = true;
 };

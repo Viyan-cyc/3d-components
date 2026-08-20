@@ -585,7 +585,7 @@ export class GizmoViewport extends THREE.Group implements IUpdatable, IDisposabl
       return;
     }
     const dir = direction.clone();
-    hit.userData.onPick = () => this._onPick!(dir);
+    hit.userData.onPick = () => this._onPick(dir);
     this.pickables.push(hit);
   }
 

@@ -35,10 +35,10 @@ const multiplyBoneMatricesAt = function <
   m1: Matrix4,
   m2: Matrix4,
 ): void {
-  const offset = (instanceIndex * target.skeleton!.bones.length + boneIndex) * MATRIX_ELEMENTS;
+  const offset = (instanceIndex * target.skeleton.bones.length + boneIndex) * MATRIX_ELEMENTS;
   const ae = m1.elements;
   const be = m2.elements;
-  const te = target.boneTexture!._data;
+  const te = target.boneTexture._data;
 
   const a11 = ae[COL0]; const a12 = ae[COL1]; const a13 = ae[COL2]; const a14 = ae[COL3];
   const a21 = ae[COL0 + ROW1_OFFSET]; const a22 = ae[COL1 + ROW1_OFFSET];
@@ -134,11 +134,11 @@ export const setBonesAt = function <
       if (!excludeBonesSet?.has(bone.name)) {
         bone.updateMatrix();
       }
-      bone.matrixWorld.multiplyMatrices(bone.parent!.matrixWorld, bone.matrix);
+      bone.matrixWorld.multiplyMatrices(bone.parent.matrixWorld, bone.matrix);
     }
 
     multiplyBoneMatricesAt(this, id, i, bone.matrixWorld, boneInverses[i]);
   }
 
-  this.boneTexture!.enqueueUpdate(id);
+  this.boneTexture.enqueueUpdate(id);
 };

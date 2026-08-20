@@ -17,7 +17,7 @@ const drawTexture = (draw: (ctx: CanvasRenderingContext2D, size: number) => void
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   draw(ctx, CANVAS_SIZE);
   const tex = new THREE.CanvasTexture(canvas);
@@ -99,7 +99,7 @@ export const makeBackdropTexture = (): THREE.CanvasTexture => {
  */
 export const makeLabelTexture = (letter: string): THREE.CanvasTexture => {
   // 先量算文字宽度以决定画布宽度
-  const probe = document.createElement('canvas').getContext('2d')!;
+  const probe = document.createElement('canvas').getContext('2d');
   probe.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
   const textWidth = probe.measureText(letter).width;
   const width = Math.max(CANVAS_SIZE, Math.ceil(textWidth) + PADDING);
@@ -107,7 +107,7 @@ export const makeLabelTexture = (letter: string): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = CANVAS_SIZE;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, width, CANVAS_SIZE);
   ctx.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
   ctx.textAlign = 'center';

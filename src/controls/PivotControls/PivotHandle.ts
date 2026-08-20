@@ -205,7 +205,7 @@ export abstract class PivotHandle extends THREE.Group {
       if (mesh.geometry) {
         mesh.geometry.dispose();
       }
-      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      const mat = mesh.material;
       if (Array.isArray(mat)) {
         mat.forEach((m) => m.dispose());
       } else if (mat) {

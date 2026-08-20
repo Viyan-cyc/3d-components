@@ -72,12 +72,12 @@ const raycastInstances = function <
     if (this.boundingSphere === null) {
       this.computeBoundingSphere();
     }
-    sphereLocal.copy(this.boundingSphere!);
+    sphereLocal.copy(this.boundingSphere);
     if (!raycaster.ray.intersectsSphere(sphereLocal)) {
       return;
     }
 
-    const instancesToCheck = this.instanceIndex!.array;
+    const instancesToCheck = this.instanceIndex.array;
     const raycastFrustum = this.raycastOnlyFrustum
       && this._perObjectFrustumCulled;
     const checkCount = raycastFrustum

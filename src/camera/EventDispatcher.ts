@@ -25,14 +25,14 @@ export class EventDispatcher {
     const list = this._listeners[ type ];
     if (! list) {
 
-      this._listeners[ type ] = [listener as Listener<CameraControlsEventType>];
+      this._listeners[ type ] = [listener];
       return;
 
     }
 
-    if (list.indexOf(listener as Listener<CameraControlsEventType>) === - 1) {
+    if (list.indexOf(listener) === - 1) {
 
-      list.push(listener as Listener<CameraControlsEventType>);
+      list.push(listener);
 
     }
 
@@ -44,7 +44,7 @@ export class EventDispatcher {
   hasEventListener<T extends CameraControlsEventType>(type: T, listener: Listener<T>): boolean {
 
     const list = this._listeners[ type ];
-    return list !== undefined && list.indexOf(listener as Listener<CameraControlsEventType>) !== - 1;
+    return list !== undefined && list.indexOf(listener) !== - 1;
 
   }
 
@@ -58,7 +58,7 @@ export class EventDispatcher {
       return;
     }
 
-    const index = list.indexOf(listener as Listener<CameraControlsEventType>);
+    const index = list.indexOf(listener);
     if (index !== - 1) {
       list.splice(index, 1);
     }

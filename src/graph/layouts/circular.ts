@@ -113,7 +113,7 @@ export const circular = function (nodes: NodeData[], config?: CircularLayoutConf
     const result: NodePos3D[] = [];
     groupOrder.forEach((key, layerIndex) => {
       const r = radius + layerIndex * radiusStep;
-      result.push(...ringPositions(buckets.get(key)!, r, layerIndex, cfg));
+      result.push(...ringPositions(buckets.get(key), r, layerIndex, cfg));
     });
     return result;
   }

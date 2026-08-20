@@ -501,13 +501,13 @@ export class MeshReflectorMaterial extends THREE.MeshStandardMaterial implements
   /** Initialize shader defines from constructor options. */
   private _initDefines(depthScale: number, distortionMap?: THREE.Texture): void {
     if (this._hasBlurFlag) {
-      this.defines!.USE_BLUR = '';
+      this.defines.USE_BLUR = '';
     }
     if (depthScale > 0) {
-      this.defines!.USE_DEPTH = '';
+      this.defines.USE_DEPTH = '';
     }
     if (distortionMap) {
-      this.defines!.USE_DISTORTION = '';
+      this.defines.USE_DISTORTION = '';
     }
   }
 

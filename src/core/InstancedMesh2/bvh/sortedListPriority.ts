@@ -37,6 +37,6 @@ export class SortedListPriority<N = Record<string, never>, L = Record<string, ne
   }
 
   public pop(): ItemListType<N, L> {
-    return this.array.pop()!;
+    return this.array.pop();
   }
 }

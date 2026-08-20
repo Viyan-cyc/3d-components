@@ -344,8 +344,8 @@ const processNodeInSearch = function <N, L>(
     return;
   }
 
-  const nodeL = node.left!;
-  const nodeR = node.right!;
+  const nodeL = node.left;
+  const nodeR = node.right;
   const costs = evaluateChildCosts(nodeL, nodeR, inheritedCost, state.leafBox);
 
   updateBest(state, nodeL, costs.costL, nodeR, costs.costR);
@@ -371,8 +371,8 @@ const evaluateRightRotations = function <N, L>(left: BVHNode<N, L>, right: BVHNo
   let bestCost = 0;
 
   if (right.object === undefined) {
-    const RL = right.left!;
-    const RR = right.right!;
+    const RL = right.left;
+    const RR = right.right;
     const rightArea = areaBox(right.box);
     const diffRR = rightArea - areaFromTwoBoxes(left.box, RL.box);
     const diffRL = rightArea - areaFromTwoBoxes(left.box, RR.box);
@@ -397,8 +397,8 @@ const evaluateLeftRotations = function <N, L>(
   let nodeSwap2: BVHNode<N, L> | null = null;
 
   if (left.object === undefined) {
-    const LL = left.left!;
-    const LR = left.right!;
+    const LL = left.left;
+    const LR = left.right;
     const leftArea = areaBox(left.box);
     const diffLR = leftArea - areaFromTwoBoxes(right.box, LL.box);
     const diffLL = leftArea - areaFromTwoBoxes(right.box, LR.box);
@@ -437,7 +437,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
     const typeArray = this.typeArray;
 
     if (typeArray !== (boxes[0].BYTES_PER_ELEMENT === BYTES_PER_ELEMENT_32 ? Float32Array : Float64Array)) {
-      // eslint-disable-next-line no-console
+
       console.warn('Different precision.');
     }
     // eslint-disable-next-line new-cap
@@ -518,7 +518,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
     }
 
     const parent2 = parent.parent;
-    const oppositeLeaf = parent.left === node ? parent.right! : parent.left!;
+    const oppositeLeaf = parent.left === node ? parent.right : parent.left;
 
     oppositeLeaf.parent = parent2;
     node.parent = null;
@@ -545,7 +545,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
   }
 
   protected insertLeaf(leaf: BVHNode<N, L>, newParent?: BVHNode<N, L>): void {
-    const sibling = this.findBestSibling(leaf.box)!;
+    const sibling = this.findBestSibling(leaf.box);
     const oldParent = sibling.parent;
 
     const effectiveParent = newParent === undefined
@@ -593,7 +593,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
   }
 
   protected findBestSibling(leafBox: FloatArray): BVHNode<N, L> | null {
-    const root = this.root!;
+    const root = this.root;
     const leafArea = areaBox(leafBox);
     const initialCost = areaFromTwoBoxes(leafBox, root.box);
 
@@ -628,11 +628,11 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
 
   protected refit(startNode: BVHNode<N, L>): void {
     let current = startNode;
-    unionBox(current.left!.box, current.right!.box, current.box);
+    unionBox(current.left.box, current.right.box, current.box);
     current = current.parent!;
 
     while (current) {
-      if (!unionBoxChanged(current.left!.box, current.right!.box, current.box)) {
+      if (!unionBoxChanged(current.left.box, current.right.box, current.box)) {
         return;
       }
       current = current.parent!;
@@ -641,7 +641,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
 
   protected refitAndRotate(leaf: BVHNode<N, L>, sibling: BVHNode<N, L>): void {
     const originalNodeBox = leaf.box;
-    let current = leaf.parent!;
+    let current = leaf.parent;
     const currentBox = current.box;
     unionBox(originalNodeBox, sibling.box, currentBox);
 
@@ -654,8 +654,8 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
         return;
       }
 
-      const left = current.left!;
-      const right = current.right!;
+      const left = current.left;
+      const right = current.right;
 
       const rightResult = evaluateRightRotations(left, right);
       const leftResult = evaluateLeftRotations(left, right, rightResult.bestCost);
@@ -672,8 +672,8 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
   }
 
   protected swapNodes(nodeA: BVHNode<N, L>, nodeB: BVHNode<N, L>): void {
-    const parentA = nodeA.parent!;
-    const parentB = nodeB.parent!;
+    const parentA = nodeA.parent;
+    const parentB = nodeB.parent;
     const parentBox = parentB.box;
 
     if (parentA.left === nodeA) {
@@ -691,7 +691,7 @@ export class HybridBuilder<N = Record<string, never>, L = Record<string, never>>
     nodeA.parent = parentB;
     nodeB.parent = parentA;
 
-    unionBox(parentB.left!.box, parentB.right!.box, parentBox);
+    unionBox(parentB.left.box, parentB.right.box, parentBox);
   }
 
   private setupExistingParent(

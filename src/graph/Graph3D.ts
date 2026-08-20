@@ -332,7 +332,7 @@ export class Graph3D extends THREE.Group implements IUpdatable, IDisposable {
         material: this.nodeMaterial,
         geometryFactory: this.nodeGeometry,
       });
-      node.setPosition(positions.get(nodeData.id)!);
+      node.setPosition(positions.get(nodeData.id));
       this.nodes.set(nodeData.id, node);
       this.nodeOrder.push(nodeData.id);
       this.add(node);

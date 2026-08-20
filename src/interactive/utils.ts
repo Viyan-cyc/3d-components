@@ -13,6 +13,7 @@ import type { EventHandlers, Intersection } from './types';
  * @internal
  */
 export interface RegistrationEntry {
+
   /** Subscriber identity. `undefined` = anonymous (legacy overwrite semantics). */
   id?: string;
   object: THREE.Object3D;

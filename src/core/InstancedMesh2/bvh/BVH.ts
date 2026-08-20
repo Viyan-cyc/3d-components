@@ -37,8 +37,8 @@ const traverseNode = function <N, L>(
 
   const stopTraversal = callback(node, depth);
   if (!stopTraversal) {
-    traverseNode(node.left!, depth + 1, callback);
-    traverseNode(node.right!, depth + 1, callback);
+    traverseNode(node.left, depth + 1, callback);
+    traverseNode(node.right, depth + 1, callback);
   }
 };
 
@@ -76,8 +76,8 @@ const checkRayIntersection = function <N, L>(opts: RayOpts<N, L>): boolean {
   if (opts.node.object !== undefined) {
     return opts.onIntersection(opts.node.object);
   }
-  return checkRayIntersection<N, L>({ ...opts, node: opts.node.left! })
-    || checkRayIntersection<N, L>({ ...opts, node: opts.node.right! });
+  return checkRayIntersection<N, L>({ ...opts, node: opts.node.left })
+    || checkRayIntersection<N, L>({ ...opts, node: opts.node.right });
 };
 
 interface BoxIntersectionOpts<N, L> {
@@ -93,8 +93,8 @@ const checkBoxIntersection = function <N, L>(opts: BoxIntersectionOpts<N, L>): b
   if (opts.node.object !== undefined) {
     return opts.onIntersection(opts.node.object);
   }
-  return checkBoxIntersection<N, L>({ ...opts, node: opts.node.left! })
-    || checkBoxIntersection<N, L>({ ...opts, node: opts.node.right! });
+  return checkBoxIntersection<N, L>({ ...opts, node: opts.node.left })
+    || checkBoxIntersection<N, L>({ ...opts, node: opts.node.right });
 };
 
 interface SphereIntersectionOpts<N, L> {
@@ -111,8 +111,8 @@ const checkSphereIntersection = function <N, L>(opts: SphereIntersectionOpts<N, 
   if (opts.node.object !== undefined) {
     return opts.onIntersection(opts.node.object);
   }
-  return checkSphereIntersection<N, L>({ ...opts, node: opts.node.left! })
-    || checkSphereIntersection<N, L>({ ...opts, node: opts.node.right! });
+  return checkSphereIntersection<N, L>({ ...opts, node: opts.node.left })
+    || checkSphereIntersection<N, L>({ ...opts, node: opts.node.right });
 };
 
 const collectRayIntersections = function <N, L>(opts: RayIntersectionsOpts<N, L>): void {
@@ -132,8 +132,8 @@ const collectRayIntersections = function <N, L>(opts: RayIntersectionsOpts<N, L>
     return;
   }
 
-  collectRayIntersections<N, L>({ ...opts, node: opts.node.left! });
-  collectRayIntersections<N, L>({ ...opts, node: opts.node.right! });
+  collectRayIntersections<N, L>({ ...opts, node: opts.node.left });
+  collectRayIntersections<N, L>({ ...opts, node: opts.node.right });
 };
 
 interface FrustumCullOpts<N, L> {
@@ -147,8 +147,8 @@ const showAllDescendants = function <N, L>(opts: FrustumCullOpts<N, L>): void {
     opts.onIntersection(opts.node, opts.frustum, 0);
     return;
   }
-  showAllDescendants<N, L>({ ...opts, node: opts.node.left! });
-  showAllDescendants<N, L>({ ...opts, node: opts.node.right! });
+  showAllDescendants<N, L>({ ...opts, node: opts.node.left });
+  showAllDescendants<N, L>({ ...opts, node: opts.node.right });
 };
 
 const frustumCullNode = function <N, L>(node: BVHNode<N, L>, mask: number, opts: FrustumCullOpts<N, L>): void {
@@ -166,13 +166,13 @@ const frustumCullNode = function <N, L>(node: BVHNode<N, L>, mask: number, opts:
   }
 
   if (currentMask === 0) {
-    showAllDescendants<N, L>({ ...opts, node: node.left! });
-    showAllDescendants<N, L>({ ...opts, node: node.right! });
+    showAllDescendants<N, L>({ ...opts, node: node.left });
+    showAllDescendants<N, L>({ ...opts, node: node.right });
     return;
   }
 
-  frustumCullNode(node.left!, currentMask, opts);
-  frustumCullNode(node.right!, currentMask, opts);
+  frustumCullNode(node.left, currentMask, opts);
+  frustumCullNode(node.right, currentMask, opts);
 };
 
 const getLODLevel = function (nodeBox: FloatArray, cameraPosition: FloatArray, levels: FloatArray): number {
@@ -180,7 +180,7 @@ const getLODLevel = function (nodeBox: FloatArray, cameraPosition: FloatArray, l
 
   for (let i = levels.length - 1; i > 0; i--) {
     if (max >= levels[i]) {
-      return min >= levels[i] ? i : null as unknown as number;
+      return min >= levels[i] ? i : null;
     }
   }
 
@@ -207,12 +207,12 @@ const showAllDescendantsLOD = function <N, L>(opts: LODCullOpts<N, L>): void {
   }
   showAllDescendantsLOD<N, L>({
     ...opts,
-    node: opts.node.left!,
+    node: opts.node.left,
     level: currentLevel,
   });
   showAllDescendantsLOD<N, L>({
     ...opts,
-    node: opts.node.right!,
+    node: opts.node.right,
     level: currentLevel,
   });
 };
@@ -238,12 +238,12 @@ const frustumCullLODNode = function <N, L>(opts: LODCullOpts<N, L>): void {
   if (currentMask === 0) {
     showAllDescendantsLOD<N, L>({
       ...opts,
-      node: opts.node.left!,
+      node: opts.node.left,
       level: currentLevel,
     });
     showAllDescendantsLOD<N, L>({
       ...opts,
-      node: opts.node.right!,
+      node: opts.node.right,
       level: currentLevel,
     });
     return;
@@ -251,13 +251,13 @@ const frustumCullLODNode = function <N, L>(opts: LODCullOpts<N, L>): void {
 
   frustumCullLODNode<N, L>({
     ...opts,
-    node: opts.node.left!,
+    node: opts.node.left,
     mask: currentMask,
     level: currentLevel,
   });
   frustumCullLODNode<N, L>({
     ...opts,
-    node: opts.node.right!,
+    node: opts.node.right,
     mask: currentMask,
     level: currentLevel,
   });
@@ -289,20 +289,20 @@ const findClosestPoint = function <N, L>(opts: ClosestPointOpts<N, L>): void {
     return;
   }
 
-  const leftDistance = minDistanceSqPointToBox(opts.node.left!.box, opts.point);
-  const rightDistance = minDistanceSqPointToBox(opts.node.right!.box, opts.point);
+  const leftDistance = minDistanceSqPointToBox(opts.node.left.box, opts.point);
+  const rightDistance = minDistanceSqPointToBox(opts.node.right.box, opts.point);
 
   if (leftDistance < rightDistance) {
     if (leftDistance < best) {
-      findClosestPoint<N, L>({ ...opts, node: opts.node.left!, bestDist: best });
+      findClosestPoint<N, L>({ ...opts, node: opts.node.left, bestDist: best });
     }
     if (rightDistance < best) {
-      findClosestPoint<N, L>({ ...opts, node: opts.node.right!, bestDist: best });
+      findClosestPoint<N, L>({ ...opts, node: opts.node.right, bestDist: best });
     }
   } else if (rightDistance < best) {
-    findClosestPoint<N, L>({ ...opts, node: opts.node.right!, bestDist: best });
+    findClosestPoint<N, L>({ ...opts, node: opts.node.right, bestDist: best });
     if (leftDistance < best) {
-      findClosestPoint<N, L>({ ...opts, node: opts.node.left!, bestDist: best });
+      findClosestPoint<N, L>({ ...opts, node: opts.node.left, bestDist: best });
     }
   }
 };
@@ -478,7 +478,7 @@ export class BVH<N, L> {
     onClosestDistance?: OnClosestDistanceCallback<L>,
   ): number {
     if (this.root === null) {
-      return undefined as unknown as number;
+      return undefined;
     }
 
     let bestDistance = Infinity;

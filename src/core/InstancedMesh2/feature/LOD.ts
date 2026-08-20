@@ -64,7 +64,7 @@ const patchProperty = function <
 ): void {
   Object.defineProperty(obj, propertyName, {
     get(this: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>) {
-      return this._parentLOD![propertyName];
+      return this._parentLOD[propertyName];
     },
   });
 };
@@ -108,7 +108,7 @@ const addLevel = function <
   const {
     renderList, geometry, material, distance, hysteresis,
   } = options;
-  const objectsList = this.LODinfo!.objects;
+  const objectsList = this.LODinfo.objects;
   const levels = renderList.levels;
   let index: number;
   let object: InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
@@ -198,7 +198,7 @@ export const addLOD = function <
 
   setFirstLODDistance.call(this, 0);
   addLevel.call(this, {
-    renderList: this.LODinfo!.render!, geometry, material, distance, hysteresis,
+    renderList: this.LODinfo.render, geometry, material, distance, hysteresis,
   });
 
   return this;
@@ -284,7 +284,7 @@ export const updateLOD = function <
   }
   return updateLevel.call(
     this,
-    list as LODRenderList<TData> | null,
+    list,
     levelIndex, distance, hysteresis,
   ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
 };
@@ -302,7 +302,7 @@ export const updateShadowLOD = function <
 ): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
   return updateLevel.call(
     this,
-    this.LODinfo?.shadowRender as LODRenderList<TData> | null,
+    this.LODinfo?.shadowRender,
     levelIndex, distance, hysteresis,
   ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
 };
@@ -387,7 +387,7 @@ export const updateAllLOD = function <
 ): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
   return updateAllLevels.call(
     this,
-    this.LODinfo?.render as LODRenderList<TData> | null,
+    this.LODinfo?.render,
     distances, hysteresis,
   ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
 };
@@ -404,7 +404,7 @@ export const updateAllShadowLOD = function <
 ): InstancedMesh2<TData, TGeometry, TMaterial, TEventMap> {
   return updateAllLevels.call(
     this,
-    this.LODinfo?.shadowRender as LODRenderList<TData> | null,
+    this.LODinfo?.shadowRender,
     distances, hysteresis,
   ) as InstancedMesh2<TData, TGeometry, TMaterial, TEventMap>;
 };
@@ -445,7 +445,7 @@ const removeLevelObject = function <
     }
     disposeLOD(obj);
   } catch (e) {
-    // eslint-disable-next-line no-console
+
     console.error(e);
   }
 };
@@ -477,14 +477,14 @@ export const removeLOD = function <
   const [removed] = list.levels.splice(levelIndex, 1);
   list.count?.splice?.(levelIndex, 1);
   if (list.levels.length <= 1) {
-    info!.render = null;
+    info.render = null;
   }
 
   const obj = removed.object;
-  removeShadowLevel(info!, levelIndex);
+  removeShadowLevel(info, levelIndex);
   removeLevelObject.call(
     this,
-    info!, obj, removeObject,
+    info, obj, removeObject,
   );
 
   return this;
