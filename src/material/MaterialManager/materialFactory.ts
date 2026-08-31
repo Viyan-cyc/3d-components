@@ -28,6 +28,35 @@ const MATERIAL_FACTORIES: Record<MaterialType, () => THREE.Material> = {
 export const createMaterial = (type: MaterialType): THREE.Material => MATERIAL_FACTORIES[type]();
 
 /**
+ * 扩展属性写入（颜色/标量/布尔/枚举）：duck-type 'in' 守卫 + Record 直赋。
+ * 基类属性（depthTest/depthWrite/blending/fog/toneMapped）对所有材质 'in' 恒真；
+ * 类型专属属性缺该 prop 时自动跳过。颜色用 .set() 保引用不变。
+ */
+const applyExtendedProps = (material: THREE.Material, config: MaterialConfig): void => {
+  const anyMat = material as unknown as Record<string, unknown>;
+  const cfg = config as unknown as Record<string, unknown>;
+  // 颜色（新 Color 字段；.set 保引用）
+  const colorKeys = ['specular'];
+  for (const k of colorKeys) {
+    if (cfg[k] !== undefined && k in material) {
+      (anyMat[k] as THREE.Color).set(cfg[k] as THREE.ColorRepresentation);
+    }
+  }
+  // 标量/布尔/枚举（直赋；'in' 守卫保证该 prop 存在）
+  const directKeys = [
+    'shininess', 'sheenRoughness', 'iridescence', 'iridescenceIOR',
+    'anisotropy', 'anisotropyRotation', 'size',
+    'depthTest', 'depthWrite', 'blending', 'fog', 'toneMapped',
+    'wireframe', 'flatShading', 'sizeAttenuation',
+  ];
+  for (const k of directKeys) {
+    if (cfg[k] !== undefined && k in material) {
+      anyMat[k] = cfg[k];
+    }
+  }
+};
+
+/**
  * 直接应用 config 中的同步(非贴图)属性。只写 config 声明的字段,其余不动。
  * `color`/`emissive` 是 Color 对象,用 `.set()` 而非重新赋值,保住引用不变。
  */
@@ -79,6 +108,9 @@ export const applySyncProps = (material: THREE.Material, config: MaterialConfig)
   if (config.side !== undefined) {
     material.side = config.side;
   }
+  applyExtendedProps(material, config);
+  // 任何同步属性改动都需重编译（flatShading/wireframe 换 shader；其余幂等）
+  material.needsUpdate = true;
 };
 
 /** 该材质是否具备某贴图槽位。 */

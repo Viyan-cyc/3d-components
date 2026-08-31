@@ -118,6 +118,54 @@ export interface MaterialConfig {
   /** 绒感颜色（physical）。 */
   sheenColor?: THREE.ColorRepresentation;
 
+  /** 绒感粗糙度（physical）。 */
+  sheenRoughness?: number;
+
+  /** 高光颜色（phong）。 */
+  specular?: THREE.ColorRepresentation;
+
+  /** 高光强度（phong）。 */
+  shininess?: number;
+
+  /** 是否线框渲染（basic/lambert/phong/standard/physical/toon）。 */
+  wireframe?: boolean;
+
+  /** 是否平面着色（lambert/phong/standard/physical）。 */
+  flatShading?: boolean;
+
+  /** 虹彩强度（physical）。 */
+  iridescence?: number;
+
+  /** 虹彩折射率（physical）。 */
+  iridescenceIOR?: number;
+
+  /** 各向异性强度（physical）。 */
+  anisotropy?: number;
+
+  /** 各向异性旋转（physical）。 */
+  anisotropyRotation?: number;
+
+  /** 粒子大小（points）。 */
+  size?: number;
+
+  /** 粒子是否随距离衰减（points）。 */
+  sizeAttenuation?: boolean;
+
+  /** 是否参与深度测试（Material 基类，所有材质）。 */
+  depthTest?: boolean;
+
+  /** 是否写入深度缓冲（Material 基类，所有材质）。 */
+  depthWrite?: boolean;
+
+  /** 混合模式（Material 基类，所有材质）。 */
+  blending?: THREE.Blending;
+
+  /** 是否受雾影响（Material 基类，所有材质）。 */
+  fog?: boolean;
+
+  /** 是否参与色调映射（Material 基类，所有材质）。 */
+  toneMapped?: boolean;
+
   /** 漫反射贴图。`null` 显式清空。 */
   map?: TextureDescriptor | null;
 
