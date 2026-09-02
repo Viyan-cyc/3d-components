@@ -1,0 +1,100 @@
+<div class="page">
+  <h2>Rack</h2>
+  <span class="tag">extends <code>THREE.Group</code></span>
+  <span class="tag">import <code>@a3d/a3d-components/core</code></span>
+  <span class="tag">implements <code>IDisposable</code></span>
+  <p class="desc">仓储货架组件。立柱 + 横梁构成框架、层板承载货物，全部构件复用同一个单位 BoxGeometry，经两个 InstancedMesh 实例化渲染——无论货架多大规模，始终只有 <strong>2 个 draw call</strong>。支持数量（等分）或数组（逐格尺寸）两种布局定义、三种层板模式，以及 <code>set()</code> 数据驱动的动态重建。原点在货架前缘左端：宽度沿 +X、高度沿 +Y、深度沿 -Z（正面朝 +Z）。</p>
+
+  <!-- Demo -->
+  <div class="demo-card">
+    <canvas id="c-rack"></canvas>
+    <div class="demo-ctrl" id="ctrl-rack"></div>
+  </div>
+
+  <h3>Constructor</h3>
+  <div class="sig"><span class="kw">new</span> Rack(options?: RackOptions)</div>
+
+  <h4>Parameters — <code>RackOptions</code></h4>
+  <table class="pt">
+    <thead><tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>data</td><td><code>RackData</code></td><td>—</td><td>初始货架数据。不传则创建空货架，之后可随时 <code>set()</code></td></tr>
+      <tr><td>frameMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>框架（立柱 + 横梁）共享材质。不传则使用默认 <code>MeshStandardMaterial</code>（白色）</td></tr>
+      <tr><td>plankMaterial</td><td><code>THREE.Material</code></td><td>—</td><td>层板共享材质。不传则使用默认 <code>MeshStandardMaterial</code>（木色 <code>0xeac58b</code>）</td></tr>
+      <tr><td>name</td><td><code>string</code></td><td>—</td><td><code>Object3D.name</code></td></tr>
+      <tr><td>visible</td><td><code>boolean</code></td><td>true</td><td>是否可见</td></tr>
+      <tr><td>userData</td><td><code>object</code></td><td>—</td><td>自定义数据</td></tr>
+      <tr><td>children</td><td><code>Object3D[]</code></td><td>—</td><td>额外子节点，自动 <code>add()</code>（<code>set()</code> 重建时保留）</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Data — <code>RackData</code>（货架结构）</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>row</td><td><code>number | number[]</code></td><td>—</td><td><strong>必填</strong>。横向货位划分：数量 ⇒ 等分 <code>row</code> 个货位、每个宽 <code>width</code>；数组 ⇒ 逐货位宽度（此时忽略 <code>width</code>）。如 <code>3</code> 或 <code>[1, 2, 1]</code></td></tr>
+      <tr><td>col</td><td><code>number | number[]</code></td><td>—</td><td><strong>必填</strong>。纵向层划分：数量 ⇒ 等分 <code>col</code> 层、每层高 <code>height</code>；数组 ⇒ 逐层高度（此时忽略 <code>height</code>）。如 <code>3</code> 或 <code>[0.5, 1, 1.5]</code></td></tr>
+      <tr><td>width</td><td><code>number</code></td><td>1</td><td>每个货位的宽度，仅 <code>row</code> 为数量时生效</td></tr>
+      <tr><td>height</td><td><code>number</code></td><td>1</td><td>每层的高度，仅 <code>col</code> 为数量时生效</td></tr>
+      <tr><td>depth</td><td><code>number</code></td><td>—</td><td><strong>必填</strong>。货架深度（Z 方向）。正面在 <code>z = 0</code>、背面在 <code>z = -depth</code></td></tr>
+      <tr><td>firstplane</td><td><code>boolean</code></td><td>false</td><td>最底层（<code>y = 0</code>）是否也生成层板 / 横梁。关闭时底层直接落地，首个层板位于第一层顶部</td></tr>
+      <tr><td>goodsPlank</td><td><code>string | number | RackPlank[]</code></td><td>—</td><td>层板模式：<strong>不传</strong> ⇒ 每层一块通长实心层板；<strong>字符串</strong> ⇒ 每货位一块，宽度为货位净宽的百分比（<code>'60'</code> ⇒ 60%）；<strong>数值</strong> ⇒ 每货位一块固定宽度层板；<strong>数组</strong> ⇒ 不自动生成，由数组显式指定每块层板</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Data — <code>RackPlank</code>（显式层板）</h4>
+  <table class="pt">
+    <thead><tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>position</td><td><code>Vec3</code></td><td>—</td><td><strong>必填</strong>。层板中心位置（货架局部坐标：x 沿宽、y 沿高、z 沿深）</td></tr>
+      <tr><td>width</td><td><code>number</code></td><td>—</td><td><strong>必填</strong>。层板宽度（X 方向）</td></tr>
+      <tr><td>depth</td><td><code>number</code></td><td>—</td><td><strong>必填</strong>。层板深度（Z 方向）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Properties</h3>
+  <table class="pt">
+    <thead><tr><th>属性</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>parameters</td><td><code>Readonly&lt;RackData&gt; | null</code></td><td>当前货架配置的独立副本（<code>set()</code> 合并后的结果，只读）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Methods</h3>
+  <div class="method">
+    <div class="sig">.set(<strong>data</strong>: Partial&lt;RackData&gt;): <span class="kw">this</span></div>
+    <p>重建货架。与当前配置<strong>浅合并</strong>：只覆盖传入的字段，其余沿用上次配置——适配数据驱动的动态场景（如智能排布）。链式调用。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.copy(<strong>source</strong>: Rack): <span class="kw">this</span></div>
+    <p>复制另一个货架：拷贝其变换与货架数据后整体重建，实例网格不与源实例共享；源实例上额外挂载的子节点递归克隆保留。</p>
+  </div>
+  <div class="method">
+    <div class="sig">.dispose(): void</div>
+    <p>释放生成的实例网格、共享几何体；自建材质一并释放。</p>
+  </div>
+
+  <h3>示例</h3>
+  <pre><code class="language-ts">import { Rack } from '@a3d/a3d-components/core';
+
+// 4 货位 × 3 层、深 1m 的等分货架，每货位一块 60% 宽层板
+const rack = new Rack({
+  data: { row: 4, col: 3, width: 1.2, height: 0.8, depth: 1, goodsPlank: '60' },
+});
+scene.add(rack);
+
+// 数据驱动重建：只改层数，其余沿用
+rack.set({ col: 5 });
+
+// 逐货位宽度 + 逐层高度 + 最底层层板
+rack.set({
+  row: [1, 2, 1],
+  col: [0.5, 1, 1.5],
+  firstplane: true,
+});
+
+// 显式层板：完全自定义每块层板的位置与尺寸
+rack.set({
+  goodsPlank: [{ position: { x: 1, y: 1, z: -0.5 }, width: 0.6, depth: 0.9 }],
+});</code></pre>
+</div>

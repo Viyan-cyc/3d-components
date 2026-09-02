@@ -10,11 +10,18 @@
  * 零依赖：纯 node fs + 字符串切分。模板稳定（class 名固定 page/tag/desc/sig/pt/method），
  * 唯一有嵌套的是 div.method（内含 div.sig），靠"按 <div class="method"> 切分 + 叶子非贪婪"处理。
  *
- * 公开 Object3D 组件用 allowlist（3d-components 自己的公开 API 面）。新增组件时：
- * 1) 写 docs/components/<name>/index.html（遵循同模板）；2) 把名字加进下面 COMPONENTS。
+ * 组件收集（无 allowlist）：扫描 docs/components 下各子目录的 index.html，页面 tag 区写了
+ *   <span class="tag">import <code>@a3d/a3d-components/<domain></code></span>
+ * 才进 catalog——这一行是「公开可创建组件」的声明位，与组件知识同源。
+ * 无 import tag 的页面 = 参考文档（utils/材质/控制器等，createComponentObject 造不出），跳过。
+ * domain 必须在 CREATABLE_DOMAINS（= 3d-templete libraryBridge 注册的域），否则跳过 + warn。
+ *
+ * 新增组件时：1) 写 docs/components/<name>/index.html（遵循同模板）；
+ * 2) 页面 tag 区加 import tag 行。无需改本脚本。
  */
+/* eslint-disable no-console -- CLI 构建脚本，console 是唯一进度输出手段 */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,20 +30,9 @@ const repoRoot = join(__dirname, '..');
 const docsComponentsDir = join(repoRoot, 'docs', 'components');
 const outFile = join(repoRoot, 'docs', 'components.json');
 
-// 公开 Object3D 组件 API（均在 core 子路径）。dir = name.toLowerCase()。
-const COMPONENTS = [
-  'Wall',
-  'Shape',
-  'Grid',
-  'Path',
-  'Outlines',
-  'Wireframe',
-  'BitmapText',
-  'Html',
-  'Sky',
-  'InstancedMesh2',
-];
-const IMPORT_PATH = '@a3d/a3d-components/core';
+// libraryBridge（3d-templete）注册的命名空间域 = createComponentObject 可创建的域
+const CREATABLE_DOMAINS = new Set(['core', 'heat', 'material']);
+const IMPORT_TAG_RE = /<span class="tag">import\s*<code>([\s\S]*?)<\/code><\/span>/;
 
 // ── 基础工具 ──
 
@@ -92,12 +88,8 @@ const parseRows3 = (tbl) => parseRows(tbl, 3).map((c) => ({ name: c[0], type: c[
 
 // ── 单组件解析 ──
 
-const parseComponent = (name) => {
-  const file = join(docsComponentsDir, name.toLowerCase(), 'index.html');
-  if (!existsSync(file)) {
-    console.warn(`[gen] 缺少 ${file}，跳过 ${name}`);
-    return null;
-  }
+const parseComponent = (dir) => {
+  const file = join(docsComponentsDir, dir, 'index.html');
   const html = readFileSync(file, 'utf-8');
 
   // head = 第一个 <div class="method"> 之前的全部（含 h2/desc/extends/构造 sig/参数表/属性表）
@@ -105,10 +97,25 @@ const parseComponent = (name) => {
   const parts = html.split('<div class="method">');
   const head = parts[0];
 
-  const h2 = stripTags(firstMatch(head, /<h2[^>]*>([\s\S]*?)<\/h2>/));
-  if (h2 && h2 !== name) {
-    console.warn(`[gen] ${name}: h2 实际为 "${h2}"，与 allowlist 不符`);
+  // import tag = 公开可创建组件声明；无 tag = 参考文档，跳过（正常路径，非告警）
+  const importPath = stripTags(firstMatch(html, IMPORT_TAG_RE));
+  if (!importPath) {
+    console.log(`[gen] - ${dir}: 无 import tag（参考文档），跳过`);
+    return null;
   }
+  const domain = importPath.replace(/^@a3d\/a3d-components\//, '');
+  if (!CREATABLE_DOMAINS.has(domain)) {
+    console.warn(`[gen] ! ${dir}: import tag 域 "${domain}" 不在 libraryBridge 注册域（${[...CREATABLE_DOMAINS].join('/')}），跳过——createComponentObject 造不出，进 catalog 只会让 LLM 用了回落原生 THREE`);
+    return null;
+  }
+
+  // 组件名以页面 <h2> 为准（单一来源，目录名不再参与命名）
+  const name = stripTags(firstMatch(head, /<h2[^>]*>([\s\S]*?)<\/h2>/));
+  if (!name) {
+    console.warn(`[gen] ! ${dir}: 缺少 <h2> 组件名，跳过`);
+    return null;
+  }
+
   const summary = stripTags(firstMatch(head, /<p class="desc">([\s\S]*?)<\/p>/));
   const extends_ = stripTags(firstMatch(head, /<span class="tag">extends\s*<code>([\s\S]*?)<\/code><\/span>/));
   // 构造签名 = head 里第一个 div.sig（无嵌套 div，非贪婪到首个 </div> 安全）
@@ -157,7 +164,7 @@ const parseComponent = (name) => {
   return {
     name,
     summary,
-    importPath: IMPORT_PATH,
+    importPath,
     extends: extends_,
     constructor,
     options,
@@ -172,16 +179,20 @@ const parseComponent = (name) => {
 
 const main = () => {
   const out = [];
-  for (const name of COMPONENTS) {
+  const dirs = readdirSync(docsComponentsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  for (const dir of dirs) {
     try {
-      const doc = parseComponent(name);
+      const doc = parseComponent(dir);
       if (doc) {
         out.push(doc);
-        console.log(`[gen] ✓ ${name}: ${doc.options.length} options, ${doc.dataTypes.length} dataTypes, ` +
+        console.log(`[gen] ✓ ${doc.name}: ${doc.options.length} options, ${doc.dataTypes.length} dataTypes, ` +
             `${doc.properties.length} properties, ${doc.methods.length} methods, ${doc.examples.length} examples`);
       }
     } catch (e) {
-      console.error(`[gen] ${name} 解析失败:`, e.message);
+      console.error(`[gen] ${dir} 解析失败:`, e.message);
     }
   }
   out.sort((a, b) => a.name.localeCompare(b.name));

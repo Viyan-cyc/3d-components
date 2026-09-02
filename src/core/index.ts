@@ -23,6 +23,9 @@ export type {
   PathOptions, PathData, PathMode, FlowOptions,
 } from './Path';
 
+export { Rack } from './Rack';
+export type { RackOptions, RackData, RackPlank } from './Rack';
+
 export { Outlines } from './Outlines';
 export type { OutlinesOptions } from './Outlines';
 

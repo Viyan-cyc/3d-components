@@ -1295,6 +1295,153 @@
     ]
   },
   {
+    "name": "Rack",
+    "summary": "仓储货架组件。立柱 + 横梁构成框架、层板承载货物，全部构件复用同一个单位 BoxGeometry，经两个 InstancedMesh 实例化渲染——无论货架多大规模，始终只有 2 个 draw call。支持数量（等分）或数组（逐格尺寸）两种布局定义、三种层板模式，以及 set() 数据驱动的动态重建。原点在货架前缘左端：宽度沿 +X、高度沿 +Y、深度沿 -Z（正面朝 +Z）。",
+    "importPath": "@a3d/a3d-components/core",
+    "extends": "THREE.Group",
+    "constructor": "new Rack(options?: RackOptions)",
+    "options": [
+      {
+        "name": "data",
+        "type": "RackData",
+        "default": "—",
+        "description": "初始货架数据。不传则创建空货架，之后可随时 set()"
+      },
+      {
+        "name": "frameMaterial",
+        "type": "THREE.Material",
+        "default": "—",
+        "description": "框架（立柱 + 横梁）共享材质。不传则使用默认 MeshStandardMaterial（白色）"
+      },
+      {
+        "name": "plankMaterial",
+        "type": "THREE.Material",
+        "default": "—",
+        "description": "层板共享材质。不传则使用默认 MeshStandardMaterial（木色 0xeac58b）"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "default": "—",
+        "description": "Object3D.name"
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "default": "true",
+        "description": "是否可见"
+      },
+      {
+        "name": "userData",
+        "type": "object",
+        "default": "—",
+        "description": "自定义数据"
+      },
+      {
+        "name": "children",
+        "type": "Object3D[]",
+        "default": "—",
+        "description": "额外子节点，自动 add()（set() 重建时保留）"
+      }
+    ],
+    "dataTypes": [
+      {
+        "name": "RackData",
+        "fields": [
+          {
+            "name": "row",
+            "type": "number | number[]",
+            "default": "—",
+            "description": "必填。横向货位划分：数量 ⇒ 等分 row 个货位、每个宽 width；数组 ⇒ 逐货位宽度（此时忽略 width）。如 3 或 [1, 2, 1]"
+          },
+          {
+            "name": "col",
+            "type": "number | number[]",
+            "default": "—",
+            "description": "必填。纵向层划分：数量 ⇒ 等分 col 层、每层高 height；数组 ⇒ 逐层高度（此时忽略 height）。如 3 或 [0.5, 1, 1.5]"
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "default": "1",
+            "description": "每个货位的宽度，仅 row 为数量时生效"
+          },
+          {
+            "name": "height",
+            "type": "number",
+            "default": "1",
+            "description": "每层的高度，仅 col 为数量时生效"
+          },
+          {
+            "name": "depth",
+            "type": "number",
+            "default": "—",
+            "description": "必填。货架深度（Z 方向）。正面在 z = 0、背面在 z = -depth"
+          },
+          {
+            "name": "firstplane",
+            "type": "boolean",
+            "default": "false",
+            "description": "最底层（y = 0）是否也生成层板 / 横梁。关闭时底层直接落地，首个层板位于第一层顶部"
+          },
+          {
+            "name": "goodsPlank",
+            "type": "string | number | RackPlank[]",
+            "default": "—",
+            "description": "层板模式：不传 ⇒ 每层一块通长实心层板；字符串 ⇒ 每货位一块，宽度为货位净宽的百分比（'60' ⇒ 60%）；数值 ⇒ 每货位一块固定宽度层板；数组 ⇒ 不自动生成，由数组显式指定每块层板"
+          }
+        ]
+      },
+      {
+        "name": "RackPlank",
+        "fields": [
+          {
+            "name": "position",
+            "type": "Vec3",
+            "default": "—",
+            "description": "必填。层板中心位置（货架局部坐标：x 沿宽、y 沿高、z 沿深）"
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "default": "—",
+            "description": "必填。层板宽度（X 方向）"
+          },
+          {
+            "name": "depth",
+            "type": "number",
+            "default": "—",
+            "description": "必填。层板深度（Z 方向）"
+          }
+        ]
+      }
+    ],
+    "properties": [
+      {
+        "name": "parameters",
+        "type": "Readonly<RackData> | null",
+        "description": "当前货架配置的独立副本（set() 合并后的结果，只读）"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".set(data: Partial<RackData>): this",
+        "description": "重建货架。与当前配置浅合并：只覆盖传入的字段，其余沿用上次配置——适配数据驱动的动态场景（如智能排布）。链式调用。"
+      },
+      {
+        "signature": ".copy(source: Rack): this",
+        "description": "复制另一个货架：拷贝其变换与货架数据后整体重建，实例网格不与源实例共享；源实例上额外挂载的子节点递归克隆保留。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放生成的实例网格、共享几何体；自建材质一并释放。"
+      }
+    ],
+    "examples": [
+      "import { Rack } from '@a3d/a3d-components/core';\n\n// 4 货位 × 3 层、深 1m 的等分货架，每货位一块 60% 宽层板\nconst rack = new Rack({\n  data: { row: 4, col: 3, width: 1.2, height: 0.8, depth: 1, goodsPlank: '60' },\n});\nscene.add(rack);\n\n// 数据驱动重建：只改层数，其余沿用\nrack.set({ col: 5 });\n\n// 逐货位宽度 + 逐层高度 + 最底层层板\nrack.set({\n  row: [1, 2, 1],\n  col: [0.5, 1, 1.5],\n  firstplane: true,\n});\n\n// 显式层板：完全自定义每块层板的位置与尺寸\nrack.set({\n  goodsPlank: [{ position: { x: 1, y: 1, z: -0.5 }, width: 0.6, depth: 0.9 }],\n});"
+    ]
+  },
+  {
     "name": "Shape",
     "summary": "异形面绘制组件。接收 XZ 平面上的轮廓点，挤出指定高度，生成带圆角拐角的实心几何体。轮廓总是闭合（首尾自动相连）。适合台面、地板异形区域、建筑平台等场景。",
     "importPath": "@a3d/a3d-components/core",

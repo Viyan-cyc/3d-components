@@ -1,6 +1,7 @@
 <div class="page">
   <h2>InstancedMesh2</h2>
   <span class="tag">extends <code>THREE.Mesh</code></span>
+  <span class="tag">import <code>@a3d/a3d-components/core</code></span>
   <p class="desc">高性能实例化渲染器。基于<strong>间接实例化</strong>（Indirect Instancing）架构，通过 <code>instanceIndex</code> 属性索引 DataTexture 中的逐实例矩阵、颜色、骨骼和自定义 Uniform，实现零缓冲区重分配的逐实例视锥裁剪、LOD 切换与部分 GPU 更新。内置 BVH 空间索引加速视锥裁剪、射线检测与 LOD 距离判定；支持逐实例骨骼动画、变形目标与自定义 Uniform。</p>
 
   <div class="demo-card">
