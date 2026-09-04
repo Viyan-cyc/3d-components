@@ -13,8 +13,7 @@
  * 组件收集（无 allowlist）：扫描 docs/components 下各子目录的 index.html，页面 tag 区写了
  *   <span class="tag">import <code>@a3d/a3d-components/<domain></code></span>
  * 才进 catalog——这一行是「公开可创建组件」的声明位，与组件知识同源。
- * 无 import tag 的页面 = 参考文档（utils/材质/控制器等，createComponentObject 造不出），跳过。
- * domain 必须在 CREATABLE_DOMAINS（= 3d-templete libraryBridge 注册的域），否则跳过 + warn。
+ * 无 import tag 的页面 = 参考文档（utils/材质/控制器等非 Object3D 子类），跳过。
  *
  * 新增组件时：1) 写 docs/components/<name>/index.html（遵循同模板）；
  * 2) 页面 tag 区加 import tag 行。无需改本脚本。
@@ -30,8 +29,7 @@ const repoRoot = join(__dirname, '..');
 const docsComponentsDir = join(repoRoot, 'docs', 'components');
 const outFile = join(repoRoot, 'docs', 'components.json');
 
-// libraryBridge（3d-templete）注册的命名空间域 = createComponentObject 可创建的域
-const CREATABLE_DOMAINS = new Set(['core', 'heat', 'material']);
+// import tag 域（core/heat/material）= @a3d/a3d-components 子模块，barrel 导出全部组件类
 const IMPORT_TAG_RE = /<span class="tag">import\s*<code>([\s\S]*?)<\/code><\/span>/;
 
 // ── 基础工具 ──
@@ -86,6 +84,20 @@ const parseRows4 = (tbl) => parseRows(tbl, 4).map((c) => ({
 // 3 列（属性：name,type,description）
 const parseRows3 = (tbl) => parseRows(tbl, 3).map((c) => ({ name: c[0], type: c[1], description: c[2] }));
 
+// dataTypes 表列数不统一：3 列（字段/类型/说明，无默认值，如 HeatMapPoint/HeatMapData）
+// 或 4 列（参数/类型/默认值/说明，如 PathData/WallData）。先试 4 列，空则回退 3 列。
+const parseDataTable = (tbl) => {
+  const rows4 = parseRows(tbl, 4);
+  if (rows4.length > 0) {
+    return rows4.map((c) => ({
+      name: c[0], type: c[1], default: c[2], description: c[3],
+    }));
+  }
+  return parseRows(tbl, 3).map((c) => ({
+    name: c[0], type: c[1], default: '—', description: c[2],
+  }));
+};
+
 // ── 单组件解析 ──
 
 const parseComponent = (dir) => {
@@ -101,11 +113,6 @@ const parseComponent = (dir) => {
   const importPath = stripTags(firstMatch(html, IMPORT_TAG_RE));
   if (!importPath) {
     console.log(`[gen] - ${dir}: 无 import tag（参考文档），跳过`);
-    return null;
-  }
-  const domain = importPath.replace(/^@a3d\/a3d-components\//, '');
-  if (!CREATABLE_DOMAINS.has(domain)) {
-    console.warn(`[gen] ! ${dir}: import tag 域 "${domain}" 不在 libraryBridge 注册域（${[...CREATABLE_DOMAINS].join('/')}），跳过——createComponentObject 造不出，进 catalog 只会让 LLM 用了回落原生 THREE`);
     return null;
   }
 
@@ -125,17 +132,26 @@ const parseComponent = (dir) => {
   const h4Chunks = head.split('<h4').slice(1).map((c) => `<h4${ c}`);
   const paramTables = [];
   for (const chunk of h4Chunks) {
-    const tbl = firstMatch(chunk, /<table class="pt">([\s\S]*?)<\/table>/);
+    // 只取「当前 h4 到第一个 <h3> 之前」的内容。否则 HeatMapGradient 这类「h4 后跟
+    // <pre><code> 代码块而非 table」的段落会越界匹配到后面 Properties 的 table（h3 之后）。
+    const h3Seg = chunk.match(/^([\s\S]*?)<h3/);
+    const seg = h3Seg ? h3Seg[1] : chunk;
+    const tbl = firstMatch(seg, /<table class="pt">([\s\S]*?)<\/table>/);
     if (tbl) {
-      const beforeTable = chunk.split('<table')[0];
-      const typeName = stripTags(firstMatch(beforeTable, /<code>([\s\S]*?)<\/code>/));
-      paramTables.push({ name: typeName || '(unnamed)', fields: parseRows4(tbl) });
-    } else {
-      console.warn(`[gen] ${name}: 某 h4 后无 table，跳过该表`);
+      const beforeTable = seg.split('<table')[0];
+      // 类型名优先取 h4 里的 <code>（如 "Parameters — <code>HeatMapOptions</code>"）；
+      // 无 <code> 的纯文本 h4（如 "<h4>HeatMapPoint</h4>"）取去标签后的 h4 文本。
+      let typeName = stripTags(firstMatch(beforeTable, /<code>([\s\S]*?)<\/code>/));
+      if (!typeName) {
+        typeName = stripTags(beforeTable).replace(/^Parameters\s*[—-]\s*/, '').trim();
+      }
+      paramTables.push({ name: typeName || '(unnamed)', table: tbl });
     }
+    // 无 table 的 h4（如 HeatMapGradient 用 pre 代码块表示类型）→ 不进 dataTypes，跳过，
+    // 其代码块已被下方 examples 抓取。
   }
-  const options = paramTables.length > 0 ? paramTables[0].fields : [];
-  const dataTypes = paramTables.slice(1);
+  const options = paramTables.length > 0 ? parseRows4(paramTables[0].table) : [];
+  const dataTypes = paramTables.slice(1).map((t) => ({ name: t.name, fields: parseDataTable(t.table) }));
 
   // 属性表：<h3>Properties</h3> 到下一个 <h3> 之间的 table（3 列）
   let properties = [];

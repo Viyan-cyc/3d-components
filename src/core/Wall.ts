@@ -356,7 +356,10 @@ const buildBodyGeometry = (
  * segment's face and oversized across so it cuts clean through the wall thickness.
  */
 const buildHoleGeometry = (h: WallHole, runs: Run[], width: number): THREE.BufferGeometry | null => {
-  if (h.segment < 0 || h.segment >= runs.length) {
+  // segment 是必填墙段索引。缺失 / NaN / 小数时会导致 runs[h.segment] 取到 undefined → run.len
+  // 抛 TypeError → 整面墙构造失败退 fallback（实证：codegen 生成仓库时 hole 漏 segment，改墙色
+  // 因此失效）。此处兜底：非法 segment 直接跳过该洞，墙体照常渲染（仅缺挖洞）。
+  if (!Number.isInteger(h.segment) || h.segment < 0 || h.segment >= runs.length) {
     return null;
   }
   if (!Array.isArray(h.path) || h.path.length < MIN_HOLE_PATH_POINTS) {

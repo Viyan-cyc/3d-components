@@ -166,6 +166,7 @@
     "dev": "vite build --watch",
     "docs": "typedoc",
     "gen:component-docs": "node scripts/gen-component-docs.mjs",
+    "sync:catalog": "node scripts/sync-catalog.mjs",
     "docs:serve": "vite docs --open --port 7777",
     "prepublishOnly": "npm run build",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",

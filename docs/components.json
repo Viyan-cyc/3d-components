@@ -423,6 +423,153 @@
     ]
   },
   {
+    "name": "HeatMap",
+    "summary": "Canvas 热力图纹理生成器。基于两遍 Alpha 通道算法：第一遍在阴影 Canvas 上绘制径向渐变圆累积强度，第二遍将 Alpha 通道映射为颜色梯度。输出 THREE.CanvasTexture，可直接赋给任意材质的 map 属性。",
+    "importPath": "@a3d/a3d-components/heat",
+    "extends": "",
+    "constructor": "new HeatMap(options?: HeatMapOptions)",
+    "options": [
+      {
+        "name": "width",
+        "type": "number",
+        "default": "256",
+        "description": "Canvas 宽度（像素）"
+      },
+      {
+        "name": "height",
+        "type": "number",
+        "default": "256",
+        "description": "Canvas 高度（像素）"
+      },
+      {
+        "name": "radius",
+        "type": "number",
+        "default": "40",
+        "description": "默认热力点半径（像素）"
+      },
+      {
+        "name": "opacity",
+        "type": "number",
+        "default": "0.6",
+        "description": "全局不透明度 0–1"
+      },
+      {
+        "name": "gradient",
+        "type": "HeatMapGradient",
+        "default": "蓝→绿→黄→红",
+        "description": "颜色梯度映射"
+      }
+    ],
+    "dataTypes": [
+      {
+        "name": "HeatMapPoint",
+        "fields": [
+          {
+            "name": "x",
+            "type": "number",
+            "default": "—",
+            "description": "X 坐标（像素，0 – width）"
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "default": "—",
+            "description": "Y 坐标（像素，0 – height）"
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "default": "—",
+            "description": "强度 / 权重，归一化到 max / min"
+          }
+        ]
+      },
+      {
+        "name": "HeatMapData",
+        "fields": [
+          {
+            "name": "data",
+            "type": "HeatMapPoint[]",
+            "default": "—",
+            "description": "数据点数组"
+          },
+          {
+            "name": "max",
+            "type": "number",
+            "default": "—",
+            "description": "归一化最大值，省略则自动取数据最大值"
+          },
+          {
+            "name": "min",
+            "type": "number",
+            "default": "—",
+            "description": "归一化最小值，默认 0"
+          }
+        ]
+      }
+    ],
+    "properties": [
+      {
+        "name": "texture",
+        "type": "THREE.CanvasTexture",
+        "description": "Three.js 纹理，赋给材质 map"
+      },
+      {
+        "name": "canvas",
+        "type": "HTMLCanvasElement",
+        "description": "底层显示 Canvas，可用于非 Three.js 场景"
+      },
+      {
+        "name": "width",
+        "type": "number",
+        "description": "Canvas 宽度（只读）"
+      },
+      {
+        "name": "height",
+        "type": "number",
+        "description": "Canvas 高度（只读）"
+      }
+    ],
+    "methods": [
+      {
+        "signature": ".setData(data: HeatMapData): this",
+        "description": "设置热力图数据并重新渲染。替换已有数据，Canvas 和纹理立即更新。返回 this 支持链式调用。"
+      },
+      {
+        "signature": ".addData(point: HeatMapPoint): this",
+        "description": "追加单个数据点并重新渲染。若新点 value 超过当前 max 则自动更新。返回 this。"
+      },
+      {
+        "signature": ".setGradient(gradient: HeatMapGradient): this",
+        "description": "替换颜色梯度并重新渲染。返回 this。"
+      },
+      {
+        "signature": ".setRadius(radius: number): this",
+        "description": "设置默认热力点半径并重新渲染。用于未指定 radius 的数据点。值自动钳制到 ≥ 1。返回 this。"
+      },
+      {
+        "signature": ".setOpacity(opacity: number): this",
+        "description": "设置全局不透明度并重新渲染。值自动钳制到 0–1。返回 this。"
+      },
+      {
+        "signature": ".getData(): Readonly<HeatMapData>",
+        "description": "返回当前数据集的只读引用。"
+      },
+      {
+        "signature": ".clear(): this",
+        "description": "清空所有数据并重新渲染。返回 this。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放 CanvasTexture 资源。离屏 Canvas 将被 GC 回收。"
+      }
+    ],
+    "examples": [
+      "type HeatMapGradient = Record<number, string>;\n\n// 示例\nconst gradient: HeatMapGradient = {\n  0.25: 'rgb(0,0,255)',\n  0.55: 'rgb(0,255,0)',\n  0.85: 'rgb(255,255,0)',\n  1.0:  'rgb(255,0,0)',\n};",
+      "import { HeatMap } from '@a3d/a3d-components/heat';\nimport * as THREE from 'three';\n\n// 创建热力图\nconst heatMap = new HeatMap({\n  width: 512,\n  height: 512,\n  radius: 50,\n  opacity: 0.7,\n  gradient: {\n    0.25: 'rgb(0,0,255)',\n    0.55: 'rgb(0,255,0)',\n    0.85: 'rgb(255,255,0)',\n    1.0:  'rgb(255,0,0)',\n  },\n});\n\n// 设置数据\nheatMap.setData({\n  max: 100,\n  data: [\n    { x: 100, y: 100, value: 80 },\n    { x: 300, y: 200, value: 50 },\n    { x: 400, y: 350, value: 100 },\n  ],\n});\n\n// 用作 Three.js 贴图\nconst material = new THREE.MeshBasicMaterial({\n  map: heatMap.texture,\n  transparent: true,\n});\nconst plane = new THREE.Mesh(\n  new THREE.PlaneGeometry(10, 10),\n  material,\n);\nscene.add(plane);\n\n// 运行时动态更新\nheatMap.addData({ x: 250, y: 250, value: 60 });\nheatMap.setOpacity(0.5);\nheatMap.setGradient({\n  0.0: 'rgb(0,0,0)',\n  0.5: 'rgb(128,0,255)',\n  1.0: 'rgb(255,255,255)',\n});"
+    ]
+  },
+  {
     "name": "Html",
     "summary": "3D 空间中的 HTML 覆盖层组件。将 DOM 元素定位在 Three.js 场景的 3D 坐标上，每帧根据相机投影自动更新屏幕位置。支持两种定位模式：2D 投影（默认）和 CSS3D 变换。纯 Three.js 实现，无 React 依赖。",
     "importPath": "@a3d/a3d-components/core",
@@ -935,6 +1082,150 @@
     ],
     "examples": [
       "import { InstancedMesh2 } from '@a3d/a3d-components/core';\nimport * as THREE from 'three';\n\n// 基础用法：创建 5000 个实例\nconst mesh = new InstancedMesh2(\n  new THREE.BoxGeometry(1, 1, 1),\n  new THREE.MeshStandardMaterial({ color: 0x44aa88 }),\n  { capacity: 5000, createEntities: true, allowsEuler: true },\n);\n\nmesh.addInstances(5000, (obj, i) => {\n  obj.position.set(Math.random() * 100 - 50, 0, Math.random() * 100 - 50);\n  obj.rotation.y = Math.random() * Math.PI * 2;\n  obj.updateMatrix();\n});\nscene.add(mesh);\n\n// 启用 BVH 加速视锥裁剪\nmesh.computeBVH({ getBBoxFromBSphere: true });\n\n// LOD：4 级细节，距离越远越简化\nmesh.setFirstLODDistance(0);\nmesh.addLOD(geoL1, matL1, 15);   // 15 单位内用 L1\nmesh.addLOD(geoL2, matL2, 40);   // 40 单位内用 L2\nmesh.addLOD(geoL3, matL3, 80);   // 80 单位内用 L3\n\n// 逐实例颜色\nmesh.setColorAt(0, new THREE.Color('red'));\n\n// 逐实例自定义 Uniform\nmesh.initUniformsPerInstance({\n  vertex: { windStrength: 'float', windDir: 'vec2' },\n});\nmesh.setUniformAt(0, 'windStrength', 0.8);\nmesh.setUniformAt(0, 'windDir', new THREE.Vector2(1, 0));"
+    ]
+  },
+  {
+    "name": "MeshReflectorMaterial",
+    "summary": "实时平面反射材质。基于 MeshStandardMaterial，通过虚拟镜像相机将场景渲染到 RenderTarget，再合成到表面。支持多通道模糊、深度感知模糊、法线贴图扰动和扭曲贴图。适用于镜面、地板反射、水面等效果。",
+    "importPath": "@a3d/a3d-components/material",
+    "extends": "THREE.MeshStandardMaterial",
+    "constructor": "new MeshReflectorMaterial(options?: MeshReflectorMaterialOptions)",
+    "options": [
+      {
+        "name": "resolution",
+        "type": "number",
+        "default": "256",
+        "description": "反射 RenderTarget 分辨率，越高越清晰但更耗性能"
+      },
+      {
+        "name": "blur",
+        "type": "number | [number, number]",
+        "default": "[0, 0]",
+        "description": "模糊半径，单值或 [宽, 高] 元组，0 为禁用"
+      },
+      {
+        "name": "mixBlur",
+        "type": "number",
+        "default": "0",
+        "description": "模糊混合度 (0=仅清晰, 1=全模糊)"
+      },
+      {
+        "name": "mixStrength",
+        "type": "number",
+        "default": "1",
+        "description": "反射强度乘数"
+      },
+      {
+        "name": "mixContrast",
+        "type": "number",
+        "default": "1",
+        "description": "反射对比度 (1=不变, >1=更高, <1=更低)"
+      },
+      {
+        "name": "mirror",
+        "type": "number",
+        "default": "0",
+        "description": "镜面程度 (0=与基础色混合, 1=纯反射)"
+      },
+      {
+        "name": "distortion",
+        "type": "number",
+        "default": "1",
+        "description": "扭曲强度，需配合 distortionMap 使用"
+      },
+      {
+        "name": "distortionMap",
+        "type": "THREE.Texture",
+        "default": "null",
+        "description": "扭曲贴图，红通道作为 UV 偏移"
+      },
+      {
+        "name": "minDepthThreshold",
+        "type": "number",
+        "default": "0.9",
+        "description": "深度感知模糊最小阈值"
+      },
+      {
+        "name": "maxDepthThreshold",
+        "type": "number",
+        "default": "1",
+        "description": "深度感知模糊最大阈值"
+      },
+      {
+        "name": "depthScale",
+        "type": "number",
+        "default": "0",
+        "description": "深度缩放 (>0 启用深度感知模糊)"
+      },
+      {
+        "name": "depthToBlurRatioBias",
+        "type": "number",
+        "default": "0.25",
+        "description": "深度与模糊比率偏置"
+      },
+      {
+        "name": "reflectorOffset",
+        "type": "number",
+        "default": "0",
+        "description": "反射面沿法线偏移，避免 z-fighting"
+      },
+      {
+        "name": "color",
+        "type": "ColorRepresentation",
+        "default": "0xffffff",
+        "description": "基础颜色"
+      },
+      {
+        "name": "metalness",
+        "type": "number",
+        "default": "0",
+        "description": "金属度 0–1"
+      },
+      {
+        "name": "roughness",
+        "type": "number",
+        "default": "0",
+        "description": "粗糙度 0–1 (也影响模糊混合)"
+      }
+    ],
+    "dataTypes": [],
+    "properties": [],
+    "methods": [
+      {
+        "signature": ".updateBeforeRender(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera): boolean",
+        "description": "每帧在 renderer.render() 之前调用，更新反射纹理。渲染场景到虚拟镜像相机，应用斜裁剪平面，可选模糊。返回 true 表示反射已更新，false 表示反射面背对相机（无需更新）。"
+      },
+      {
+        "signature": ".bindToMesh(mesh: THREE.Mesh): this",
+        "description": "将材质绑定到使用它的 Mesh 对象。必须在将材质赋给 Mesh 后调用，以便材质知道反射平面的位置。支持链式调用。"
+      },
+      {
+        "signature": ".setMirror(v: number): this",
+        "description": "设置镜面程度 (0=与基础色混合, 1=纯反射)。"
+      },
+      {
+        "signature": ".setMixBlur(v: number): this",
+        "description": "设置模糊混合度 (0=仅清晰, 1=全模糊)。"
+      },
+      {
+        "signature": ".setMixStrength(v: number): this",
+        "description": "设置反射强度乘数。"
+      },
+      {
+        "signature": ".setMixContrast(v: number): this",
+        "description": "设置反射对比度。"
+      },
+      {
+        "signature": ".setDistortion(v: number): this",
+        "description": "设置扭曲强度。"
+      },
+      {
+        "signature": ".dispose(): void",
+        "description": "释放所有 GPU 资源（RenderTarget、模糊通道等）。调用后材质不可再使用。"
+      }
+    ],
+    "examples": [
+      "import * as THREE from 'three';\nimport { MeshReflectorMaterial } from '@a3d/a3d-components/material';\n\n// 创建反射地板\nconst reflectorMat = new MeshReflectorMaterial({\n  mirror: 0.75,\n  blur: [300, 100],\n  mixBlur: 1,\n  mixStrength: 0.8,\n  resolution: 512,\n  color: 0x999999,\n});\nconst floor = new THREE.Mesh(\n  new THREE.PlaneGeometry(10, 10),\n  reflectorMat,\n);\nfloor.rotation.x = -Math.PI / 2;\nreflectorMat.bindToMesh(floor);\nscene.add(floor);\n\n// 渲染循环中更新反射\nfunction animate() {\n  requestAnimationFrame(animate);\n  reflectorMat.updateBeforeRender(renderer, scene, camera);\n  renderer.render(scene, camera);\n}"
     ]
   },
   {
